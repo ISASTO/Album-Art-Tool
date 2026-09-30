@@ -41,8 +41,9 @@ namespace AlbumArtTool
         private readonly Label empty = Label("Scanning your music…", 12);
         private readonly Label status = Label("Ready", 9);
         private readonly ProgressBar progress = new ProgressBar();
-        private readonly CheckBox onlyMissing = new CheckBox { Text = "Only fill tracks missing covers", Checked = true };
-        private readonly CheckBox folderCover = new CheckBox { Text = "Update folder cover images too", Checked = true };
+        private readonly Label progressPercent = Label("", 9);
+        private readonly CheckBox onlyMissing = new ThemeCheckBox { Text = "Only fill tracks missing covers", Checked = true };
+        private readonly CheckBox folderCover = new ThemeCheckBox { Text = "Update folder cover images too", Checked = true };
         private readonly ToolTip tips = new ToolTip();
         private readonly Scanner scanner = new Scanner();
         private readonly CoverEditor editor = new CoverEditor();
@@ -53,6 +54,7 @@ namespace AlbumArtTool
         private string lastEditedFolder;
         private byte[] pending;
         private int previewVersion;
+        private int progressVersion;
         private bool showingMissing = true, busy, writing, refreshing, hasScanned;
 
         internal MainForm(string root, bool autoScan = true, ICoverSearch onlineService = null)
@@ -191,10 +193,17 @@ namespace AlbumArtTool
             body.Controls.Add(listPanel, 0, 0); body.Controls.Add(sidebar, 1, 0);
             var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Padding = new Padding(0, 8, 0, 0) };
             bottom.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86));
+            bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190)); bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86));
             status.AutoEllipsis = true; status.TextAlign = ContentAlignment.MiddleLeft; status.ForeColor = Muted;
+            status.AccessibleName = "Operation status and track counter";
             progress.Dock = DockStyle.Fill; progress.Margin = new Padding(6, 8, 8, 8); progress.Visible = false;
-            bottom.Controls.Add(status, 0, 0); bottom.Controls.Add(progress, 1, 0); bottom.Controls.Add(issuesButton, 2, 0);
+            progress.AccessibleName = "Scan and update progress";
+            progressPercent.TextAlign = ContentAlignment.MiddleRight; progressPercent.AccessibleName = "Progress percentage";
+            var progressArea = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
+            progressArea.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            progressArea.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); progressArea.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 47));
+            progressArea.Controls.Add(progress, 0, 0); progressArea.Controls.Add(progressPercent, 1, 0);
+            bottom.Controls.Add(status, 0, 0); bottom.Controls.Add(progressArea, 1, 0); bottom.Controls.Add(issuesButton, 2, 0);
             outer.Controls.Add(header, 0, 0); outer.Controls.Add(pathRow, 0, 1); outer.Controls.Add(tabs, 0, 2); outer.Controls.Add(body, 0, 3); outer.Controls.Add(bottom, 0, 4);
             Controls.Add(outer);
             tips.SetToolTip(onlyMissing, "Keeps existing embedded front covers. Uncheck to replace the cover on every track in this album.");
@@ -328,27 +337,45 @@ namespace AlbumArtTool
 
         private void SetBusy(bool value, bool edit = false)
         {
+            progressVersion++;
             busy = value; writing = value && edit;
-            browse.Enabled = search.Enabled = missingTab.Enabled = existingTab.Enabled = albums.Enabled = !value;
+            browse.Enabled = missingTab.Enabled = existingTab.Enabled = albums.Enabled = !value;
+            search.ReadOnly = value; search.ForeColor = value ? Muted : Ink;
             scan.Enabled = !writing;
             scan.Text = value && !edit ? "Stop scan" : "Rescan";
             undo.Enabled = !value && lastEdit != null && lastEdit.Entries.Count > 0;
             progress.Visible = value;
+            progressPercent.Visible = value; progressPercent.Text = "";
             progress.Style = value && !edit ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
             progress.Value = 0;
             choose.Enabled = openFolder.Enabled = onlyMissing.Enabled = !value && albums.SelectedAlbum != null;
             if (value) folderCover.Enabled = false;
-            online.Enabled = !value && albums.SelectedAlbum != null;
+            online.SetActive(!value);
+            if (value && !edit)
+            {
+                empty.Text = "Scanning your music…\nAlbums appear when the scan finishes.";
+                empty.Visible = true; empty.BringToFront();
+            }
             issuesButton.Enabled = issues.Count > 0;
             UpdateApplyButton();
         }
 
-        private IProgress<ProgressInfo> Reporter() => new Progress<ProgressInfo>(p =>
+        private IProgress<ProgressInfo> Reporter()
         {
-            if (IsDisposed || !busy) return;
-            status.Text = p.Message;
-            if (p.Total > 0) { progress.Style = ProgressBarStyle.Continuous; progress.Value = Math.Max(0, Math.Min(100, (int)(100.0 * p.Completed / p.Total))); }
-        });
+            int operation = progressVersion;
+            return new Progress<ProgressInfo>(p =>
+            {
+                if (IsDisposed || !busy || operation != progressVersion) return;
+                status.Text = p.Message;
+                if (p.Total > 0)
+                {
+                    progress.Style = ProgressBarStyle.Continuous;
+                    progress.Value = Math.Max(0, Math.Min(100, (int)(100.0 * p.Completed / p.Total)));
+                    progressPercent.Text = progress.Value + "%";
+                }
+                else { progress.Style = ProgressBarStyle.Marquee; progressPercent.Text = ""; }
+            });
+        }
 
         internal async Task ScanAsync()
         {
@@ -367,7 +394,7 @@ namespace AlbumArtTool
                     (issues.Count > 0 ? " · " + issues.Count + " issues (Details)" : " · Drop an image onto an album to get started.");
                 RefreshAlbums();
             }
-            catch (Exception e) { if (!IsDisposed) { issues.Add(e.Message); status.Text = "Scan could not finish. See Details."; } }
+            catch (Exception e) { if (!IsDisposed) { issues.Add(e.Message); status.Text = "Scan could not finish. See Details."; RefreshAlbums(); } }
             finally { if (!IsDisposed) { SetBusy(false); ShowSelection(); } }
         }
 

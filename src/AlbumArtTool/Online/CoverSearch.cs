@@ -37,6 +37,11 @@ namespace AlbumArtTool.Online
         public string ImageUrl { get; set; }
         public byte[] Thumbnail { get; set; }
         public int MatchScore { get; set; }
+        public int ImageWidth { get; set; }
+        public int ImageHeight { get; set; }
+        public bool SizeChecked { get; set; }
+        public string Resolution => ImageWidth > 0 && ImageHeight > 0 ? ImageWidth + " × " + ImageHeight + " px" :
+            SizeChecked ? "Size unavailable" : "Checking size…";
     }
 
     internal sealed class CoverSearchUpdate
@@ -59,6 +64,7 @@ namespace AlbumArtTool.Online
         private readonly Dictionary<string, CoverSearchUpdate> cache = new Dictionary<string, CoverSearchUpdate>();
         private readonly Queue<string> cacheOrder = new Queue<string>();
         private readonly SemaphoreSlim musicBrainzGate = new SemaphoreSlim(1, 1);
+        private readonly SemaphoreSlim sizeGate = new SemaphoreSlim(2, 2);
         private DateTime lastMusicBrainz = DateTime.MinValue;
         private string bandcampBlocked;
 
@@ -92,6 +98,8 @@ namespace AlbumArtTool.Online
                                 found.Add(candidate);
                                 progress.Report(Snapshot(found, issues, query, false));
                             }
+                            await ReadSizeAsync(candidate, token).ConfigureAwait(false);
+                            lock (gate) progress.Report(Snapshot(found, issues, query, false));
                         }
                         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
                         catch (Exception e) when (Expected(e)) { /* A missing CAA front image is normal. */ }
@@ -127,6 +135,20 @@ namespace AlbumArtTool.Online
             var bytes = await web.GetAsync(candidate.ImageUrl, Artwork.MaxImageBytes, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             return Artwork.Normalize(bytes);
+        }
+
+        private async Task ReadSizeAsync(CoverCandidate candidate, CancellationToken token)
+        {
+            await sizeGate.WaitAsync(token).ConfigureAwait(false);
+            try
+            {
+                var header = await web.GetPrefixAsync(candidate.ImageUrl, 128 * 1024, token).ConfigureAwait(false);
+                var size = ImageHeader.ReadSize(header);
+                candidate.ImageWidth = size.Width; candidate.ImageHeight = size.Height;
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+            catch (Exception e) when (Expected(e)) { /* The cover is still usable if its size cannot be checked. */ }
+            finally { candidate.SizeChecked = true; sizeGate.Release(); }
         }
 
         private static CoverSearchUpdate Snapshot(List<CoverCandidate> candidates, List<string> issues, CoverQuery query, bool complete) =>

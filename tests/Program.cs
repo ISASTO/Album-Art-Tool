@@ -30,7 +30,7 @@ internal static partial class Tests
             if (args.Length > 0 && args[0] == "--live-search") return LiveSearch(args.Length > 1 ? args[1] : workspace).GetAwaiter().GetResult();
             OnlineTests().GetAwaiter().GetResult();
             foreach (var path in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) RoundTrip(path);
-            PartialAlbums(); MixedAlbums(); Guards(); FolderArt(); CancelScan(); InvalidArt(); UntaggedMp3();
+            PartialAlbums(); MixedAlbums(); Guards(); FolderArt(); CancelScan(); CountedScanProgress(); InvalidArt(); UntaggedMp3();
             GuiSmoke(args.Length > 0 ? args[0] : workspace);
             Console.WriteLine("PASS: " + assertions + " assertions, real codec round trips, audio integrity and GUI smoke checks.");
             return 0;
@@ -245,6 +245,7 @@ internal static partial class Tests
             {
                 try
                 {
+                    await ScanningGuiTest(form, output);
                     await form.ScanAsync();
                     var lists = Descendants(form).OfType<AlbumList>().Single();
                     Assert(lists.AlbumCount == 2, "GUI missing tab lists only incomplete albums");

@@ -37,6 +37,14 @@ internal static partial class Tests
         foreach (string url in new[] { "file:///C:/secret.jpg", "https://localhost/a", "https://127.0.0.1/a", "https://bandcamp.com.evil.example/a", "https://bandcamp.com@evil.example/a", "http://bandcamp.com/a", "https://bandcamp.com:8080/a" })
             Assert(!WebTransport.AllowedUrl(url), "unsafe artwork URL rejected: " + url);
         Assert(WebTransport.AllowedUrl("https://ia800100.us.archive.org/cover.jpg"), "CAA archive CDN redirect is allowed");
+        Assert(ImageHeader.ReadSize(Cover) == new Size(600, 600), "JPEG source dimensions are read without using the scaled thumbnail");
+        using (var bitmap = new Bitmap(1234, 345))
+        using (var buffer = new MemoryStream())
+        {
+            bitmap.Save(buffer, ImageFormat.Png);
+            Assert(ImageHeader.ReadSize(buffer.ToArray().Take(24).ToArray()) == new Size(1234, 345), "PNG dimensions need only the small IHDR header");
+        }
+        Assert(ImageHeader.ReadSize(new byte[] { 0xff, 0xd8, 0xff, 0xe1, 0xff, 0xff }).IsEmpty, "truncated image metadata has no invented dimensions");
 
         var transport = new FakeTransport(Cover);
         using (var service = new CoverSearchService(transport))
@@ -44,6 +52,8 @@ internal static partial class Tests
             CoverSearchUpdate final = null;
             await service.SearchAsync(query, false, new DirectProgress<CoverSearchUpdate>(u => final = u), CancellationToken.None);
             Assert(final.Complete && final.Candidates.Count == 3 && final.Candidates[0].Source == "Bandcamp", "independent sources produce ranked, decoded previews");
+            Assert(final.Candidates.All(c => c.Resolution == "600 × 600 px"), "every result gets the full-size image resolution");
+            using (var preview = Artwork.Decode(final.Candidates[0].Thumbnail)) Assert(preview.Width == 180, "full-size resolution is distinct from 180-pixel display thumbnails");
             int requests = transport.Count;
             await service.SearchAsync(query, false, new DirectProgress<CoverSearchUpdate>(u => final = u), CancellationToken.None);
             Assert(requests == transport.Count, "reselecting an album uses the bounded session cache");
@@ -83,6 +93,16 @@ internal static partial class Tests
             for (int i = 0; i < 2; i++) try { await client.GetAsync("https://musicbrainz.org/ws/2/", 1024, CancellationToken.None); } catch (HttpRequestException) { }
             Assert(rateRequests == 1, "rate-limited servers are given a cooldown");
         }
+        bool rangeSent = false;
+        using (var client = new WebTransport(new FakeHandler(request =>
+        {
+            rangeSent = request.Headers.Range?.ToString() == "bytes=0-127";
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(new byte[4096]) };
+        })))
+        {
+            var prefix = await client.GetPrefixAsync("https://f4.bcbits.com/img/cover.jpg", 128, CancellationToken.None);
+            Assert(rangeSent && prefix.Length == 128, "dimension checks request a byte range and stay bounded even when servers ignore it");
+        }
     }
 
     private static async Task OnlineGuiTest(MainForm form, AlbumList albums, string output)
@@ -91,6 +111,8 @@ internal static partial class Tests
         await panel.CurrentSearch;
         await Task.Delay(60); // Drain posted UI progress messages.
         Assert(panel.DisplayedCandidates.Count == 2, "selecting an album automatically displays online suggestions");
+        Assert(Descendants(panel).OfType<Label>().Count(l => l.AccessibleName == "Full-size cover resolution" && l.Text == "600 × 600 px") == 2,
+            "source resolutions are visible on the suggested cover cards");
         var selected = albums.SelectedAlbum;
         string before = CoverEditor.Hash(selected.Tracks[0].Path);
         await form.ApplyOnlineCoverAsync("another-album", panel.DisplayedCandidates[0]);
@@ -121,10 +143,11 @@ internal static partial class Tests
             CoverSearchUpdate final = null;
             await service.SearchAsync(query, true, new DirectProgress<CoverSearchUpdate>(u => final = u), CancellationToken.None);
             foreach (string issue in final.Issues) Console.WriteLine("SOURCE NOTE: " + issue);
-            foreach (var result in final.Candidates) Console.WriteLine("LIVE RESULT: " + result.Source + " | " + result.Title + " | " + result.Artist);
+            foreach (var result in final.Candidates) Console.WriteLine("LIVE RESULT: " + result.Source + " | " + result.Title + " | " + result.Artist + " | " + result.Resolution);
             if (final.Candidates.Count == 0) throw new Exception("Live lookup returned no usable covers from any source.");
             var image = await service.DownloadAsync(final.Candidates[0], CancellationToken.None);
             using (var bitmap = Artwork.Decode(image)) Console.WriteLine("LIVE COVER: " + bitmap.Width + " x " + bitmap.Height + ", " + image.Length + " bytes.");
+            if (!final.Candidates.Any(c => c.ImageWidth > 0 && c.ImageHeight > 0)) throw new Exception("No source image dimensions were resolved.");
             File.WriteAllBytes(Path.Combine(output, "live-cover.jpg"), image);
             Console.WriteLine("PASS live album lookup and high-resolution download.");
             return 0;
@@ -152,6 +175,7 @@ internal static partial class Tests
             if (url.Contains("musicbrainz.org/ws")) return Task.FromResult(Encoding.UTF8.GetBytes(MusicBrainzJson));
             return Task.FromResult(image);
         }
+        public async Task<byte[]> GetPrefixAsync(string url, int limit, CancellationToken token) => (await GetAsync(url, limit, token)).Take(limit).ToArray();
         public void Dispose() { }
     }
     private sealed class FakeHandler : HttpMessageHandler
@@ -169,8 +193,10 @@ internal static partial class Tests
             token.ThrowIfCancellationRequested();
             progress.Report(new CoverSearchUpdate { Complete = true, Candidates = new List<CoverCandidate> {
                 new CoverCandidate { Source = "Bandcamp", Title = query.Title, Artist = query.Artist, MatchScore = 100, Thumbnail = image,
+                    ImageWidth = 600, ImageHeight = 600, SizeChecked = true,
                     ImageUrl = "https://f4.bcbits.com/img/a123_0.jpg", PageUrl = "https://atlas.bandcamp.com/album/morning-miles" },
                 new CoverCandidate { Source = "Deezer", Title = query.Title + " (alternate edition)", Artist = query.Artist, MatchScore = 90,
+                    ImageWidth = 600, ImageHeight = 600, SizeChecked = true,
                     Thumbnail = MakeCover(Color.Coral), ImageUrl = "https://cdn-images.dzcdn.net/images/cover/abc/1000x1000.jpg", PageUrl = "https://deezer.com/album/123" }
             } });
             return Task.CompletedTask;

@@ -15,7 +15,7 @@ namespace AlbumArtTool
     {
         private readonly ICoverSearch service;
         private readonly TextBox query = new TextBox();
-        private readonly CheckBox automatic = new CheckBox { Text = "Online suggestions", Checked = true, AutoSize = true };
+        private readonly CheckBox automatic = new ThemeCheckBox { Text = "Online suggestions", Checked = true, AutoSize = true };
         private readonly Button find = MakeButton("Search");
         private readonly Button bandcamp = MakeButton("Bandcamp ↗");
         private readonly Label summary = new Label();
@@ -26,6 +26,7 @@ namespace AlbumArtTool
         private int version;
         private string signature = "";
         private bool hasResults;
+        private bool active;
         internal Task CurrentSearch { get; private set; } = Task.CompletedTask;
         internal Task CurrentApply { get; private set; } = Task.CompletedTask;
         internal Func<string, CoverCandidate, Task> UseCover { get; set; }
@@ -70,7 +71,7 @@ namespace AlbumArtTool
             query.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; CurrentSearch = SearchAsync(true); } };
             automatic.CheckedChanged += (s, e) =>
             {
-                if (automatic.Checked && Enabled) CurrentSearch = SearchAsync(false);
+                if (automatic.Checked && active) CurrentSearch = SearchAsync(false);
                 else { Cancel(); summary.Text = "Automatic search off. Click Search for a one-time lookup."; }
             };
             bandcamp.Click += (s, e) => OpenPage("https://bandcamp.com/search?q=" + Uri.EscapeDataString(query.Text) + "&item_type=a");
@@ -82,20 +83,30 @@ namespace AlbumArtTool
         {
             bool changed = selected?.Key != album?.Key;
             selected = album;
-            Enabled = active && album != null;
+            SetActive(active);
             if (changed)
             {
                 Cancel(); ClearChoices(); hasResults = false; signature = "";
                 query.Text = album == null ? "" : CoverQuery.DefaultText(album.Title, album.Artist);
                 summary.Text = album == null ? "Select an album to find cover art." : "Ready to find covers.";
             }
-            if (Enabled && automatic.Checked && !hasResults)
+            if (this.active && automatic.Checked && !hasResults)
                 CurrentSearch = SearchAsync(false, true);
+        }
+
+        internal void SetActive(bool value)
+        {
+            active = value && selected != null;
+            // Keep labels enabled so Windows does not paint disabled text black.
+            // A read-only text box also retains its foreground color and allows copying.
+            query.ReadOnly = !active; query.ForeColor = active ? MainForm.Ink : MainForm.Muted;
+            find.Enabled = bandcamp.Enabled = automatic.Enabled = active;
+            foreach (var card in choices.Controls.OfType<CoverChoice>()) card.SetActive(active);
         }
 
         internal async Task SearchAsync(bool refresh, bool debounce = false)
         {
-            if (selected == null || !Enabled || string.IsNullOrWhiteSpace(query.Text)) return;
+            if (selected == null || !active || string.IsNullOrWhiteSpace(query.Text)) return;
             Cancel();
             var source = cancellation = new CancellationTokenSource();
             var token = source.Token;
@@ -132,9 +143,10 @@ namespace AlbumArtTool
                 {
                     var card = new CoverChoice(candidate, tips);
                     card.FitHeight(choices.ClientSize.Height);
+                    card.SetActive(active);
                     card.Apply += (s, e) =>
                     {
-                        if (!Enabled || selected?.Key != key || UseCover == null) return;
+                        if (!active || selected?.Key != key || UseCover == null) return;
                         CurrentApply = ApplyChoiceAsync(key, candidate);
                     };
                     card.OpenSource += (s, e) => OpenPage(candidate.PageUrl);
@@ -142,6 +154,7 @@ namespace AlbumArtTool
                 }
                 choices.ResumeLayout();
             }
+            foreach (var card in choices.Controls.OfType<CoverChoice>()) card.UpdateResolution();
             summary.Text = update.Candidates.Count == 0
                 ? update.Complete ? "No covers found. Edit the query or try Bandcamp in your browser." : "Searching for artwork…"
                 : update.Candidates.Count + " covers" + (update.Complete ? " · Best matches first." : " · More sources loading…");
@@ -183,14 +196,16 @@ namespace AlbumArtTool
         private sealed class CoverChoice : Panel
         {
             private readonly PictureBox image;
-            private readonly Label title, artist;
+            private readonly Label title, artist, resolution;
+            private readonly CoverCandidate candidate;
             private readonly LinkLabel origin;
             private readonly Button use;
             public event EventHandler Apply;
             public event EventHandler OpenSource;
             public CoverChoice(CoverCandidate candidate, ToolTip tips)
             {
-                Size = new Size(163, 194); Margin = new Padding(4); BackColor = MainForm.Surface;
+                this.candidate = candidate;
+                Size = new Size(163, 212); Margin = new Padding(4); BackColor = MainForm.Surface;
                 AccessibleName = candidate.Title + " by " + candidate.Artist + " from " + candidate.Source;
                 image = new PictureBox { Location = new Point(6, 5), Size = new Size(151, 104), SizeMode = PictureBoxSizeMode.Zoom,
                     Cursor = Cursors.Hand, Image = Artwork.Decode(candidate.Thumbnail), AccessibleName = "Apply " + AccessibleName };
@@ -200,7 +215,9 @@ namespace AlbumArtTool
                     ForeColor = MainForm.Muted, AutoEllipsis = true, Font = new Font("Segoe UI", 8), Cursor = Cursors.Hand };
                 origin = new LinkLabel { Text = candidate.Source + (candidate.MatchScore < 80 ? " · Similar" : ""), Location = new Point(6, 147),
                     Size = new Size(151, 17), LinkColor = MainForm.Accent, ActiveLinkColor = MainForm.Ink, Font = new Font("Segoe UI", 8) };
-                use = new ThemeButton { Text = "Apply this cover", Location = new Point(6, 165), Size = new Size(151, 24),
+                resolution = new Label { Text = candidate.Resolution, Location = new Point(6, 164), Size = new Size(151, 18),
+                    ForeColor = MainForm.Ink, Font = new Font("Segoe UI", 8), AccessibleName = "Full-size cover resolution" };
+                use = new ThemeButton { Text = "Apply this cover", Location = new Point(6, 183), Size = new Size(151, 24),
                     BackColor = Color.FromArgb(37, 65, 59), ForeColor = MainForm.Accent, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5f), Cursor = Cursors.Hand };
                 image.Click += (s, e) => Apply?.Invoke(this, EventArgs.Empty);
                 title.Click += (s, e) => Apply?.Invoke(this, EventArgs.Empty);
@@ -209,15 +226,22 @@ namespace AlbumArtTool
                 origin.LinkClicked += (s, e) => OpenSource?.Invoke(this, EventArgs.Empty);
                 tips.SetToolTip(image, candidate.Title + "\n" + candidate.Artist + "\nClick to download and apply. Undo is available.");
                 tips.SetToolTip(title, candidate.Title); tips.SetToolTip(origin, candidate.PageUrl);
-                Controls.AddRange(new Control[] { image, title, artist, origin, use });
+                tips.SetToolTip(resolution, "Dimensions of the full-size image at the source. Embedded artwork is limited to 1600 pixels on the longest side.");
+                Controls.AddRange(new Control[] { image, title, artist, origin, resolution, use });
             }
             internal void FitHeight(int viewportHeight)
             {
                 // Keep the action visible on smaller laptop screens; extra results still scroll.
-                int imageHeight = Math.Max(56, Math.Min(104, viewportHeight - 104));
-                Height = imageHeight + 90; image.Height = imageHeight;
+                int imageHeight = Math.Max(40, Math.Min(104, viewportHeight - 122));
+                Height = imageHeight + 108; image.Height = imageHeight;
                 title.Top = imageHeight + 7; artist.Top = imageHeight + 26;
-                origin.Top = imageHeight + 43; use.Top = imageHeight + 61;
+                origin.Top = imageHeight + 43; resolution.Top = imageHeight + 60; use.Top = imageHeight + 79;
+            }
+            internal void UpdateResolution() { resolution.Text = candidate.Resolution; }
+            internal void SetActive(bool value)
+            {
+                use.Enabled = value;
+                image.Cursor = title.Cursor = artist.Cursor = value ? Cursors.Hand : Cursors.Default;
             }
             protected override void Dispose(bool disposing)
             {
