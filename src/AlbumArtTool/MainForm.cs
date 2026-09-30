@@ -243,6 +243,7 @@ namespace AlbumArtTool
             missingTab.Text = "Add missing album art (" + library.Albums.Count(a => a.MissingCount > 0) + ")";
             existingTab.Text = "Change existing album art (" + library.Albums.Count(a => a.HasAnyCover) + ")";
             empty.Visible = visible.Count == 0;
+            albums.Visible = !empty.Visible;
             empty.Text = query.Length > 0 ? "No albums match your search." : !hasScanned ? "Scan a folder to find your albums." :
                 library.Albums.Count == 0 ? "No supported music files found.\nChoose a folder containing your albums." : showingMissing ?
                 "Every scanned track has cover art.\nUse the other tab to change a cover." : "No existing covers found yet.\nAdd your first cover in the other tab.";
@@ -354,7 +355,7 @@ namespace AlbumArtTool
             if (value && !edit)
             {
                 empty.Text = "Scanning your music…\nAlbums appear when the scan finishes.";
-                empty.Visible = true; empty.BringToFront();
+                albums.Visible = false; empty.Visible = true; empty.BringToFront();
             }
             issuesButton.Enabled = issues.Count > 0;
             UpdateApplyButton();
