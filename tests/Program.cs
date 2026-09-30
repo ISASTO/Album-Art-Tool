@@ -32,6 +32,7 @@ internal static partial class Tests
             foreach (var path in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) RoundTrip(path);
             PartialAlbums(); MixedAlbums(); Guards(); FolderArt(); CancelScan(); CountedScanProgress(); InvalidArt(); UntaggedMp3();
             GuiSmoke(args.Length > 0 ? args[0] : workspace);
+            QueueGuiSmoke(args.Length > 0 ? args[0] : workspace);
             Console.WriteLine("PASS: " + assertions + " assertions, real codec round trips, audio integrity and GUI smoke checks.");
             return 0;
         }

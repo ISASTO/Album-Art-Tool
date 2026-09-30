@@ -53,7 +53,7 @@ namespace AlbumArtTool
             var instructions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
             instructions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             instructions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); instructions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
-            instructions.Controls.Add(new Label { Text = "Click a cover to apply it immediately.", ForeColor = MainForm.Accent, Dock = DockStyle.Fill,
+            instructions.Controls.Add(new Label { Text = "Click a cover to queue it.", ForeColor = MainForm.Accent, Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 9) }, 0, 0);
             automatic.Font = new Font("Segoe UI", 9); automatic.ForeColor = MainForm.Muted; automatic.Dock = DockStyle.Fill;
             instructions.Controls.Add(automatic, 1, 0);
@@ -224,7 +224,7 @@ namespace AlbumArtTool
                 artist.Click += (s, e) => Apply?.Invoke(this, EventArgs.Empty);
                 use.Click += (s, e) => Apply?.Invoke(this, EventArgs.Empty);
                 origin.LinkClicked += (s, e) => OpenSource?.Invoke(this, EventArgs.Empty);
-                tips.SetToolTip(image, candidate.Title + "\n" + candidate.Artist + "\nClick to download and apply. Undo is available.");
+                tips.SetToolTip(image, candidate.Title + "\n" + candidate.Artist + "\nClick to queue this cover, then continue with another album.");
                 tips.SetToolTip(title, candidate.Title); tips.SetToolTip(origin, candidate.PageUrl);
                 tips.SetToolTip(resolution, "Dimensions of the full-size image at the source. Embedded artwork is limited to 1600 pixels on the longest side.");
                 Controls.AddRange(new Control[] { image, title, artist, origin, resolution, use });

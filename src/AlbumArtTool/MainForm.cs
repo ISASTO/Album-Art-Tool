@@ -12,7 +12,7 @@ using AlbumArtTool.Online;
 
 namespace AlbumArtTool
 {
-    internal sealed class MainForm : Form
+    internal sealed partial class MainForm : Form
     {
         internal static readonly Color Surface = Color.FromArgb(23, 24, 27);
         internal static readonly Color Ink = Color.FromArgb(237, 239, 241);
@@ -75,6 +75,8 @@ namespace AlbumArtTool
             folder.AccessibleName = "Music folder";
             search.AccessibleName = "Search albums, artists or folders";
             BuildLayout();
+            albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? "Applying cover…" : "Queued") : null;
+            queueButton.Click += (s, e) => ShowQueue();
             browse.Click += async (s, e) =>
             {
                 using (var dialog = new FolderBrowserDialog { Description = "Choose the top folder containing your music", SelectedPath = folder.Text, ShowNewFolderButton = false })
@@ -105,7 +107,7 @@ namespace AlbumArtTool
             cover.Click += (s, e) => { if (choose.Enabled) choose.PerformClick(); };
             FormClosing += (s, e) =>
             {
-                if (writing) { e.Cancel = true; status.Text = "Finishing the current update. You can close the app when it completes."; }
+                if (writing || queueRunning) { e.Cancel = true; status.Text = "Work is still running. Open Queue to clear waiting jobs; the current update will finish safely."; }
                 else cancellation?.Cancel();
             };
             KeyPreview = true;
@@ -136,6 +138,8 @@ namespace AlbumArtTool
             header.Controls.Add(Label("Album Art Tool", 23, true), 0, 0);
             var subtitle = Label("A cover for every album.", 10); subtitle.ForeColor = Muted;
             header.Controls.Add(subtitle, 0, 1); header.Controls.Add(undo, 1, 0);
+            queueButton.Margin = new Padding(3, 0, 3, 0); queueButton.Font = new Font("Segoe UI", 8);
+            header.Controls.Add(queueButton, 1, 1);
             var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
             pathRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -230,9 +234,11 @@ namespace AlbumArtTool
             RefreshAlbums();
         }
 
-        private void RefreshAlbums(string key = null)
+        private void RefreshAlbums(string key = null, bool preserveStaged = false)
         {
             if (IsDisposed) return;
+            string previousKey = albums.SelectedAlbum?.Key;
+            byte[] previousImage = preserveStaged ? pending : null;
             key = key ?? albums.SelectedAlbum?.Key;
             string query = search.Text.Trim();
             var visible = library.Albums.Where(a => showingMissing ? a.MissingCount > 0 : a.HasAnyCover)
@@ -249,6 +255,7 @@ namespace AlbumArtTool
                 "Every scanned track has cover art.\nUse the other tab to change a cover." : "No existing covers found yet.\nAdd your first cover in the other tab.";
             if (empty.Visible) empty.BringToFront();
             ShowSelection();
+            if (previousImage != null && albums.SelectedAlbum?.Key == previousKey) SetPendingImage(previousImage);
         }
 
         private void ShowSelection()
@@ -268,9 +275,11 @@ namespace AlbumArtTool
             bool shared = album != null && library.Albums.Count(a => string.Equals(a.Folder, album.Folder, StringComparison.OrdinalIgnoreCase)) > 1;
             folderCover.Enabled = !busy && album != null && !shared;
             folderCover.Text = shared ? "Folder shared by multiple albums" : "Update folder cover images too";
-            choose.Enabled = openFolder.Enabled = onlyMissing.Enabled = album != null && !busy;
+            choose.Enabled = onlyMissing.Enabled = album != null && !busy && !queuedAlbums.Contains(album.Key);
+            openFolder.Enabled = album != null && !busy;
+            folderCover.Enabled &= album != null && !queuedAlbums.Contains(album.Key);
             UpdateApplyButton();
-            online.SetAlbum(album, !busy);
+            online.SetAlbum(album, !busy && (album == null || !queuedAlbums.Contains(album.Key)));
         }
 
         private async Task LoadPreviewAsync(Album album, int version)
@@ -302,19 +311,22 @@ namespace AlbumArtTool
 
         internal void StageImage(string path)
         {
-            if (busy || albums.SelectedAlbum == null) return;
+            if (busy || albums.SelectedAlbum == null || queuedAlbums.Contains(albums.SelectedAlbum.Key)) return;
             try
             {
-                ++previewVersion;
-                pending = Artwork.Normalize(Artwork.LoadFile(path));
-                SetPreview(pending);
-                coverCaption.Text = "New cover · ready to apply";
-                using (var image = Artwork.Decode(pending)) detail.Text = image.Width + " × " + image.Height + " · " + (pending.Length / 1024) + " KB";
+                SetPendingImage(Artwork.Normalize(Artwork.LoadFile(path)));
                 status.Text = "Review the cover, then click Apply. Press Esc to discard the preview.";
-                UpdateApplyButton();
             }
             catch (Exception e) when (Scanner.IsFileError(e) || Artwork.IsImageError(e))
             { MessageBox.Show(this, "That image could not be opened. Use a JPG, PNG, BMP or GIF.\n\n" + e.Message, "Choose another image", MessageBoxButtons.OK, MessageBoxIcon.Information); }
+        }
+
+        private void SetPendingImage(byte[] image)
+        {
+            ++previewVersion; pending = image; SetPreview(image);
+            coverCaption.Text = "New cover · ready to apply";
+            using (var decoded = Artwork.Decode(image)) detail.Text = decoded.Width + " × " + decoded.Height + " · " + image.Length / 1024 + " KB";
+            UpdateApplyButton();
         }
 
         internal static string SingleImagePath(IDataObject data)
@@ -330,8 +342,12 @@ namespace AlbumArtTool
         {
             var album = albums.SelectedAlbum;
             int count = album == null ? 0 : onlyMissing.Checked ? album.MissingCount : album.Tracks.Count;
-            apply.Text = count > 0 ? "Apply cover to " + count + (count == 1 ? " track" : " tracks") : "Apply cover";
-            apply.Enabled = !busy && pending != null && album != null && (count > 0 || (folderCover.Enabled && folderCover.Checked));
+            bool queued = album != null && queuedAlbums.Contains(album.Key);
+            apply.Text = queued ? "Cover queued" : count > 0 ? "Apply cover to " + count + (count == 1 ? " track" : " tracks") : "Apply cover";
+            bool hasImage = pending != null || album?.PreviewTrack != null || album?.FolderCovers.Count > 0;
+            apply.Enabled = !busy && !queued && hasImage && album != null && (count > 0 || (folderCover.Enabled && folderCover.Checked));
+            tips.SetToolTip(apply, queued ? "This album is already in the queue. You can work on another album." :
+                pending != null ? "Add the chosen cover to the work queue." : "Apply the displayed cover using the full-size image already in your album.");
             apply.BackColor = apply.Enabled ? Accent : Color.FromArgb(39, 44, 44);
             apply.ForeColor = apply.Enabled ? Color.FromArgb(16, 33, 29) : Muted;
         }
@@ -380,7 +396,7 @@ namespace AlbumArtTool
 
         internal async Task ScanAsync()
         {
-            if (busy) return;
+            if (busy || queueRunning) return;
             string root = folder.Text;
             cancellation?.Dispose(); cancellation = new CancellationTokenSource();
             var token = cancellation.Token;
@@ -399,58 +415,47 @@ namespace AlbumArtTool
             finally { if (!IsDisposed) { SetBusy(false); ShowSelection(); } }
         }
 
-        internal async Task ApplyAsync()
+        internal Task ApplyAsync()
         {
             var album = albums.SelectedAlbum;
-            if (busy || album == null || pending == null) return;
-            byte[] image = pending;
-            bool fillOnly = onlyMissing.Checked, sidecar = folderCover.Enabled && folderCover.Checked;
-            SetBusy(true, true); issues.Clear(); status.Text = "Saving covers and keeping originals…";
-            var reporter = Reporter();
+            if (busy || album == null || queuedAlbums.Contains(album.Key)) return Task.CompletedTask;
             try
             {
-                var result = await Task.Run(() => editor.Apply(album, image, fillOnly, sidecar, reporter));
-                issues.AddRange(result.Issues);
-                if (result.Entries.Count > 0) { lastEdit = result; lastEditedFolder = album.Folder; }
-                await RefreshFolderAsync(album.Folder, album.Key);
-                status.Text = result.TracksWritten + " tracks updated" + (result.Issues.Count > 0 ? " · " + result.Issues.Count + " issues (Details)." : " · Originals backed up. Undo is available.");
+                if (pending != null)
+                {
+                    byte[] image = pending;
+                    return EnqueueCover(album, "Chosen image", () => Task.FromResult(image));
+                }
+                // The button applies exactly the cover being previewed, at full resolution.
+                bool embedded = album.PreviewTrack != null;
+                string path = embedded ? album.PreviewTrack : album.FolderCovers.FirstOrDefault();
+                if (path == null) return Task.CompletedTask;
+                var stamp = FileStamp.Read(path);
+                return EnqueueCover(album, embedded ? "Existing embedded cover" : "Existing folder cover", () => Task.Run(() =>
+                {
+                    if (!stamp.Matches(path)) throw new IOException("The source cover changed after it was queued. Select the album again and retry.");
+                    byte[] original;
+                    if (embedded)
+                    { using (var audio = TagLib.File.Create(path, TagLib.ReadStyle.None)) original = Artwork.GetCover(audio.Tag); }
+                    else original = Artwork.LoadFile(path);
+                    if (!stamp.Matches(path)) throw new IOException("The source cover changed while it was being read. Retry the album.");
+                    return Artwork.Normalize(original);
+                }));
             }
-            catch (Exception e) { issues.Add(e.Message); status.Text = "Update interrupted. See Details; originals are in .album-art-backups."; }
-            finally { SetBusy(false); ShowSelection(); }
+            catch (Exception e) { issues.Add(e.Message); issuesButton.Enabled = true; status.Text = "Could not queue this cover. See Details."; return Task.CompletedTask; }
         }
 
-        internal async Task ApplyOnlineCoverAsync(string albumKey, CoverCandidate candidate)
+        internal Task ApplyOnlineCoverAsync(string albumKey, CoverCandidate candidate)
         {
             var album = albums.SelectedAlbum;
-            if (busy || album == null || album.Key != albumKey) return;
-            bool fillOnly = onlyMissing.Checked, sidecar = folderCover.Enabled && folderCover.Checked;
-            SetBusy(true, true); issues.Clear(); status.Text = "Downloading cover from " + candidate.Source + "…";
-            var reporter = Reporter();
-            try
-            {
-                // Freeze the target and options before awaiting any network response.
-                byte[] image = await coverSearch.DownloadAsync(candidate, CancellationToken.None);
-                if (IsDisposed || albums.SelectedAlbum?.Key != albumKey) return;
-                ++previewVersion; pending = image; SetPreview(image);
-                status.Text = "Applying the selected cover…";
-                var result = await Task.Run(() => editor.Apply(album, image, fillOnly, sidecar, reporter));
-                issues.AddRange(result.Issues);
-                if (result.Entries.Count > 0) { lastEdit = result; lastEditedFolder = album.Folder; }
-                await RefreshFolderAsync(album.Folder, album.Key);
-                status.Text = result.TracksWritten + " tracks updated from " + candidate.Source +
-                    (result.Issues.Count > 0 ? " · Some files were skipped. See Details." : " · Undo is available.");
-            }
-            catch (Exception e)
-            {
-                issues.Add(e.Message);
-                status.Text = "Could not use this cover. Try another result or see Details.";
-            }
-            finally { if (!IsDisposed) { SetBusy(false); ShowSelection(); } }
+            if (busy || album == null || album.Key != albumKey || queuedAlbums.Contains(albumKey)) return Task.CompletedTask;
+            var source = new CoverCandidate { Source = candidate.Source, ImageUrl = candidate.ImageUrl };
+            return EnqueueCover(album, source.Source, () => coverSearch.DownloadAsync(source, CancellationToken.None));
         }
 
         private async Task UndoAsync()
         {
-            if (busy || lastEdit == null) return;
+            if (busy || queueRunning || lastEdit == null) return;
             SetBusy(true, true); issues.Clear();
             var reporter = Reporter();
             try
@@ -464,13 +469,13 @@ namespace AlbumArtTool
             finally { SetBusy(false); ShowSelection(); }
         }
 
-        private async Task RefreshFolderAsync(string path, string key)
+        private async Task RefreshFolderAsync(string path, string key, bool preserveStaged = false)
         {
             var updated = await Task.Run(() => scanner.Scan(path, CancellationToken.None, recursive: false));
             library.Albums.RemoveAll(a => string.Equals(a.Folder, path, StringComparison.OrdinalIgnoreCase));
             library.Albums.AddRange(updated.Albums); issues.AddRange(updated.Issues);
             library.Albums.Sort((a, b) => StringComparer.CurrentCultureIgnoreCase.Compare(a.Artist + a.Title + a.Folder, b.Artist + b.Title + b.Folder));
-            RefreshAlbums(key);
+            RefreshAlbums(key, preserveStaged);
         }
 
         private void OpenSelectedFolder()

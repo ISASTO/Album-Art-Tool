@@ -14,9 +14,13 @@ A small, portable Windows app for finding and fixing album covers, with built-in
 2. The app automatically scans that folder and every subfolder.
 3. **Add missing album art** shows albums where one or more tracks lack an embedded front cover. **Change existing album art** shows albums with embedded or folder artwork.
 4. Select an album. Online suggestions automatically search its **album title + artist name** and display cover choices inside the app.
-5. **Click a cover or its Apply this cover button to download and apply it immediately.** Backups and Undo work for online changes too.
+5. **Click a cover or its Apply this cover button to add it to the work queue.** Continue selecting other albums while covers download and save in the background. Backups and Undo work for online changes too.
 
 You can still drag a JPG, PNG, BMP or GIF from File Explorer onto an album row or the small cover preview, or use **Choose image**. Local images are staged first; click the larger **Apply cover** button to apply them.
+
+If an album already has a folder cover, **Apply cover to X tracks** is enabled immediately. It uses the full-size image behind the preview, so you do not need to choose that file again. The same shortcut can copy the displayed embedded cover to tracks that are missing it.
+
+The **Queue** button shows active and waiting albums, recent results, and **Clear waiting jobs**. Albums in the list are marked **Queued** or **Applying cover…**. Jobs run one at a time; each keeps the album, image, and checkbox settings you chose when adding it. A failed job does not block later albums. You can browse both tabs, search, stage images and queue more work throughout. Folder switching, rescanning and Undo are available when the queue finishes. Closing the app waits for its work to finish; clear waiting jobs if you only want the current update to complete.
 
 No installer, accounts, API keys or background service. Online suggestions use the internet; uncheck **Online suggestions** to work offline. Windows 10 (1903 or newer) and Windows 11 use the .NET Framework 4.8 runtime already included with Windows. The EXE embeds its only third-party library, TagLibSharp. The ZIP includes the same EXE and license notices.
 
@@ -60,7 +64,7 @@ Every audio update is written to a temporary copy, reopened to verify its artwor
 .album-art-backups/YYYYMMDD-HHMMSS-id/
 ```
 
-**Undo last change** restores your most recent edit during the current app session. Backups remain after you close the app; to recover an older edit, close music players and copy the wanted original from its backup folder over the changed file. Backups contain full audio files and use disk space; you can delete them once satisfied with your edits.
+**Undo last change** restores your most recent completed edit during the current app session, once the queue is idle. Backups remain after you close the app; to recover an older edit, close music players and copy the wanted original from its backup folder over the changed file. Backups contain full audio files and use disk space; you can delete them once satisfied with your edits.
 
 Files changed since the scan, read-only files, and files locked against replacement are skipped with an explanation. Undo also refuses to overwrite a file edited by another program after this app's change. Changes are independent per file: if one track fails, successfully updated tracks stay updated and the remaining errors are listed in **Details**. Filesystems must support atomic file replacement; if they do not, the affected file is left unchanged.
 
@@ -88,7 +92,7 @@ $env:ALBUMART_FFMPEG = 'C:\path\to\ffmpeg.exe'
 tests/bin/Release/net48/AlbumArtTool.Tests.exe TestResults
 ```
 
-Tests also exercise provider parsing and ranking, unavailable sources, search caching, cancellation, bounded downloads, redirect validation, stale-result protection and one-click GUI application. A separate live-service check reports source availability and downloads a real high-resolution cover; public-site outages do not fail the deterministic integration suite.
+Tests also exercise provider parsing and ranking, unavailable sources, search caching, cancellation, bounded image-header checks, redirect validation, source resolutions, counted scan progress, direct folder-cover application, and the responsive work queue. Queue checks cover captured targets/options, preserved staged images, duplicate clicks, failures and clearing waiting work. A separate live-service check reports source availability and downloads a real high-resolution cover; public-site outages do not fail the deterministic integration suite.
 
 Tests verify audio decoding hashes before/after edits, existing metadata, exact backup restoration, partial albums, corrupt files, stale scans, read-only files, folder images, preserved back covers, cancellation, GUI tab behavior and cover previews. CI additionally opens the isolated EXE with no adjacent DLLs to check the portable dependency loader. Test audio fixtures are short synthesized tones, generated by `tests/generate_fixtures.py`; they contain no copyrighted music. FFmpeg and Python are test tools only and are not included in the app.
 

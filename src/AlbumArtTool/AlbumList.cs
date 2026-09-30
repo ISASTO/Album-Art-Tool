@@ -18,6 +18,7 @@ namespace AlbumArtTool
         internal event Action<Album, string> CoverDropped;
         internal Album SelectedAlbum => SelectedIndices.Count == 0 ? null : albums[SelectedIndices[0]];
         internal int AlbumCount => albums.Count;
+        internal Func<Album, string> WorkStatus { get; set; }
 
         internal AlbumList()
         {
@@ -126,8 +127,9 @@ namespace AlbumArtTool
             TextRenderer.DrawText(e.Graphics, album.Title, titleFont, new Rectangle(left, bounds.Y + S(10), width, S(23)), MainForm.Ink, flags);
             TextRenderer.DrawText(e.Graphics, album.Artist + "  ·  " + album.Tracks.Count + " tracks", detailFont,
                 new Rectangle(left, bounds.Y + S(35), width, S(20)), MainForm.Muted, flags);
-            TextRenderer.DrawText(e.Graphics, album.Coverage, detailFont, new Rectangle(left, bounds.Y + S(57), width, S(20)),
-                album.MissingCount > 0 ? Color.FromArgb(236, 190, 112) : MainForm.Accent, flags);
+            string work = WorkStatus?.Invoke(album);
+            TextRenderer.DrawText(e.Graphics, work ?? album.Coverage, detailFont, new Rectangle(left, bounds.Y + S(57), width, S(20)),
+                work != null ? MainForm.Accent : album.MissingCount > 0 ? Color.FromArgb(236, 190, 112) : MainForm.Accent, flags);
             using (var line = new Pen(Color.FromArgb(43, 44, 47))) e.Graphics.DrawLine(line, bounds.X + 9, bounds.Bottom - 1, bounds.Right - 9, bounds.Bottom - 1);
             if (selected && Focused) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(bounds, -2, -2), MainForm.Accent, MainForm.Surface);
         }
