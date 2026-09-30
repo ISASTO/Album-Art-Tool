@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>AlbumArtTool</AssemblyName>
+    <RootNamespace>AlbumArtTool</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Version>1.0.0</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+    <Prefer32Bit>false</Prefer32Bit>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="TagLibSharp" Version="2.3.0" GeneratePathProperty="true" />
+    <EmbeddedResource Include="$(PkgTagLibSharp)/lib/net462/TagLibSharp.dll" LogicalName="AlbumArtTool.TagLibSharp.dll" />
+    <InternalsVisibleTo Include="AlbumArtTool.Tests" />
+  </ItemGroup>
+</Project>

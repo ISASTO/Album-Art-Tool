@@ -1,0 +1,15 @@
+Album Art Tool uses TagLibSharp 2.3.0 (unmodified).
+Copyright (C) 2006-2007 Brian Nickel and contributors.
+Licensed under the GNU Lesser General Public License, version 2.1 or later.
+Source: https://github.com/mono/taglib-sharp/tree/TaglibSharp-2.3.0.0
+Package: https://www.nuget.org/packages/TagLibSharp/2.3.0
+Full license: licenses/TagLibSharp-LGPL-2.1.txt
+
+TagLibSharp.dll is embedded for convenient single-file distribution.
+A compatible separately supplied TagLibSharp.dll beside AlbumArtTool.exe
+will be loaded by the .NET assembly loader before the embedded fallback.
+You may modify or replace that library and reverse-engineer the application
+as needed to debug your modifications, as permitted by the LGPL.
+The application source and build project are available in this repository.
+
+The .NET Framework runtime is supplied by Windows and is not redistributed.

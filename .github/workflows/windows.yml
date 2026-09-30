@@ -1,0 +1,89 @@
+name: Build and test Windows app
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test-only audio decoder
+        run: python -m pip install imageio-ffmpeg==0.6.0
+      - name: Build
+        run: dotnet build tests/AlbumArtTool.Tests.csproj -c Release
+      - name: Verify real audio files, rollback, scanning and Windows GUI
+        shell: pwsh
+        run: |
+          $env:ALBUMART_FFMPEG = python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
+          & tests/bin/Release/net48/AlbumArtTool.Tests.exe "$PWD/TestResults"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package portable executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item src/AlbumArtTool/bin/Release/net48/AlbumArtTool.exe dist/
+          Copy-Item README.md dist/README.txt
+          Copy-Item LICENSE dist/
+          Copy-Item THIRD-PARTY-NOTICES.txt dist/
+          Copy-Item licenses dist/licenses -Recurse
+          Compress-Archive -Path dist/* -DestinationPath AlbumArtTool-Windows.zip
+          $hash = (Get-FileHash dist/AlbumArtTool.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  AlbumArtTool.exe" | Set-Content -Encoding ascii SHA256SUMS.txt
+      - name: Launch the isolated single EXE (no adjacent dependencies)
+        shell: pwsh
+        run: |
+          $emptyMusic = New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/empty-music"
+          $app = Start-Process "$PWD/dist/AlbumArtTool.exe" -ArgumentList ('"' + $emptyMusic.FullName + '"') -PassThru
+          Start-Sleep -Seconds 4
+          $app.Refresh()
+          if ($app.HasExited -or $app.MainWindowHandle -eq 0 -or -not $app.Responding) { throw "Portable EXE did not open a responsive window." }
+          $null = $app.CloseMainWindow()
+          if (-not $app.WaitForExit(5000)) { $app.Kill(); throw "App did not close cleanly." }
+          if ($app.ExitCode -ne 0) { throw "App exited with an error." }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Windows-test-preview
+          path: TestResults/*.png
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AlbumArtTool-Windows
+          path: |
+            AlbumArtTool-Windows.zip
+            dist/AlbumArtTool.exe
+            SHA256SUMS.txt
+          if-no-files-found: error
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: AlbumArtTool-Windows
+          path: release
+      - name: Publish tested portable build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" release/AlbumArtTool-Windows.zip release/dist/AlbumArtTool.exe release/SHA256SUMS.txt --verify-tag --title "Album Art Tool $RELEASE_TAG" --notes "Portable Windows app. Download AlbumArtTool.exe, place it in your music folder, and open it. Includes missing-art and existing-art tabs, drag-and-drop previews, embedded covers, folder covers, automatic backups, and Undo. Windows build, real-format audio integrity checks, and GUI smoke tests passed. The ZIP includes source-license notices."

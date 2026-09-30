@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+.vs/
+dist/
+TestResults/
+*.user
+*.tmp
+.album-art-backups/
