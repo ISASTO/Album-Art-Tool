@@ -23,7 +23,7 @@ namespace AlbumArtTool.Online
             client = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false,
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate });
             client.Timeout = Timeout.InfiniteTimeSpan;
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("AlbumArtTool/1.2.0 (+https://github.com/ISASTO/Album-Art-Tool)");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("AlbumArtTool/1.2.1 (+https://github.com/ISASTO/Album-Art-Tool)");
         }
 
         public Task<byte[]> GetAsync(string url, int limit, CancellationToken token) => FetchAsync(url, limit, false, token);

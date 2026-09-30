@@ -126,20 +126,19 @@ namespace AlbumArtTool
         private void BuildLayout()
         {
             var outer = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(22, 16, 22, 12), ColumnCount = 1, RowCount = 5 };
-            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
-            var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
+            var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
-            header.RowStyles.Add(new RowStyle(SizeType.Absolute, 38));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
+            header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             header.Controls.Add(Label("Album Art Tool", 23, true), 0, 0);
-            var subtitle = Label("A cover for every album.", 10); subtitle.ForeColor = Muted;
-            header.Controls.Add(subtitle, 0, 1); header.Controls.Add(undo, 1, 0);
-            queueButton.Margin = new Padding(3, 0, 3, 0); queueButton.Font = new Font("Segoe UI", 8);
-            header.Controls.Add(queueButton, 1, 1);
+            header.Controls.Add(undo, 1, 0);
+            header.Controls.Add(queueButton, 2, 0);
             var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
             pathRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
