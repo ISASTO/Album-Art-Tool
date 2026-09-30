@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using AlbumArtTool.Core;
+using AlbumArtTool.Online;
 
 namespace AlbumArtTool
 {
@@ -29,6 +30,8 @@ namespace AlbumArtTool
         private readonly Button openFolder = Button("Open album folder");
         private readonly Button issuesButton = Button("Details");
         private readonly AlbumList albums = new AlbumList();
+        private readonly ICoverSearch coverSearch;
+        private readonly CoverSearchPanel online;
         private readonly PictureBox cover = new PictureBox();
         private readonly Label selectedTitle = Label("Select an album", 13, true);
         private readonly Label selectedArtist = Label("", 10);
@@ -52,8 +55,10 @@ namespace AlbumArtTool
         private int previewVersion;
         private bool showingMissing = true, busy, writing, refreshing, hasScanned;
 
-        internal MainForm(string root, bool autoScan = true)
+        internal MainForm(string root, bool autoScan = true, ICoverSearch onlineService = null)
         {
+            coverSearch = onlineService ?? new CoverSearchService();
+            online = new CoverSearchPanel(coverSearch) { UseCover = ApplyOnlineCoverAsync };
             Text = "Album Art Tool";
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Color.FromArgb(15, 16, 18);
@@ -61,8 +66,8 @@ namespace AlbumArtTool
             Font = new Font("Segoe UI", 10f);
             AutoScaleDimensions = new SizeF(96, 96);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(1120, 780);
-            MinimumSize = new Size(920, 740);
+            ClientSize = new Size(1200, 820);
+            MinimumSize = new Size(1040, 760);
             folder.Text = root;
             folder.ReadOnly = true;
             folder.AccessibleName = "Music folder";
@@ -150,28 +155,40 @@ namespace AlbumArtTool
             StyleTextBox(search); searchRow.Controls.Add(searchLabel, 0, 0); searchRow.Controls.Add(search, 1, 0); tabs.Controls.Add(searchRow, 3, 0);
             var body = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Margin = new Padding(0), RowCount = 1 };
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 336));
+            body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 580));
             var listPanel = new Panel { Dock = DockStyle.Fill, BackColor = Surface, Margin = new Padding(0, 0, 16, 0) };
             albums.Dock = DockStyle.Fill; empty.Dock = DockStyle.Fill; empty.TextAlign = ContentAlignment.MiddleCenter;
             empty.ForeColor = Muted; empty.Padding = new Padding(35); empty.BackColor = Surface;
             listPanel.Controls.Add(albums); listPanel.Controls.Add(empty);
-            var sidebarScroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Surface, Padding = new Padding(14), Margin = new Padding(0) };
-            var sidebar = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 11, Padding = new Padding(0) };
-            int[] heights = { 32, 22, 200, 24, 24, 34, 28, 28, 40, 34, 30 };
-            for (int i = 0; i < heights.Length; i++) sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, heights[i]));
+            var sidebar = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = Surface, Padding = new Padding(12), ColumnCount = 1, RowCount = 5, Margin = Padding.Empty };
+            sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 29));
+            sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 23));
+            sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 141));
+            sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
             selectedTitle.AutoEllipsis = selectedArtist.AutoEllipsis = true;
+            var manual = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 8, 0, 0) };
+            manual.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            manual.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145)); manual.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            var preview = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
+            preview.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); preview.RowStyles.Add(new RowStyle(SizeType.Absolute, 19)); preview.RowStyles.Add(new RowStyle(SizeType.Absolute, 19));
             cover.Dock = DockStyle.Fill; cover.SizeMode = PictureBoxSizeMode.Zoom; cover.BackColor = Color.FromArgb(31, 33, 36);
-            cover.Margin = new Padding(24, 6, 24, 6); cover.Cursor = Cursors.Hand; cover.AccessibleName = "Album cover preview and image drop target";
-            coverCaption.TextAlign = ContentAlignment.MiddleCenter; coverCaption.ForeColor = Muted;
-            detail.ForeColor = Muted; detail.TextAlign = ContentAlignment.MiddleCenter;
+            cover.Margin = new Padding(4, 0, 8, 2); cover.Cursor = Cursors.Hand; cover.AccessibleName = "Album cover preview and image drop target";
+            coverCaption.TextAlign = ContentAlignment.MiddleCenter; coverCaption.ForeColor = Muted; coverCaption.Font = new Font("Segoe UI", 8); coverCaption.AutoEllipsis = true;
+            detail.ForeColor = Muted; detail.TextAlign = ContentAlignment.MiddleCenter; detail.Font = new Font("Segoe UI", 8); detail.AutoEllipsis = true;
+            preview.Controls.Add(cover, 0, 0); preview.Controls.Add(coverCaption, 0, 1); preview.Controls.Add(detail, 0, 2);
+            var editing = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
+            foreach (int height in new[] { 32, 28, 28, 36 }) editing.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
             foreach (var check in new[] { onlyMissing, folderCover })
             { check.Dock = DockStyle.Fill; check.Font = new Font("Segoe UI", 9); check.ForeColor = Ink; check.Margin = new Padding(5, 0, 0, 0); }
+            editing.Controls.Add(choose, 0, 0); editing.Controls.Add(onlyMissing, 0, 1); editing.Controls.Add(folderCover, 0, 2); editing.Controls.Add(apply, 0, 3);
+            manual.Controls.Add(preview, 0, 0); manual.Controls.Add(editing, 1, 0);
+            var path = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
+            path.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); path.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); path.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145));
             selectedPath.ForeColor = Muted; selectedPath.AutoEllipsis = true; selectedPath.TextAlign = ContentAlignment.MiddleLeft;
-            sidebar.Controls.Add(selectedTitle, 0, 0); sidebar.Controls.Add(selectedArtist, 0, 1);
-            sidebar.Controls.Add(cover, 0, 2); sidebar.Controls.Add(coverCaption, 0, 3); sidebar.Controls.Add(detail, 0, 4);
-            sidebar.Controls.Add(choose, 0, 5); sidebar.Controls.Add(onlyMissing, 0, 6); sidebar.Controls.Add(folderCover, 0, 7);
-            sidebar.Controls.Add(apply, 0, 8); sidebar.Controls.Add(openFolder, 0, 9); sidebar.Controls.Add(selectedPath, 0, 10);
-            sidebarScroll.Controls.Add(sidebar); body.Controls.Add(listPanel, 0, 0); body.Controls.Add(sidebarScroll, 1, 0);
+            path.Controls.Add(selectedPath, 0, 0); path.Controls.Add(openFolder, 1, 0);
+            sidebar.Controls.Add(selectedTitle, 0, 0); sidebar.Controls.Add(selectedArtist, 0, 1); sidebar.Controls.Add(online, 0, 2); sidebar.Controls.Add(manual, 0, 3); sidebar.Controls.Add(path, 0, 4);
+            body.Controls.Add(listPanel, 0, 0); body.Controls.Add(sidebar, 1, 0);
             var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Padding = new Padding(0, 8, 0, 0) };
             bottom.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86));
@@ -243,6 +260,7 @@ namespace AlbumArtTool
             folderCover.Text = shared ? "Folder shared by multiple albums" : "Update folder cover images too";
             choose.Enabled = openFolder.Enabled = onlyMissing.Enabled = album != null && !busy;
             UpdateApplyButton();
+            online.SetAlbum(album, !busy);
         }
 
         private async Task LoadPreviewAsync(Album album, int version)
@@ -320,6 +338,7 @@ namespace AlbumArtTool
             progress.Value = 0;
             choose.Enabled = openFolder.Enabled = onlyMissing.Enabled = !value && albums.SelectedAlbum != null;
             if (value) folderCover.Enabled = false;
+            online.Enabled = !value && albums.SelectedAlbum != null;
             issuesButton.Enabled = issues.Count > 0;
             UpdateApplyButton();
         }
@@ -372,6 +391,35 @@ namespace AlbumArtTool
             finally { SetBusy(false); ShowSelection(); }
         }
 
+        internal async Task ApplyOnlineCoverAsync(string albumKey, CoverCandidate candidate)
+        {
+            var album = albums.SelectedAlbum;
+            if (busy || album == null || album.Key != albumKey) return;
+            bool fillOnly = onlyMissing.Checked, sidecar = folderCover.Enabled && folderCover.Checked;
+            SetBusy(true, true); issues.Clear(); status.Text = "Downloading cover from " + candidate.Source + "…";
+            var reporter = Reporter();
+            try
+            {
+                // Freeze the target and options before awaiting any network response.
+                byte[] image = await coverSearch.DownloadAsync(candidate, CancellationToken.None);
+                if (IsDisposed || albums.SelectedAlbum?.Key != albumKey) return;
+                ++previewVersion; pending = image; SetPreview(image);
+                status.Text = "Applying the selected cover…";
+                var result = await Task.Run(() => editor.Apply(album, image, fillOnly, sidecar, reporter));
+                issues.AddRange(result.Issues);
+                if (result.Entries.Count > 0) { lastEdit = result; lastEditedFolder = album.Folder; }
+                await RefreshFolderAsync(album.Folder, album.Key);
+                status.Text = result.TracksWritten + " tracks updated from " + candidate.Source +
+                    (result.Issues.Count > 0 ? " · Some files were skipped. See Details." : " · Undo is available.");
+            }
+            catch (Exception e)
+            {
+                issues.Add(e.Message);
+                status.Text = "Could not use this cover. Try another result or see Details.";
+            }
+            finally { if (!IsDisposed) { SetBusy(false); ShowSelection(); } }
+        }
+
         private async Task UndoAsync()
         {
             if (busy || lastEdit == null) return;
@@ -422,6 +470,7 @@ namespace AlbumArtTool
                 var image = cover.Image;
                 cover.Image = null;
                 image?.Dispose(); tips.Dispose();
+                online.Dispose(); coverSearch.Dispose();
             }
             base.Dispose(disposing);
         }

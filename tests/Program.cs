@@ -11,7 +11,7 @@ using System.Windows.Forms;
 using AlbumArtTool;
 using AlbumArtTool.Core;
 
-internal static class Tests
+internal static partial class Tests
 {
     private static int assertions;
     private static readonly Scanner Scanner = new Scanner();
@@ -27,6 +27,8 @@ internal static class Tests
         Directory.CreateDirectory(workspace);
         try
         {
+            if (args.Length > 0 && args[0] == "--live-search") return LiveSearch(args.Length > 1 ? args[1] : workspace).GetAwaiter().GetResult();
+            OnlineTests().GetAwaiter().GetResult();
             foreach (var path in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) RoundTrip(path);
             PartialAlbums(); MixedAlbums(); Guards(); FolderArt(); CancelScan(); InvalidArt(); UntaggedMp3();
             GuiSmoke(args.Length > 0 ? args[0] : workspace);
@@ -237,7 +239,7 @@ internal static class Tests
         string imagePath = Path.Combine(workspace, "cover.jpg"); File.WriteAllBytes(imagePath, Cover);
         Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false);
         Exception failure = null;
-        using (var form = new MainForm(root, false))
+        using (var form = new MainForm(root, false, new FakeCoverSearch(Cover)))
         {
             form.Shown += async (s, e) =>
             {
@@ -254,7 +256,7 @@ internal static class Tests
                     var data = new DataObject(DataFormats.FileDrop, new[] { imagePath });
                     Assert(MainForm.SingleImagePath(data) == imagePath, "Windows file drop accepts a single image");
                     Assert(MainForm.SingleImagePath(new DataObject(DataFormats.FileDrop, new[] { imagePath, imagePath })) == null, "ambiguous multiple-image drop rejected");
-                    var dropTarget = Descendants(form).OfType<PictureBox>().Single();
+                    var dropTarget = Descendants(form).OfType<PictureBox>().Single(p => p.AccessibleName == "Album cover preview and image drop target");
                     typeof(Control).GetMethod("OnDragDrop", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
                         .Invoke(dropTarget, new object[] { new DragEventArgs(data, 0, 0, 0, DragDropEffects.Copy, DragDropEffects.Copy) });
                     Assert(Descendants(form).OfType<Button>().Single(b => b.Text.StartsWith("Apply cover")).Enabled, "drop preview enables Apply");
@@ -266,6 +268,7 @@ internal static class Tests
                     Assert(lists.AlbumCount == 1, "completed album disappears from missing tab");
                     existing.PerformClick();
                     Assert(lists.AlbumCount == 2, "completed album appears in existing tab");
+                    await OnlineGuiTest(form, lists, output);
                 }
                 catch (Exception ex) { failure = ex; }
                 finally { form.Close(); }

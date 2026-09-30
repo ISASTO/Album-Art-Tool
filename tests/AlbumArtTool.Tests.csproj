@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="../src/AlbumArtTool/AlbumArtTool.csproj" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Windows.Forms" />
     <None Include="fixtures/*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
