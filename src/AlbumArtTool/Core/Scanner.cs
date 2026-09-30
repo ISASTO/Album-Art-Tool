@@ -49,8 +49,10 @@ namespace AlbumArtTool.Core
                     {
                         if ((System.IO.File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) continue;
                         var stamp = FileStamp.Read(path);
-                        using (var file = TagLib.File.Create(path, TagLib.ReadStyle.None))
+                        using (var file = TagLib.File.Create(path, TagLib.ReadStyle.Average))
                         {
+                            if (file.Properties == null || (file.Properties.MediaTypes & TagLib.MediaTypes.Audio) == 0)
+                                throw new InvalidDataException("No readable audio stream was found.");
                             string title = string.IsNullOrWhiteSpace(file.Tag.Album) ? new DirectoryInfo(folder).Name : file.Tag.Album.Trim();
                             // Album artist, never track artist, keeps compilations together.
                             string albumArtist = (file.Tag.FirstAlbumArtist ?? "").Trim();

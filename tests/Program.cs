@@ -109,7 +109,9 @@ internal static class Tests
         File.WriteAllText(Path.Combine(root, "broken.mp3"), "This is not an MP3.");
         File.WriteAllText(Path.Combine(root, "notes.txt"), "ignore me");
         var result = Scanner.Scan(root, CancellationToken.None);
-        Assert(result.Albums.Count == 3 && result.FilesRead == 3 && result.Issues.Count == 1, "recursive scan, same-folder albums, duplicate editions and corrupt-file reporting");
+        Assert(result.Albums.Count == 3 && result.FilesRead == 3 && result.Issues.Count == 1,
+            "recursive scan, same-folder albums, duplicate editions and corrupt-file reporting: " +
+            result.Albums.Count + " albums, " + result.FilesRead + " tracks, " + result.Issues.Count + " issues");
         string compilation = NewFolder("compilation");
         string a = CopyTrack(compilation, "one.mp3"); string b = CopyTrack(compilation, "two.mp3");
         using (var file = TagLib.File.Create(a)) { file.Tag.AlbumArtists = new string[0]; file.Tag.Performers = new[] { "Artist A" }; file.Save(); }

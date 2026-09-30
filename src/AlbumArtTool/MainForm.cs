@@ -49,6 +49,7 @@ namespace AlbumArtTool
         private EditResult lastEdit;
         private string lastEditedFolder;
         private byte[] pending;
+        private int previewVersion;
         private bool showingMissing = true, busy, writing, refreshing, hasScanned;
 
         internal MainForm(string root, bool autoScan = true)
@@ -219,6 +220,7 @@ namespace AlbumArtTool
 
         private void ShowSelection()
         {
+            int version = ++previewVersion;
             pending = null;
             var album = albums.SelectedAlbum;
             selectedTitle.Text = album?.Title ?? "Select an album";
@@ -229,11 +231,32 @@ namespace AlbumArtTool
             detail.Text = album == null ? "" : album.Tracks.Count + " tracks · " + album.MissingCount + " missing covers";
             coverCaption.Text = album?.Thumbnail != null ? (album.PreviewTrack != null ? "Current embedded cover" : "Current folder cover") : "Drop a cover image here";
             SetPreview(album?.Thumbnail);
+            if (album?.Thumbnail != null) _ = LoadPreviewAsync(album, version);
             bool shared = album != null && library.Albums.Count(a => string.Equals(a.Folder, album.Folder, StringComparison.OrdinalIgnoreCase)) > 1;
             folderCover.Enabled = !busy && album != null && !shared;
             folderCover.Text = shared ? "Folder shared by multiple albums" : "Update folder cover images too";
             choose.Enabled = openFolder.Enabled = onlyMissing.Enabled = album != null && !busy;
             UpdateApplyButton();
+        }
+
+        private async Task LoadPreviewAsync(Album album, int version)
+        {
+            try
+            {
+                byte[] bytes = await Task.Run(() =>
+                {
+                    byte[] original;
+                    if (album.PreviewTrack != null)
+                    {
+                        using (var audio = TagLib.File.Create(album.PreviewTrack, TagLib.ReadStyle.None)) original = Artwork.GetCover(audio.Tag);
+                    }
+                    else original = album.FolderCovers.Count > 0 ? Artwork.LoadFile(album.FolderCovers[0]) : null;
+                    return original == null ? null : Artwork.Normalize(original, 480);
+                });
+                if (!IsDisposed && version == previewVersion && pending == null && bytes != null) SetPreview(bytes);
+            }
+            catch (Exception e) when (Scanner.IsFileError(e) || Artwork.IsImageError(e) || e is TagLib.CorruptFileException || e is TagLib.UnsupportedFormatException)
+            { /* Retain the scan thumbnail if the source has become unavailable. */ }
         }
 
         private void SetPreview(byte[] bytes)
@@ -248,6 +271,7 @@ namespace AlbumArtTool
             if (busy || albums.SelectedAlbum == null) return;
             try
             {
+                ++previewVersion;
                 pending = Artwork.Normalize(Artwork.LoadFile(path));
                 SetPreview(pending);
                 coverCaption.Text = "New cover · ready to apply";
