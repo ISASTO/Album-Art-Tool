@@ -59,8 +59,9 @@ namespace AlbumArtTool
             BackColor = Color.FromArgb(15, 16, 18);
             ForeColor = Ink;
             Font = new Font("Segoe UI", 10f);
+            AutoScaleDimensions = new SizeF(96, 96);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(1120, 820);
+            ClientSize = new Size(1120, 780);
             MinimumSize = new Size(920, 740);
             folder.Text = root;
             folder.ReadOnly = true;
@@ -116,11 +117,11 @@ namespace AlbumArtTool
         private void BuildLayout()
         {
             var outer = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(22, 16, 22, 12), ColumnCount = 1, RowCount = 5 };
-            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
-            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
@@ -128,23 +129,27 @@ namespace AlbumArtTool
             header.Controls.Add(Label("Album Art Tool", 23, true), 0, 0);
             var subtitle = Label("A cover for every album.", 10); subtitle.ForeColor = Muted;
             header.Controls.Add(subtitle, 0, 1); header.Controls.Add(undo, 1, 0);
-            var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3 };
+            var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
+            pathRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
             StyleTextBox(folder); pathRow.Controls.Add(folder, 0, 0); pathRow.Controls.Add(browse, 1, 0); pathRow.Controls.Add(scan, 2, 0);
-            var tabs = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, Padding = new Padding(0, 8, 0, 8) };
+            var tabs = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Padding = new Padding(0, 6, 0, 6) };
+            tabs.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 238));
             tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 263));
             tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 226));
             missingTab.AccessibleRole = existingTab.AccessibleRole = AccessibleRole.PageTab;
             tabs.Controls.Add(missingTab, 0, 0); tabs.Controls.Add(existingTab, 1, 0);
-            var searchRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Margin = new Padding(0) };
+            var searchRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
+            searchRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             searchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 55)); searchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             var searchLabel = Label("Search", 9); searchLabel.TextAlign = ContentAlignment.MiddleLeft;
             StyleTextBox(search); searchRow.Controls.Add(searchLabel, 0, 0); searchRow.Controls.Add(search, 1, 0); tabs.Controls.Add(searchRow, 3, 0);
             var body = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Margin = new Padding(0), RowCount = 1 };
+            body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 336));
             var listPanel = new Panel { Dock = DockStyle.Fill, BackColor = Surface, Margin = new Padding(0, 0, 16, 0) };
             albums.Dock = DockStyle.Fill; empty.Dock = DockStyle.Fill; empty.TextAlign = ContentAlignment.MiddleCenter;
@@ -152,7 +157,7 @@ namespace AlbumArtTool
             listPanel.Controls.Add(albums); listPanel.Controls.Add(empty);
             var sidebarScroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Surface, Padding = new Padding(14), Margin = new Padding(0) };
             var sidebar = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 11, Padding = new Padding(0) };
-            int[] heights = { 32, 24, 226, 26, 24, 38, 31, 31, 44, 42, 34 };
+            int[] heights = { 32, 22, 200, 24, 24, 34, 28, 28, 40, 34, 30 };
             for (int i = 0; i < heights.Length; i++) sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, heights[i]));
             selectedTitle.AutoEllipsis = selectedArtist.AutoEllipsis = true;
             cover.Dock = DockStyle.Fill; cover.SizeMode = PictureBoxSizeMode.Zoom; cover.BackColor = Color.FromArgb(31, 33, 36);
@@ -167,7 +172,8 @@ namespace AlbumArtTool
             sidebar.Controls.Add(choose, 0, 5); sidebar.Controls.Add(onlyMissing, 0, 6); sidebar.Controls.Add(folderCover, 0, 7);
             sidebar.Controls.Add(apply, 0, 8); sidebar.Controls.Add(openFolder, 0, 9); sidebar.Controls.Add(selectedPath, 0, 10);
             sidebarScroll.Controls.Add(sidebar); body.Controls.Add(listPanel, 0, 0); body.Controls.Add(sidebarScroll, 1, 0);
-            var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, Padding = new Padding(0, 8, 0, 0) };
+            var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Padding = new Padding(0, 8, 0, 0) };
+            bottom.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110)); bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86));
             status.AutoEllipsis = true; status.TextAlign = ContentAlignment.MiddleLeft; status.ForeColor = Muted;
             progress.Dock = DockStyle.Fill; progress.Margin = new Padding(6, 8, 8, 8); progress.Visible = false;
@@ -179,7 +185,7 @@ namespace AlbumArtTool
             tips.SetToolTip(undo, "Restore files from your most recent edit in this session (Ctrl+Z). Backups remain in .album-art-backups after closing.");
         }
 
-        private static Button Button(string text) => new Button { Text = text, Dock = DockStyle.Fill, FlatStyle = FlatStyle.Flat,
+        private static Button Button(string text) => new ThemeButton { Text = text, Dock = DockStyle.Fill, FlatStyle = FlatStyle.Flat,
             BackColor = Surface, ForeColor = Ink, Cursor = Cursors.Hand, Margin = new Padding(3), Font = new Font("Segoe UI", 9f), UseVisualStyleBackColor = false };
         private static Label Label(string text, float size, bool bold = false) => new Label { Text = text, Dock = DockStyle.Fill,
             Font = new Font("Segoe UI", size, bold ? FontStyle.Bold : FontStyle.Regular), ForeColor = Ink, Margin = new Padding(0), TextAlign = ContentAlignment.MiddleLeft };
@@ -408,7 +414,15 @@ namespace AlbumArtTool
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { cancellation?.Cancel(); cancellation?.Dispose(); cover.Image?.Dispose(); tips.Dispose(); }
+            if (disposing)
+            {
+                var source = cancellation;
+                cancellation = null;
+                source?.Cancel(); source?.Dispose();
+                var image = cover.Image;
+                cover.Image = null;
+                image?.Dispose(); tips.Dispose();
+            }
             base.Dispose(disposing);
         }
     }

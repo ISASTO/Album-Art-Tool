@@ -230,7 +230,7 @@ internal static class Tests
         string root = NewFolder("gui");
         string first = Path.Combine(root, "Morning Miles"), second = Path.Combine(root, "Quiet Hours"), third = Path.Combine(root, "The Long Way Home");
         Directory.CreateDirectory(first); Directory.CreateDirectory(second); Directory.CreateDirectory(third);
-        CopyTrack(first, "one.mp3", "Morning Miles", "The Early Birds"); CopyTrack(first, "two.mp3", "Morning Miles", "The Early Birds");
+        CopyTrack(first, "one.mp3", "Morning Miles", "Atlas Sessions"); CopyTrack(first, "two.mp3", "Morning Miles", "Atlas Sessions");
         CopyTrack(second, "one.flac", "Quiet Hours", "Paper Lanterns");
         CopyTrack(third, "one.m4a", "The Long Way Home", "Sunday Club");
         Editor.Apply(ScanAlbum(third), MakeCover(Color.DarkSalmon), false, true);
@@ -247,13 +247,16 @@ internal static class Tests
                     var lists = Descendants(form).OfType<AlbumList>().Single();
                     Assert(lists.AlbumCount == 2, "GUI missing tab lists only incomplete albums");
                     var existing = Descendants(form).OfType<Button>().Single(b => b.Text.StartsWith("Change existing album art"));
+                    Assert(existing.Bottom <= existing.Parent.ClientSize.Height, "tab button fits inside its visible row");
                     existing.PerformClick();
                     Assert(lists.AlbumCount == 1 && lists.SelectedAlbum.Thumbnail != null, "GUI existing tab shows cover thumbnails");
                     Descendants(form).OfType<Button>().Single(b => b.Text.StartsWith("Add missing album art")).PerformClick();
                     var data = new DataObject(DataFormats.FileDrop, new[] { imagePath });
                     Assert(MainForm.SingleImagePath(data) == imagePath, "Windows file drop accepts a single image");
                     Assert(MainForm.SingleImagePath(new DataObject(DataFormats.FileDrop, new[] { imagePath, imagePath })) == null, "ambiguous multiple-image drop rejected");
-                    form.StageImage(imagePath);
+                    var dropTarget = Descendants(form).OfType<PictureBox>().Single();
+                    typeof(Control).GetMethod("OnDragDrop", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                        .Invoke(dropTarget, new object[] { new DragEventArgs(data, 0, 0, 0, DragDropEffects.Copy, DragDropEffects.Copy) });
                     Assert(Descendants(form).OfType<Button>().Single(b => b.Text.StartsWith("Apply cover")).Enabled, "drop preview enables Apply");
                     Directory.CreateDirectory(output);
                     await Task.Delay(150);

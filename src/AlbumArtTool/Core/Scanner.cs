@@ -78,6 +78,12 @@ namespace AlbumArtTool.Core
                         clock.Restart();
                     }
                 }
+                if (result.Cancelled)
+                {
+                    // Never offer a partly scanned album for a whole-album edit.
+                    result.FilesRead -= albums.Values.Sum(a => a.Tracks.Count);
+                    break;
+                }
                 var covers = new List<string>();
                 byte[] folderThumbnail = null;
                 foreach (string path in files.Where(p => CoverNames.Contains(Path.GetFileNameWithoutExtension(p)) && ImageExtensions.Contains(Path.GetExtension(p)))

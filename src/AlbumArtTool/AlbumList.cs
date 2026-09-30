@@ -38,6 +38,8 @@ namespace AlbumArtTool
             rowHeight = new ImageList { ImageSize = new Size(1, 86), ColorDepth = ColorDepth.Depth32Bit };
             rowHeight.Images.Add(new Bitmap(1, 86));
             SmallImageList = rowHeight;
+            HandleCreated += (s, e) => UpdateRowHeight();
+            DpiChangedAfterParent += (s, e) => UpdateRowHeight();
             RetrieveVirtualItem += (s, e) =>
             {
                 var album = albums[e.ItemIndex];
@@ -60,6 +62,11 @@ namespace AlbumArtTool
                 SelectedIndices.Add(item.Index);
                 CoverDropped?.Invoke(albums[item.Index], path);
             };
+        }
+
+        private void UpdateRowHeight()
+        {
+            rowHeight.ImageSize = new Size(1, Math.Min(256, (int)Math.Round(86.0 * DeviceDpi / 96.0)));
         }
 
         internal void SetAlbums(IEnumerable<Album> values, string selectedKey = null)
@@ -99,10 +106,11 @@ namespace AlbumArtTool
             if (e.ItemIndex >= albums.Count || e.ColumnIndex != 0) return;
             var album = albums[e.ItemIndex];
             var bounds = e.Bounds;
+            int S(int value) => (int)Math.Round(value * bounds.Height / 86.0);
             bool selected = SelectedIndices.Contains(e.ItemIndex);
             using (var fill = new SolidBrush(selected ? Color.FromArgb(32, 55, 52) : MainForm.Surface)) e.Graphics.FillRectangle(fill, bounds);
-            int coverSize = bounds.Height - 18;
-            var cover = new Rectangle(bounds.X + 9, bounds.Y + 9, coverSize, coverSize);
+            int coverSize = bounds.Height - S(18);
+            var cover = new Rectangle(bounds.X + S(9), bounds.Y + S(9), coverSize, coverSize);
             using (var fill = new SolidBrush(Color.FromArgb(40, 41, 44))) e.Graphics.FillRectangle(fill, cover);
             var image = GetThumbnail(album);
             if (image != null)
@@ -113,12 +121,12 @@ namespace AlbumArtTool
             }
             else
                 TextRenderer.DrawText(e.Graphics, "♪", titleFont, cover, MainForm.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            int left = cover.Right + 13, width = Math.Max(1, bounds.Right - left - 12);
+            int left = cover.Right + S(13), width = Math.Max(1, bounds.Right - left - S(12));
             var flags = TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix;
-            TextRenderer.DrawText(e.Graphics, album.Title, titleFont, new Rectangle(left, bounds.Y + 10, width, 23), MainForm.Ink, flags);
+            TextRenderer.DrawText(e.Graphics, album.Title, titleFont, new Rectangle(left, bounds.Y + S(10), width, S(23)), MainForm.Ink, flags);
             TextRenderer.DrawText(e.Graphics, album.Artist + "  ·  " + album.Tracks.Count + " tracks", detailFont,
-                new Rectangle(left, bounds.Y + 35, width, 20), MainForm.Muted, flags);
-            TextRenderer.DrawText(e.Graphics, album.Coverage, detailFont, new Rectangle(left, bounds.Y + 57, width, 20),
+                new Rectangle(left, bounds.Y + S(35), width, S(20)), MainForm.Muted, flags);
+            TextRenderer.DrawText(e.Graphics, album.Coverage, detailFont, new Rectangle(left, bounds.Y + S(57), width, S(20)),
                 album.MissingCount > 0 ? Color.FromArgb(236, 190, 112) : MainForm.Accent, flags);
             using (var line = new Pen(Color.FromArgb(43, 44, 47))) e.Graphics.DrawLine(line, bounds.X + 9, bounds.Bottom - 1, bounds.Right - 9, bounds.Bottom - 1);
             if (selected && Focused) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(bounds, -2, -2), MainForm.Accent, MainForm.Surface);
