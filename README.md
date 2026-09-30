@@ -20,18 +20,20 @@ You can still drag a JPG, PNG, BMP or GIF from File Explorer onto an album row o
 
 If an album already has a folder cover, **Apply cover to X tracks** is enabled immediately. It uses the full-size image behind the preview, so you do not need to choose that file again. The same shortcut can copy the displayed embedded cover to tracks that are missing it.
 
-The **Queue** button shows active and waiting albums, recent results, and **Clear waiting jobs**. Albums in the list are marked **Queued** or **Applying cover…**. Jobs run one at a time; each keeps the album, image, and checkbox settings you chose when adding it. A failed job does not block later albums. You can browse both tabs, search, stage images and queue more work throughout. Folder switching, rescanning and Undo are available when the queue finishes. Closing the app waits for its work to finish; clear waiting jobs if you only want the current update to complete.
+The **Queue** button shows active and waiting albums, recent results, and **Clear waiting jobs**. Albums in the list are marked **Queued** or **Applying cover…**. Jobs run one at a time; each keeps the album, image, and checkbox settings you chose when adding it. A failed job does not block later albums. You can browse both tabs, search, stage images and queue more work throughout. Folder switching, rescanning and Undo are available when the queue finishes. To close with work pending, clear waiting jobs and let the current update finish.
 
 No installer, accounts, API keys or background service. Online suggestions use the internet; uncheck **Online suggestions** to work offline. Windows 10 (1903 or newer) and Windows 11 use the .NET Framework 4.8 runtime already included with Windows. The EXE embeds its only third-party library, TagLibSharp. The ZIP includes the same EXE and license notices.
 
 Scanning first counts supported music files using directory listings, without reading audio tags. It then shows a filling progress bar, a percentage, and an exact counter such as **2751/3867 tracks scanned**. Files that fail to open still count as checked and appear in Details. The initial counting phase can also be stopped. Disabled options keep readable text on the dark background.
+
+[Scan progress preview](docs/scanning.png) · [Background queue preview](docs/queue.png)
 
 ## Online cover search
 
 - Only the selected album is searched. The query starts as `album title + artist name`; you can edit it and press Enter or Search if tags are incomplete or an edition needs clarification.
 - Sources are searched independently, so one failing source cannot prevent the others from returning covers. Good title-and-artist matches rank first; **Bandcamp is preferred among similarly strong matches**, followed by high-resolution Deezer album artwork and front covers from MusicBrainz's Cover Art Archive.
 - Bandcamp results depend on its public search page. If Bandcamp requires browser verification or blocks the request, the app reports that source as unavailable and stops retrying it for the session. The **Bandcamp ↗** button opens the same search in your browser. No CAPTCHA bypass, login or hidden API credentials are used.
-- Cover Art Archive previews are 250 pixels; applying uses its 1200-pixel front cover. Deezer uses its `cover_xl` image. Bandcamp uses the original cover asset when its public search results are available. The existing 1600-pixel embedded-art limit still applies.
+- Cover Art Archive requests previews up to 250 pixels and front covers up to 1200 pixels; actual dimensions depend on the available image. Deezer uses its `cover_xl` image. Bandcamp uses the original cover asset when its public search results are available. The existing 1600-pixel embedded-art limit still applies.
 - Each suggested cover shows the source image's resolution, such as **1000 × 1000 px**. Thumbnails appear first while the app checks the full-size image header. These checks read at most 128 KB per cover, with two running at a time. If a source cannot provide readable dimensions, the card says **Size unavailable**; the cover can still be selected.
 - Source names beneath covers link to their album pages. Compare the title, artist and artwork before clicking, especially for similar titles or alternate releases.
 - Results are cached for up to 24 queries during the current session. Rapid selection changes cancel stale searches. MusicBrainz requests are spaced at least 1.1 seconds apart; server rate-limit responses are respected.
