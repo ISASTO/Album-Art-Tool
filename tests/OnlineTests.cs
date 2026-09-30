@@ -95,13 +95,16 @@ internal static partial class Tests
         string before = CoverEditor.Hash(selected.Tracks[0].Path);
         await form.ApplyOnlineCoverAsync("another-album", panel.DisplayedCandidates[0]);
         Assert(CoverEditor.Hash(selected.Tracks[0].Path) == before, "a stale artwork result cannot edit a different album");
-        var target = panel.DisplayedCandidates[0];
+        var firstAction = Descendants(panel).OfType<Button>().First(b => b.Text == "Apply this cover");
+        var viewport = firstAction.Parent.Parent;
+        Assert(viewport.RectangleToScreen(viewport.ClientRectangle).Contains(firstAction.RectangleToScreen(firstAction.ClientRectangle)),
+            "the first cover action is fully visible without scrolling");
+        using (var bitmap = new Bitmap(form.Width, form.Height))
+        { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "online-cover-search.png"), ImageFormat.Png); }
         var bad = new CoverCandidate { Source = "Broken source", ImageUrl = "invalid" };
         await form.ApplyOnlineCoverAsync(selected.Key, bad);
         Assert(CoverEditor.Hash(selected.Tracks[0].Path) == before, "failed image downloads leave album files unchanged");
         await panel.CurrentSearch; await Task.Delay(60);
-        using (var bitmap = new Bitmap(form.Width, form.Height))
-        { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "online-cover-search.png"), ImageFormat.Png); }
         var use = Descendants(panel).OfType<Button>().First(b => b.Text == "Apply this cover");
         use.PerformClick(); await panel.CurrentApply;
         Assert(CoverEditor.Hash(selected.Tracks[0].Path) != before, "one click on a result applies its artwork");

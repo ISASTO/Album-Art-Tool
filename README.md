@@ -4,7 +4,9 @@ A small, portable Windows app for finding and fixing album covers, with built-in
 
 **[Download the Windows app](https://github.com/ISASTO/Album-Art-Tool/releases/latest)** · Single portable EXE.
 
-![Album Art Tool on Windows, showing missing albums and a staged cover](docs/screenshot.png)
+![Album Art Tool on Windows, showing online artwork suggestions](docs/screenshot.png)
+
+*Interface shown with test albums and example search results.*
 
 ## Use it
 

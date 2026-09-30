@@ -58,6 +58,10 @@ namespace AlbumArtTool
             instructions.Controls.Add(automatic, 1, 0);
             choices.Dock = DockStyle.Fill; choices.AutoScroll = true; choices.BackColor = Color.FromArgb(18, 19, 22);
             choices.WrapContents = true; choices.Padding = new Padding(3); choices.Margin = Padding.Empty;
+            choices.SizeChanged += (s, e) =>
+            {
+                foreach (var card in choices.Controls.OfType<CoverChoice>()) card.FitHeight(choices.ClientSize.Height);
+            };
             summary.Dock = DockStyle.Fill; summary.ForeColor = MainForm.Muted; summary.Font = new Font("Segoe UI", 8.5f);
             summary.AutoEllipsis = true; summary.TextAlign = ContentAlignment.MiddleLeft;
             layout.Controls.Add(searchRow, 0, 0); layout.Controls.Add(instructions, 0, 1); layout.Controls.Add(choices, 0, 2); layout.Controls.Add(summary, 0, 3);
@@ -127,6 +131,7 @@ namespace AlbumArtTool
                 foreach (var candidate in DisplayedCandidates)
                 {
                     var card = new CoverChoice(candidate, tips);
+                    card.FitHeight(choices.ClientSize.Height);
                     card.Apply += (s, e) =>
                     {
                         if (!Enabled || selected?.Key != key || UseCover == null) return;
@@ -178,6 +183,9 @@ namespace AlbumArtTool
         private sealed class CoverChoice : Panel
         {
             private readonly PictureBox image;
+            private readonly Label title, artist;
+            private readonly LinkLabel origin;
+            private readonly Button use;
             public event EventHandler Apply;
             public event EventHandler OpenSource;
             public CoverChoice(CoverCandidate candidate, ToolTip tips)
@@ -186,13 +194,13 @@ namespace AlbumArtTool
                 AccessibleName = candidate.Title + " by " + candidate.Artist + " from " + candidate.Source;
                 image = new PictureBox { Location = new Point(6, 5), Size = new Size(151, 104), SizeMode = PictureBoxSizeMode.Zoom,
                     Cursor = Cursors.Hand, Image = Artwork.Decode(candidate.Thumbnail), AccessibleName = "Apply " + AccessibleName };
-                var title = new Label { Text = candidate.Title, Location = new Point(6, 111), Size = new Size(151, 19),
+                title = new Label { Text = candidate.Title, Location = new Point(6, 111), Size = new Size(151, 19),
                     ForeColor = MainForm.Ink, AutoEllipsis = true, Font = new Font("Segoe UI", 8.5f, FontStyle.Bold), Cursor = Cursors.Hand };
-                var artist = new Label { Text = candidate.Artist, Location = new Point(6, 130), Size = new Size(151, 17),
+                artist = new Label { Text = candidate.Artist, Location = new Point(6, 130), Size = new Size(151, 17),
                     ForeColor = MainForm.Muted, AutoEllipsis = true, Font = new Font("Segoe UI", 8), Cursor = Cursors.Hand };
-                var origin = new LinkLabel { Text = candidate.Source + (candidate.MatchScore < 80 ? " · Similar" : ""), Location = new Point(6, 147),
+                origin = new LinkLabel { Text = candidate.Source + (candidate.MatchScore < 80 ? " · Similar" : ""), Location = new Point(6, 147),
                     Size = new Size(151, 17), LinkColor = MainForm.Accent, ActiveLinkColor = MainForm.Ink, Font = new Font("Segoe UI", 8) };
-                var use = new ThemeButton { Text = "Apply this cover", Location = new Point(6, 165), Size = new Size(151, 24),
+                use = new ThemeButton { Text = "Apply this cover", Location = new Point(6, 165), Size = new Size(151, 24),
                     BackColor = Color.FromArgb(37, 65, 59), ForeColor = MainForm.Accent, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5f), Cursor = Cursors.Hand };
                 image.Click += (s, e) => Apply?.Invoke(this, EventArgs.Empty);
                 title.Click += (s, e) => Apply?.Invoke(this, EventArgs.Empty);
@@ -202,6 +210,14 @@ namespace AlbumArtTool
                 tips.SetToolTip(image, candidate.Title + "\n" + candidate.Artist + "\nClick to download and apply. Undo is available.");
                 tips.SetToolTip(title, candidate.Title); tips.SetToolTip(origin, candidate.PageUrl);
                 Controls.AddRange(new Control[] { image, title, artist, origin, use });
+            }
+            internal void FitHeight(int viewportHeight)
+            {
+                // Keep the action visible on smaller laptop screens; extra results still scroll.
+                int imageHeight = Math.Max(56, Math.Min(104, viewportHeight - 104));
+                Height = imageHeight + 90; image.Height = imageHeight;
+                title.Top = imageHeight + 7; artist.Top = imageHeight + 26;
+                origin.Top = imageHeight + 43; use.Top = imageHeight + 61;
             }
             protected override void Dispose(bool disposing)
             {
