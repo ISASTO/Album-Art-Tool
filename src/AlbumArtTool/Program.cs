@@ -3,14 +3,17 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows.Forms;
+using System.Threading.Tasks;
+using AlbumArtTool.Updates;
 
 namespace AlbumArtTool
 {
     internal static class Program
     {
         [STAThread]
-        private static void Main(string[] args)
+        private static int Main(string[] args)
         {
+            if (args.Length == 1 && args[0] == "--apply-update") return UpdateInstaller.RunHelper();
             // Register before the JIT loads any method that refers to TagLibSharp.
             AppDomain.CurrentDomain.AssemblyResolve += (sender, e) =>
             {
@@ -23,6 +26,7 @@ namespace AlbumArtTool
                 }
             };
             Start(args);
+            return 0;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -34,7 +38,12 @@ namespace AlbumArtTool
                 "Album Art Tool", MessageBoxButtons.OK, MessageBoxIcon.Error);
             string root = args.Length > 0 && Directory.Exists(args[0])
                 ? Path.GetFullPath(args[0]) : AppDomain.CurrentDomain.BaseDirectory;
-            Application.Run(new MainForm(root));
+            Task.Run(() => UpdateInstaller.CleanOldWorkspaces());
+            using (var form = new MainForm(root))
+            {
+                form.Shown += (s, e) => UpdateInstaller.SignalStarted(args);
+                Application.Run(form);
+            }
         }
     }
 }

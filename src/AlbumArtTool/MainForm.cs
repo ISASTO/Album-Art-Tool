@@ -77,6 +77,7 @@ namespace AlbumArtTool
             BuildLayout();
             albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? "Applying cover…" : "Queued") : null;
             queueButton.Click += (s, e) => ShowQueue();
+            getUpdates.Click += async (s, e) => await GetUpdatesAsync();
             browse.Click += async (s, e) =>
             {
                 using (var dialog = new FolderBrowserDialog { Description = "Choose the top folder containing your music", SelectedPath = folder.Text, ShowNewFolderButton = false })
@@ -107,6 +108,7 @@ namespace AlbumArtTool
             cover.Click += (s, e) => { if (choose.Enabled) choose.PerformClick(); };
             FormClosing += (s, e) =>
             {
+                if (installingUpdate && !restartForUpdate) { e.Cancel = true; return; }
                 if (writing || queueRunning) { e.Cancel = true; status.Text = "Work is still running. Open Queue to clear waiting jobs; the current update will finish safely."; }
                 else cancellation?.Cancel();
             };
@@ -131,14 +133,16 @@ namespace AlbumArtTool
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
-            var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
+            var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1 };
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
             header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             header.Controls.Add(Label("Album Art Tool", 23, true), 0, 0);
             header.Controls.Add(undo, 1, 0);
             header.Controls.Add(queueButton, 2, 0);
+            header.Controls.Add(getUpdates, 3, 0);
             var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
             pathRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -211,6 +215,7 @@ namespace AlbumArtTool
             Controls.Add(outer);
             tips.SetToolTip(onlyMissing, "Keeps existing embedded front covers. Uncheck to replace the cover on every track in this album.");
             tips.SetToolTip(folderCover, "Updates recognized cover/folder/front/album/albumart images, or creates cover.jpg. Disabled when multiple albums share a folder.");
+            tips.SetToolTip(getUpdates, "Check GitHub releases, download a newer version, and restart when your scan and artwork queue finish.");
             tips.SetToolTip(undo, "Restore files from your most recent edit in this session (Ctrl+Z). Backups remain in .album-art-backups after closing.");
         }
 

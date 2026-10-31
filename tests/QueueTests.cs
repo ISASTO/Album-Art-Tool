@@ -57,6 +57,7 @@ internal static partial class Tests
                     Directory.CreateDirectory(output);
                     using (var bitmap = new Bitmap(form.Width, form.Height))
                     { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "artwork-queue.png"), ImageFormat.Png); }
+                    Assert(!form.CanInstallUpdate, "active artwork queue prevents an update restart");
                     service.Release.TrySetResult(true);
                     await Task.WhenAll(online, folderJob, localJob); await form.QueueCompletion;
                     Assert(list.SelectedAlbum.Title == names[3] && apply.Enabled && Descendants(form).OfType<Label>().Any(l => l.Text == expectedStagedCaption),

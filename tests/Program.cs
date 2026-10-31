@@ -29,6 +29,7 @@ internal static partial class Tests
         {
             if (args.Length > 0 && args[0] == "--live-search") return LiveSearch(args.Length > 1 ? args[1] : workspace).GetAwaiter().GetResult();
             OnlineTests().GetAwaiter().GetResult();
+            UpdateTests().GetAwaiter().GetResult();
             foreach (var path in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) RoundTrip(path);
             PartialAlbums(); MixedAlbums(); Guards(); FolderArt(); CancelScan(); CountedScanProgress(); InvalidArt(); UntaggedMp3();
             GuiSmoke(args.Length > 0 ? args[0] : workspace);
@@ -246,6 +247,7 @@ internal static partial class Tests
             {
                 try
                 {
+                    await UpdateGuiTest(form, output);
                     await ScanningGuiTest(form, output);
                     await form.ScanAsync();
                     var lists = Descendants(form).OfType<AlbumList>().Single();
@@ -266,6 +268,7 @@ internal static partial class Tests
                     await Task.Delay(150);
                     using (var bitmap = new Bitmap(form.Width, form.Height))
                     { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "album-art-tool.png"), ImageFormat.Png); }
+                    Assert(!form.CanInstallUpdate, "staged cover prevents an update restart");
                     await form.ApplyAsync();
                     Assert(lists.AlbumCount == 1, "completed album disappears from missing tab");
                     existing.PerformClick();

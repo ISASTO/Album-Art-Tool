@@ -62,6 +62,7 @@ internal static partial class Tests
         Directory.CreateDirectory(output);
         using (var bitmap = new Bitmap(form.Width, form.Height))
         { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "scanning-progress.png"), ImageFormat.Png); }
+        Assert(!form.CanInstallUpdate, "active scan prevents an update restart");
         setBusy.Invoke(form, new object[] { false, false });
     }
 }
