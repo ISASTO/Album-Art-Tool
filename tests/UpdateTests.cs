@@ -169,6 +169,17 @@ internal static partial class Tests
     [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr parent, ChildWindowCallback callback, IntPtr parameter);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr SendMessage(IntPtr window, uint message, int length, StringBuilder text);
 
+    private sealed class UpdateGateHandler : HttpMessageHandler
+    {
+        internal bool Cancelled;
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            try { await Task.Delay(30000, token); }
+            catch (OperationCanceledException) { Cancelled = true; throw; }
+            return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+        }
+    }
+
     private static async Task UpdateGuiTest(MainForm form, string output)
     {
         var button = Descendants(form).OfType<Button>().Single(b => b.Text == "Get updates");
@@ -184,5 +195,18 @@ internal static partial class Tests
         { dialog.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "app-updates.png"), ImageFormat.Png); }
         dialog.Close();
         Assert(form.CanInstallUpdate, "idle app can hand off an update");
+        form.CreateUpdateService = () => new UpdateService(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
+        await form.GetUpdatesAsync();
+        dialog = form.OwnedForms.Single(f => f.Text == "Get updates");
+        Assert(form.Enabled && Descendants(dialog).OfType<Label>().Any(l => l.Text.StartsWith("Update could not finish.")), "offline update error keeps the app usable");
+        dialog.Close();
+        var gate = new UpdateGateHandler();
+        form.CreateUpdateService = () => new UpdateService(gate);
+        var checking = form.GetUpdatesAsync();
+        await Task.Delay(30);
+        Assert(!checking.IsCompleted && form.Enabled, "update request runs without blocking album browsing");
+        form.OwnedForms.Single(f => f.Text == "Get updates").Close();
+        await checking;
+        Assert(gate.Cancelled && form.Enabled, "closing update window cancels the active network request");
     }
 }

@@ -13,13 +13,15 @@ namespace AlbumArtTool
     {
         private readonly Button getUpdates = Button("Get updates");
         private Form updateWindow;
-        private bool installingUpdate, restartForUpdate;
+        private bool checkingUpdate, installingUpdate, restartForUpdate;
         internal Func<UpdateService> CreateUpdateService = () => new UpdateService();
         internal bool CanInstallUpdate => !busy && !writing && !queueRunning && pending == null;
 
         internal async Task GetUpdatesAsync()
         {
             if (updateWindow != null && !updateWindow.IsDisposed) { updateWindow.Activate(); return; }
+            if (checkingUpdate) return;
+            checkingUpdate = true;
             var dialog = updateWindow = new Form { Text = "Get updates", ClientSize = new Size(530, 222), MinimumSize = new Size(530, 260),
                 StartPosition = FormStartPosition.CenterParent, BackColor = Surface, ForeColor = Ink, Font = new Font("Segoe UI", 10),
                 MaximizeBox = false, MinimizeBox = false, AutoScaleMode = AutoScaleMode.Dpi };
@@ -95,6 +97,7 @@ namespace AlbumArtTool
             }
             finally
             {
+                downloading = false; checkingUpdate = false;
                 if (!handedOff && directory != null) UpdateInstaller.CleanWorkspace(directory);
                 if (!IsDisposed && !handedOff) { installingUpdate = false; Enabled = true; }
                 if (!dialog.IsDisposed)

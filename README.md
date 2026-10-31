@@ -38,6 +38,8 @@ A temporary copy of the current app waits for the running EXE to exit, verifies 
 
 **Install v1.3.0 manually once to get the button** if you are upgrading from an earlier release. After that, use **Get updates** for future releases. No music files are sent to GitHub.
 
+[Update window preview](docs/updates.png)
+
 ## Online cover search
 
 - Only the selected album is searched. The query starts as `album title + artist name`; you can edit it and press Enter or Search if tags are incomplete or an edition needs clarification.
