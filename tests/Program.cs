@@ -28,6 +28,7 @@ internal static partial class Tests
         try
         {
             if (args.Length > 0 && args[0] == "--live-search") return LiveSearch(args.Length > 1 ? args[1] : workspace).GetAwaiter().GetResult();
+            if (args.Length > 0 && args[0] == "--live-update") return LiveUpdateTest().GetAwaiter().GetResult();
             OnlineTests().GetAwaiter().GetResult();
             UpdateTests().GetAwaiter().GetResult();
             foreach (var path in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) RoundTrip(path);

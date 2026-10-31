@@ -37,12 +37,12 @@ namespace AlbumArtTool.Updates
             client.DefaultRequestHeaders.UserAgent.ParseAdd("AlbumArtTool/" + DisplayVersion);
         }
 
-        internal async Task<AppRelease> CheckAsync(CancellationToken token)
+        internal async Task<AppRelease> CheckAsync(CancellationToken token, Version installedVersion = null)
         {
             using (var output = new MemoryStream())
             {
                 await GetAsync(LatestUrl, output, 1024 * 1024, null, token, TimeSpan.FromSeconds(25)).ConfigureAwait(false);
-                return ParseRelease(Encoding.UTF8.GetString(output.ToArray()), CurrentVersion);
+                return ParseRelease(Encoding.UTF8.GetString(output.ToArray()), installedVersion ?? CurrentVersion);
             }
         }
 

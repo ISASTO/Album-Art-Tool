@@ -12,6 +12,7 @@ namespace AlbumArtTool.Updates
 {
     internal sealed class UpdateJob
     {
+        public UpdateJob() { }
         public string Target { get; set; }
         public string MusicFolder { get; set; }
         public string OriginalHash { get; set; }

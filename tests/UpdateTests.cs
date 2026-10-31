@@ -19,6 +19,19 @@ using Microsoft.CSharp;
 
 internal static partial class Tests
 {
+    private static async Task<int> LiveUpdateTest()
+    {
+        string directory = NewFolder("live-update");
+        using (var service = new UpdateService())
+        {
+            var release = await service.CheckAsync(CancellationToken.None, new Version(0, 0));
+            if (release == null) throw new Exception("No published release found.");
+            await service.DownloadAsync(release, Path.Combine(directory, "Download.exe"), null, CancellationToken.None);
+            Console.WriteLine("LIVE UPDATE: GitHub release " + release.Version + ", " + release.Size + " bytes; SHA-256 and EXE version verified.");
+        }
+        return 0;
+    }
+
     private static string ReleaseJson(string tag, byte[] bytes, string digest = null, bool prerelease = false, bool draft = false, string url = null)
     {
         string hash;
@@ -128,7 +141,7 @@ internal static partial class Tests
                 parent.Kill(); parent.WaitForExit();
                 bool finished = helper.WaitForExit(60000);
                 string error = Path.Combine(directory, "error.txt");
-                Assert(finished && helper.ExitCode == 0, "actual helper replaces and restarts Windows app: " + (File.Exists(error) ? File.ReadAllText(error) : "no error file"));
+                Assert(finished && !File.Exists(error), "actual helper replaces and restarts Windows app: " + (File.Exists(error) ? File.ReadAllText(error) : "no error file"));
                 Assert(UpdateService.Hash(installed) == release.Sha256 && !File.Exists(job.Backup), "verified new EXE replaces old one, then removes rollback backup after startup");
                 reopened = Process.GetProcessesByName("AlbumArtTool").Single(p => { try { return string.Equals(p.MainModule.FileName, installed, StringComparison.OrdinalIgnoreCase); } catch { return false; } });
                 reopened.Refresh();

@@ -38,6 +38,12 @@ jobs:
         run: |
           & tests/bin/Release/net48/AlbumArtTool.Tests.exe --live-search "$PWD/TestResults"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Check live GitHub release metadata and verified EXE download
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          & tests/bin/Release/net48/AlbumArtTool.Tests.exe --live-update
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Package portable executable
         shell: pwsh
         run: |
@@ -99,4 +105,4 @@ jobs:
           if [ "$RELEASE_TAG" = "main" ]; then
             RELEASE_TAG="v$(python3 -c 'import xml.etree.ElementTree as e; print(e.parse("src/AlbumArtTool/AlbumArtTool.csproj").find(".//Version").text)')"
           fi
-          gh release create "$RELEASE_TAG" release/AlbumArtTool-Windows.zip release/dist/AlbumArtTool.exe release/SHA256SUMS.txt --target "$RELEASE_COMMIT" --title "Album Art Tool $RELEASE_TAG" --notes "Fixes clipped header controls: Undo last change and Queue now sit side by side at full height. Removes the header tagline. Download AlbumArtTool.exe and replace your previous copy. Windows build, real-format audio integrity checks, and GUI tests passed. The ZIP includes source-license notices."
+          gh release create "$RELEASE_TAG" release/AlbumArtTool-Windows.zip release/dist/AlbumArtTool.exe release/SHA256SUMS.txt --target "$RELEASE_COMMIT" --title "Album Art Tool $RELEASE_TAG" --notes "Adds Get updates: checks this repository's latest stable release, downloads and verifies the EXE, waits for scans and artwork jobs to finish, and restarts in the same music folder. Staged artwork must be applied or discarded before restarting. The updater keeps the previous EXE during installation and restores it if the new app fails to launch. Download this version manually once to get the new button. Windows integration tests cover actual EXE replacement and restart, rollback, corrupt downloads, version comparisons, queue interlocks, and existing audio-editing behavior. The ZIP includes source-license notices."
