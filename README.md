@@ -8,6 +8,8 @@ One Windows app for album artwork, artist cleanup, MP3 conversion, duplicate rem
 
 *Interface shown with test albums and example search results.*
 
+[Light mode preview](docs/light-mode.png)
+
 The app starts in **dark mode**. Click **Light mode** in the header to switch, or **Dark mode** to switch back. Your choice is remembered on this PC and updates open tool windows immediately without interrupting work or discarding a staged cover. Both themes use rounded artwork and controls, readable text, subtle hover transitions, and frosted-style panels. The dropdowns keep native keyboard navigation with clean rounded borders. Windows 11 adds native window corners and matching title-bar colors where supported; older Windows versions use the same painted interface. No additional UI framework or runtime is required.
 
 ## Use it
