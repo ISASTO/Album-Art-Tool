@@ -66,7 +66,7 @@ namespace AlbumArtTool
             artistPreview.Columns.Add("Track", 180); artistPreview.Columns.Add("Current artist", 180); artistPreview.Columns.Add("After cleanup", 150); artistPreview.HeaderStyle = ColumnHeaderStyle.Nonclickable;
             artistPreview.Resize += (s, e) =>
             {
-                int width = Math.Max(120, artistPreview.ClientSize.Width - 2);
+                int width = Math.Max(120, artistPreview.ClientSize.Width);
                 artistPreview.Columns[0].Width = width * 36 / 100; artistPreview.Columns[1].Width = width * 34 / 100;
                 artistPreview.Columns[2].Width = width - artistPreview.Columns[0].Width - artistPreview.Columns[1].Width;
             };

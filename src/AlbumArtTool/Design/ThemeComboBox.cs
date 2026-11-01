@@ -18,13 +18,20 @@ namespace AlbumArtTool.Design
         protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
         protected override void OnDropDown(EventArgs e) { base.OnDropDown(e); Invalidate(); }
         protected override void OnDropDownClosed(EventArgs e) { base.OnDropDownClosed(e); Invalidate(); }
+        protected override void OnDrawItem(DrawItemEventArgs e)
+        {
+            if ((e.State & DrawItemState.ComboBoxEdit) == 0) base.OnDrawItem(e);
+        }
         protected override void WndProc(ref Message m)
         {
+            if (DropDownStyle == ComboBoxStyle.DropDownList && (m.Msg == 0x0317 || m.Msg == 0x0318) && m.WParam != IntPtr.Zero)
+            {
+                using (var graphics = Graphics.FromHdc(m.WParam)) PaintFace(graphics);
+                m.Result = IntPtr.Zero; return;
+            }
             base.WndProc(ref m);
             if (IsDisposed || !IsHandleCreated || DropDownStyle != ComboBoxStyle.DropDownList) return;
             if (m.Msg == 0x000F) { using (var graphics = CreateGraphics()) PaintFace(graphics); }
-            else if ((m.Msg == 0x0317 || m.Msg == 0x0318) && m.WParam != IntPtr.Zero)
-                using (var graphics = Graphics.FromHdc(m.WParam)) PaintFace(graphics);
         }
         private void PaintFace(Graphics target)
         {
