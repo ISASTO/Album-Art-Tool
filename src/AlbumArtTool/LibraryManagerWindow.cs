@@ -133,13 +133,13 @@ namespace AlbumArtTool
                 files.BeginUpdate(); populatingFiles = true;
                 try
                 {
-                foreach (var action in plan.Actions)
-                {
-                    var item = new ListViewItem(action.HasWork ? action.Description : "Keep") { Tag = action, Checked = action.HasWork, ToolTipText = action.Source + "\n" + (action.Target ?? action.Keeper ?? "PC backup folder") + "\n" + (action.Reason ?? "") };
-                    item.SubItems.Add(Relative(action.Source)); item.SubItems.Add(action.Keeper != null ? "Keep: " + Relative(action.Keeper) : action.Target != null ? Relative(action.Target) : "PC backup folder"); item.SubItems.Add(action.Reason ?? "");
-                    if (!action.HasWork) item.ForeColor = MainForm.Muted; files.Items.Add(item);
-                }
-                foreach (string issue in plan.Issues) { var item = new ListViewItem("Skipped") { ForeColor = MainForm.Muted }; item.SubItems.Add(issue); files.Items.Add(item); }
+                    foreach (var action in plan.Actions)
+                    {
+                        var item = new ListViewItem(action.HasWork ? action.Description : "Keep") { Tag = action, Checked = action.HasWork, ToolTipText = action.Source + "\n" + (action.Target ?? action.Keeper ?? "PC backup folder") + "\n" + (action.Reason ?? "") };
+                        item.SubItems.Add(Relative(action.Source)); item.SubItems.Add(action.Keeper != null ? "Keep: " + Relative(action.Keeper) : action.Target != null ? Relative(action.Target) : "PC backup folder"); item.SubItems.Add(action.Reason ?? "");
+                        if (!action.HasWork) item.ForeColor = MainForm.Muted; files.Items.Add(item);
+                    }
+                    foreach (string issue in plan.Issues) { var item = new ListViewItem("Skipped") { ForeColor = MainForm.Muted }; item.SubItems.Add(issue); files.Items.Add(item); }
                 }
                 finally { populatingFiles = false; files.EndUpdate(); }
                 long bytes = plan.Actions.Where(a => a.HasWork && (a.Archive || a.Convert || a.Square)).Sum(a => a.Stamp.Length);

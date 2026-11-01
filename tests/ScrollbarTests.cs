@@ -13,6 +13,8 @@ using AlbumArtTool.Design;
 internal static partial class Tests
 {
     [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
+    [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(Point point);
+    [DllImport("user32.dll")] private static extern IntPtr GetCapture();
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] private static extern int TestWindowStyle(IntPtr window, int index);
     [StructLayout(LayoutKind.Sequential)] private struct TestScrollInfo { public int Size, Mask, Min, Max; public uint Page; public int Position, Track; }
     [DllImport("user32.dll")] private static extern bool GetScrollInfo(IntPtr window, int bar, ref TestScrollInfo info);
@@ -38,10 +40,12 @@ internal static partial class Tests
     {
         var bounds = bar.RectangleToScreen(bar.ClientRectangle);
         Cursor.Position = vertical ? new Point(bounds.Left + bounds.Width / 2, bounds.Top + 12) : new Point(bounds.Left + 12, bounds.Top + bounds.Height / 2);
-        await Task.Delay(35); mouse_event(2, 0, 0, 0, UIntPtr.Zero); await Task.Delay(35);
+        await Task.Delay(90);
+        Console.WriteLine("DRAG " + (vertical ? "V" : "H") + " bounds=" + bounds + " cursor=" + Cursor.Position + " hit=" + WindowFromPoint(Cursor.Position) + " bar=" + bar.Handle + " visible=" + bar.Visible);
+        mouse_event(2, 0, 0, 0, UIntPtr.Zero); await Task.Delay(90);
         try
         {
-            Assert(bar.Capture, "rounded scrollbar receives real mouse capture on its thumb");
+            Assert(bar.Capture, "rounded scrollbar receives real mouse capture on its thumb (capture=" + GetCapture() + ", bar=" + bar.Handle + ")");
             for (int step = 1; step <= 6; step++)
             {
                 Cursor.Position = vertical ? new Point(bounds.Left + bounds.Width / 2, bounds.Top + 12 + (bounds.Height - 19) * step / 6) :
@@ -55,7 +59,7 @@ internal static partial class Tests
     private static void ScrollbarGuiSmoke(string output)
     {
         Exception failure = null;
-        using (var form = new Form { Text = "Scrollbar check", ClientSize = new Size(900, 680), Font = new Font("Segoe UI", 10) })
+        using (var form = new Form { Text = "Scrollbar check", StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(900, 680), Font = new Font("Segoe UI", 10) })
         {
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(12) };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45)); layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55));
@@ -71,7 +75,7 @@ internal static partial class Tests
             {
                 try
                 {
-                    await Task.Delay(80);
+                    form.Activate(); form.BringToFront(); await Task.Delay(80);
                     var albumHost = ThemeScrollbars.For(albums); var rowHost = ThemeScrollbars.For(rows);
                     Assert(albumHost.VerticalBar.Visible && rowHost.VerticalBar.Visible && rowHost.HorizontalBar.Visible, "independent scrollbars follow native virtual and track-list ranges");
                     Assert(rows.ClientSize == rowHost.VisibleContent.Size && albums.ClientSize == albumHost.VisibleContent.Size,
@@ -124,7 +128,11 @@ internal static partial class Tests
                     Assert(rows.Items.Count == 0 && albums.AlbumCount == 0 && !albumHost.VerticalBar.Visible && !rowHost.VerticalBar.Visible,
                         "scrollbars disappear when lists become empty without retaining stale rows");
                 }
-                catch (Exception ex) { failure = ex; }
+                catch (Exception ex)
+                {
+                    using (var screen = ScreenImage(new Rectangle(form.Location, form.Size))) screen.Save(Path.Combine(output, "scrollbar-failure-screen.png"), ImageFormat.Png);
+                    failure = ex;
+                }
                 finally { mouse_event(4, 0, 0, 0, UIntPtr.Zero); AppTheme.SetDark(true, false); form.Close(); }
             };
             Application.Run(form);

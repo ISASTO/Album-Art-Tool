@@ -56,7 +56,7 @@ namespace AlbumArtTool.Design
             finally { parent.ResumeLayout(true); }
             window = new ContentWindow(control, QueueSync);
             control.SizeChanged += ContentChanged; control.VisibleChanged += ContentChanged; control.FontChanged += ContentChanged;
-            control.BackColorChanged += ContentChanged;
+            control.BackColorChanged += ContentChanged; control.EnabledChanged += ContentChanged;
             if (control is ScrollableControl scrollable) scrollable.Scroll += ContentScrolled;
             QueueSync();
         }
@@ -87,6 +87,8 @@ namespace AlbumArtTool.Design
             syncing = true;
             try
             {
+                if (content is ListView && (SendMessage(content.Handle, 0x1037, IntPtr.Zero, IntPtr.Zero).ToInt64() & 0x10000) == 0)
+                    SendMessage(content.Handle, 0x1036, (IntPtr)0x10000, (IntPtr)0x10000);
                 int gutter = AppTheme.Scale(this, 14);
                 bool showVertical = vertical.Visible, showHorizontal = horizontal.Visible;
                 // Native bars may appear/disappear as the window is resized. Converge
@@ -186,7 +188,7 @@ namespace AlbumArtTool.Design
                 window?.Dispose();
                 if (content != null)
                 {
-                    content.SizeChanged -= ContentChanged; content.VisibleChanged -= ContentChanged; content.FontChanged -= ContentChanged; content.BackColorChanged -= ContentChanged;
+                    content.SizeChanged -= ContentChanged; content.VisibleChanged -= ContentChanged; content.FontChanged -= ContentChanged; content.BackColorChanged -= ContentChanged; content.EnabledChanged -= ContentChanged;
                     if (content is ScrollableControl scrollable) scrollable.Scroll -= ContentScrolled;
                 }
             }
@@ -311,7 +313,7 @@ namespace AlbumArtTool.Design
             {
                 private readonly RoundedBar bar;
                 internal BarAccessibility(RoundedBar bar) : base(bar) { this.bar = bar; }
-                public override string Value { get => bar.metrics.Position.ToString(System.Globalization.CultureInfo.InvariantCulture); set { if (int.TryParse(value, out int position)) bar.scroll(position); } }
+                public override string Value { get { var value = bar.metrics; return value.Position.ToString(System.Globalization.CultureInfo.InvariantCulture); } set { if (int.TryParse(value, out int position)) bar.scroll(position); } }
             }
             protected override void Dispose(bool disposing) { if (disposing) repeat.Dispose(); base.Dispose(disposing); }
         }
