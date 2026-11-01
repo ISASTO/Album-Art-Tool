@@ -5,7 +5,7 @@
     <AssemblyName>AlbumArtTool</AssemblyName>
     <RootNamespace>AlbumArtTool</RootNamespace>
     <LangVersion>latest</LangVersion>
-    <Version>2.4.1</Version>
+    <Version>2.4.2</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/AppIcon.ico</ApplicationIcon>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

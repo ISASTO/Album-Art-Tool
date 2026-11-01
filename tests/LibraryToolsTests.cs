@@ -141,6 +141,7 @@ internal static partial class Tests
         SetArtists(one, new[] { "BENEE" }, new[] { "BENEE" }, "Happen to Me");
         SetArtists(two, new[] { "BENEE", "Featured Artist" }, new[] { "BENEE" }, "A collaboration");
         System.IO.File.Copy(one, Path.Combine(copy, "one.mp3")); System.IO.File.Copy(two, Path.Combine(copy, "two.mp3"));
+        SetArtists(Path.Combine(copy, "one.mp3"), new[] { "BENEE" }, new[] { "BENEE" }, "A different opener");
         string cleanFile = CopyTrack(second, "one.flac", "A clean album", "Another Artist"); SetArtists(cleanFile, new[] { "Another Artist" }, new string[0]);
         var service = new GatedCoverSearch(); Exception failure = null;
         using (var form = new MainForm(root, false, service))
@@ -170,6 +171,16 @@ internal static partial class Tests
                     var preview = Descendants(form).OfType<ListView>().Single(l => l.AccessibleName == "Current track artists");
                     Assert(preview.Items.Cast<ListViewItem>().Count(i => i.SubItems[2].Text == "Unchanged") == 1 && preview.Items.Cast<ListViewItem>().Count(i => i.SubItems[2].Text == "BENEE") == 1,
                         "artist preview distinguishes unchanged tracks from the actual proposed credits");
+                    Cursor.Position = preview.PointToScreen(new Point(90, 35)); await Task.Delay(40);
+                    using (var prior = ScreenImage(AlbumArtTool.Design.ThemeScrollbars.For(preview).VisibleContent))
+                    {
+                        string oldTitle = preview.Items[0].Text;
+                        list.SelectedIndices.Clear(); list.SelectedIndices.Add(1); await Task.Delay(80);
+                        using (var after = ScreenImage(AlbumArtTool.Design.ThemeScrollbars.For(preview).VisibleContent))
+                            Assert(preview.Items[0].Text != oldTitle && DifferentPixels(prior, after) > 30,
+                                "album switching repaints track names without moving the pointer out of the preview");
+                    }
+                    list.SelectedIndices.Clear(); list.SelectedIndices.Add(0); await Task.Delay(40);
                     ProcessStartInfo opened = null; form.StartExplorer = info => opened = info;
                     var albumFolder = Descendants(form).OfType<Button>().Single(b => b.AccessibleName == "Open artist-tab album folder");
                     var showTrack = Descendants(form).OfType<Button>().Single(b => b.AccessibleName == "Reveal artist-tab selected track");

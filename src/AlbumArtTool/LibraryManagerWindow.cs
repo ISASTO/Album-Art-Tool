@@ -32,6 +32,7 @@ namespace AlbumArtTool
         private LibraryPlan plan;
         private LibraryJournal undoJournal;
         private string encoder;
+        private bool populatingFiles;
         internal bool IsWorking { get; private set; }
         internal LibraryPlan CurrentPlan => plan;
 
@@ -44,7 +45,7 @@ namespace AlbumArtTool
             foreach (int height in new[] { 38, 132, 38, 38, 44, 48 }) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
             var path = new Label { Text = "Music folder: " + root, Dock = DockStyle.Fill, ForeColor = MainForm.Ink, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
-            var options = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
+            var options = new BufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty, AccessibleName = "Library management options" };
             options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             foreach (int unused in new[] { 1, 2, 3, 4 }) options.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
             options.Controls.Add(convert, 0, 0); options.Controls.Add(square, 1, 0); options.Controls.Add(duplicates, 0, 1); options.Controls.Add(organize, 1, 1);
@@ -73,6 +74,7 @@ namespace AlbumArtTool
             files.BackColor = MainForm.Surface; files.ForeColor = MainForm.Ink; files.BorderStyle = BorderStyle.FixedSingle; files.HideSelection = false;
             files.Columns.Add("Action", 205); files.Columns.Add("Source", 285); files.Columns.Add("Destination / retained copy", 300); files.Columns.Add("Details", 420);
             files.AccessibleName = "Planned library changes"; files.ShowItemToolTips = true; files.ItemChecked += (s, e) => UpdateApply();
+            files.ItemCheck += (s, e) => { if (IsWorking && !populatingFiles) e.NewValue = e.CurrentValue; };
             progress.Dock = DockStyle.Fill; progress.Margin = new Padding(0, 8, 0, 2); progress.Visible = false; progress.AccessibleName = "Library management progress";
             var filesCard = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(10), Margin = new Padding(0, 2, 0, 0) }; filesCard.Controls.Add(files);
             layout.Controls.Add(path, 0, 0); layout.Controls.Add(optionsCard, 0, 1); layout.Controls.Add(tools, 0, 2); layout.Controls.Add(backups, 0, 3);
@@ -101,7 +103,7 @@ namespace AlbumArtTool
         private void SetWorking(bool value)
         {
             IsWorking = value;
-            foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, rename, backup, preview, undo, download, chooseEncoder, chooseBackup, files }) control.Enabled = !value;
+            foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, rename, backup, preview, undo, download, chooseEncoder, chooseBackup }) control.Enabled = !value;
             stop.Enabled = value; progress.Visible = value; UpdateApply();
         }
         private void UpdateApply()
@@ -128,7 +130,9 @@ namespace AlbumArtTool
             try
             {
                 var reporter = Reporter(); plan = await Task.Run(() => LibraryPlanner.Build(options, source.Token, reporter));
-                files.BeginUpdate();
+                files.BeginUpdate(); populatingFiles = true;
+                try
+                {
                 foreach (var action in plan.Actions)
                 {
                     var item = new ListViewItem(action.HasWork ? action.Description : "Keep") { Tag = action, Checked = action.HasWork, ToolTipText = action.Source + "\n" + (action.Target ?? action.Keeper ?? "PC backup folder") + "\n" + (action.Reason ?? "") };
@@ -136,7 +140,8 @@ namespace AlbumArtTool
                     if (!action.HasWork) item.ForeColor = MainForm.Muted; files.Items.Add(item);
                 }
                 foreach (string issue in plan.Issues) { var item = new ListViewItem("Skipped") { ForeColor = MainForm.Muted }; item.SubItems.Add(issue); files.Items.Add(item); }
-                files.EndUpdate();
+                }
+                finally { populatingFiles = false; files.EndUpdate(); }
                 long bytes = plan.Actions.Where(a => a.HasWork && (a.Archive || a.Convert || a.Square)).Sum(a => a.Stamp.Length);
                 state.Text = plan.Actions.Count(a => a.HasWork) + " changes across " + plan.Actions.Count + " files · originals need about " + (bytes / 1048576.0).ToString("N0") + " MB in the backup folder · " + plan.Issues.Count + " skipped/problems. Review, uncheck unwanted changes, then Apply.";
             }

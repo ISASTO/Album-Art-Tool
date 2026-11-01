@@ -199,6 +199,27 @@ internal static partial class Tests
                 try
                 {
                     Descendants(form).OfType<TextBox>().Single(t => t.AccessibleName == "PC backup folder").Text = backups;
+                    // Exercise the same progress callbacks as a long scan, sampling
+                    // the screen while the disabled options remain under the mouse.
+                    var setWorking = typeof(LibraryManagerWindow).GetMethod("SetWorking", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    setWorking.Invoke(form, new object[] { true });
+                    var reporter = (IProgress<ProgressInfo>)typeof(LibraryManagerWindow).GetMethod("Reporter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(form, null);
+                    var optionsPanel = Descendants(form).Single(c => c.AccessibleName == "Library management options");
+                    Cursor.Position = optionsPanel.PointToScreen(new Point(70, 20)); await Task.Delay(60);
+                    using (var initial = ScreenImage(optionsPanel.RectangleToScreen(optionsPanel.ClientRectangle)))
+                    {
+                        for (int n = 1; n <= 16; n++)
+                        {
+                            reporter.Report(new ProgressInfo { Completed = n * 300, Total = 6589, Message = n * 300 + "/6589 tracks scanned · Artist/Album " + n });
+                            await Task.Delay(25);
+                            using (var frame = ScreenImage(optionsPanel.RectangleToScreen(optionsPanel.ClientRectangle)))
+                                Assert(DifferentPixels(initial, frame) == 0, "scan progress does not alter or flash the options panel");
+                        }
+                    }
+                    var planned = Descendants(form).OfType<ListView>().Single(l => l.AccessibleName == "Planned library changes");
+                    Assert(planned.Enabled, "the management list keeps its dark background and remains scrollable during work");
+                    using (var screen = ScreenImage(new Rectangle(form.Location, form.Size))) screen.Save(Path.Combine(output, "manager-scanning-stable-options.png"), ImageFormat.Png);
+                    setWorking.Invoke(form, new object[] { false });
                     await form.PreviewAsync();
                     Assert(form.CurrentPlan != null && form.CurrentPlan.Actions.Any(a => a.Convert) && form.CurrentPlan.Actions.Any(a => a.Keeper != null), "manager UI previews conversion and duplicate removal together");
                     var rename = Descendants(form).OfType<CheckBox>().Single(c => c.AccessibleName == "Rename song files from Title tags");

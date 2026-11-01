@@ -10,7 +10,6 @@ namespace AlbumArtTool
         internal ThemeCheckBox() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true); BackColor = Color.Transparent; }
         protected override void OnPaint(PaintEventArgs e)
         {
-            base.OnPaintBackground(e);
             int size = Math.Max(13, (int)Math.Round(14.0 * DeviceDpi / 96)), gap = AppTheme.Scale(this, 7);
             var box = new Rectangle(Padding.Left + 1, (Height - size) / 2, size, size);
             AppTheme.DrawCheck(e.Graphics, box, Checked, Enabled);

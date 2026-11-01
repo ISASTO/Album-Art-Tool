@@ -30,12 +30,12 @@ namespace AlbumArtTool.Design
         internal FrostPanel() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor | ControlStyles.ResizeRedraw, true); BackColor = Color.Transparent; Padding = new Padding(10); }
         protected override void OnPaintBackground(PaintEventArgs e) { base.OnPaintBackground(e); AppTheme.Frost(e.Graphics, ClientRectangle, AppTheme.Scale(this, CornerRadius)); }
     }
-    internal sealed class DetailPanel : FrostPanel
+    // Buffer each native list locally; compositing the whole details subtree can
+    // leave owner-drawn rows stale until the mouse leaves a child window.
+    internal sealed class DetailPanel : FrostPanel { }
+    internal sealed class BufferedTableLayoutPanel : TableLayoutPanel
     {
-        protected override CreateParams CreateParams
-        {
-            get { var parameters = base.CreateParams; parameters.ExStyle |= 0x02000000; return parameters; } // WS_EX_COMPOSITED: buffer child windows together.
-        }
+        internal BufferedTableLayoutPanel() { DoubleBuffered = true; ResizeRedraw = true; }
     }
     internal sealed class InsetPanel : Panel
     {

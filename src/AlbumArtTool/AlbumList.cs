@@ -49,7 +49,7 @@ namespace AlbumArtTool
                 var album = albums[e.ItemIndex];
                 e.Item = new ListViewItem(album.Title + " · " + album.Artist + " · " + album.Coverage, 0) { ToolTipText = album.Folder, Tag = album };
             };
-            Resize += (s, e) => { if (Columns.Count > 0) Columns[0].Width = Math.Max(80, ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 2); };
+            Resize += (s, e) => { if (Columns.Count > 0) Columns[0].Width = Math.Max(80, ClientSize.Width - 2); };
             DrawColumnHeader += (s, e) => e.DrawDefault = true;
             DrawSubItem += DrawAlbum;
             MouseMove += (s, e) => SetHover(GetItemAt(e.X, e.Y)?.Index ?? -1);
