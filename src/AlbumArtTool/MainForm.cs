@@ -278,6 +278,7 @@ namespace AlbumArtTool
         {
             if (busy) return;
             showingMissing = missing; showingArtists = false;
+            SetViewFilter(0);
             onlyMissing.Checked = missing;
             StyleTabs();
             RefreshAlbums();

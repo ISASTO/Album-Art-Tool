@@ -94,7 +94,9 @@ namespace AlbumArtTool.Management
         {
             var options = plan.Options;
             if (BackupSettings.Within(options.BackupRoot, options.Root)) throw new IOException("Backups must be outside the active music tree.");
-            long backupBytes = plan.Actions.Where(a => a.Selected && a.HasWork && (a.Archive || a.Convert || a.Square)).Sum(a => a.Stamp.Length);
+            foreach (var group in plan.Actions.Where(a => !string.IsNullOrEmpty(a.MergeGroup)).GroupBy(a => a.MergeGroup))
+                if (group.Any(a => a.Selected) && group.Any(a => !a.Selected)) throw new IOException("Select or clear the complete multi-disc album before applying its merge.");
+            long backupBytes = plan.Actions.Where(a => a.Selected && a.HasWork && (a.Archive || a.Convert || a.Square || a.ChangesTags)).Sum(a => a.Stamp.Length);
             try
             {
                 var drive = new DriveInfo(Path.GetPathRoot(options.BackupRoot));
@@ -111,7 +113,7 @@ namespace AlbumArtTool.Management
             {
                 if (token.IsCancellationRequested) { journal.Stopped = true; break; }
                 var entry = new JournalEntry { Index = journal.Entries.Count, Source = row.Source, Target = row.Archive ? null : row.Target, Archive = row.Archive,
-                    MoveOnly = !row.Archive && !row.Convert && !row.Square, State = "Preparing" };
+                    MoveOnly = !row.Archive && !row.Convert && !row.Square && !row.ChangesTags, State = "Preparing" };
                 journal.Entries.Add(entry);
                 string temp = null; bool changed = false;
                 try
@@ -151,7 +153,7 @@ namespace AlbumArtTool.Management
                             Encoder.Convert(options.EncoderPath, row.Track, temp, token, fraction => progress?.Report(new ProgressInfo { Completed = done, Total = selected.Length, Fraction = fraction,
                                 Message = "MP3 320 · " + (done + 1) + "/" + selected.Length + " · " + Path.GetFileName(row.Source) }));
                         else Copy(row.Source, temp, token);
-                        if (row.Square) SquarePictures(temp);
+                        if (row.Square || row.ChangesTags) EditTags(temp, row.Square, row);
                         entry.WrittenHash = CoverEditor.Hash(temp); entry.State = "Prepared"; journal.Save(entry);
                         token.ThrowIfCancellationRequested(); CheckOriginal(entry);
                         if (row.Source.Equals(row.Target, StringComparison.OrdinalIgnoreCase))
@@ -196,25 +198,45 @@ namespace AlbumArtTool.Management
         }
         private static void CheckOriginal(JournalEntry entry)
         { if (CoverEditor.Hash(entry.Source) != entry.OriginalHash) throw new IOException("The original changed during processing. It was not removed or overwritten."); }
-        internal static void SquarePictures(string path)
+        internal static void SquarePictures(string path) => EditTags(path, true, null);
+        private static void EditTags(string path, bool square, LibraryAction row)
         {
-            byte[][] expected;
+            byte[][] expected = null;
             using (var file = TagLib.File.Create(path, TagLib.ReadStyle.None))
             {
-                var pictures = file.Tag.Pictures;
-                foreach (var picture in pictures)
+                if (square)
                 {
-                    byte[] bytes = picture.Data.Data; byte[] square = Artwork.Square(bytes);
-                    if (ReferenceEquals(bytes, square)) continue;
-                    picture.Data = new TagLib.ByteVector(square);
-                    picture.MimeType = square[0] == 0xff && square[1] == 0xd8 ? "image/jpeg" : "image/png";
+                    var pictures = file.Tag.Pictures;
+                    foreach (var picture in pictures)
+                    {
+                        byte[] bytes = picture.Data.Data; byte[] cropped = Artwork.Square(bytes);
+                        if (ReferenceEquals(bytes, cropped)) continue;
+                        picture.Data = new TagLib.ByteVector(cropped);
+                        picture.MimeType = cropped[0] == 0xff && cropped[1] == 0xd8 ? "image/jpeg" : "image/png";
+                    }
+                    expected = pictures.Select(p => p.Data.Data).ToArray(); file.Tag.Pictures = pictures;
                 }
-                expected = pictures.Select(p => p.Data.Data).ToArray(); file.Tag.Pictures = pictures; file.Save();
+                if (row?.NewTitle != null) file.Tag.Title = row.NewTitle;
+                if (row?.MergeDiscs == true)
+                {
+                    file.Tag.Album = row.MergedAlbum; file.Tag.Track = row.MergedTrack; file.Tag.TrackCount = row.MergedTrackCount;
+                    file.Tag.Disc = 1; file.Tag.DiscCount = 1;
+                    var artists = file.Tag.AlbumArtists;
+                    if (artists.Length == 0) artists = new[] { row.MergedArtist }; else artists[0] = row.MergedArtist;
+                    file.Tag.AlbumArtists = artists;
+                }
+                file.Save();
             }
             using (var file = TagLib.File.Create(path, TagLib.ReadStyle.None))
             {
-                var pictures = file.Tag.Pictures;
-                if (pictures.Length != expected.Length || pictures.Where((p, i) => !p.Data.Data.SequenceEqual(expected[i])).Any()) throw new IOException("The format did not retain all cropped pictures. Original kept.");
+                if (square)
+                {
+                    var pictures = file.Tag.Pictures;
+                    if (pictures.Length != expected.Length || pictures.Where((p, i) => !p.Data.Data.SequenceEqual(expected[i])).Any()) throw new IOException("The format did not retain all cropped pictures. Original kept.");
+                }
+                if (row?.NewTitle != null && file.Tag.Title != row.NewTitle) throw new IOException("The format did not retain the cleaned song title. Original kept.");
+                if (row?.MergeDiscs == true && (file.Tag.Album != row.MergedAlbum || file.Tag.Track != row.MergedTrack || file.Tag.TrackCount != row.MergedTrackCount ||
+                    file.Tag.Disc != 1 || file.Tag.DiscCount != 1 || file.Tag.FirstAlbumArtist != row.MergedArtist)) throw new IOException("The format did not retain the combined album and track numbering. Original kept.");
             }
         }
         internal static void Copy(string source, string target, CancellationToken token) => FileTransfer.Copy(source, target, token);

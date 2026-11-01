@@ -37,8 +37,8 @@ namespace AlbumArtTool
             albumFilter.Items.AddRange(new object[] { "All albums in this tab", "Artist cleanup available" });
             albumSort.Items.AddRange(new object[] { "Artist and album", "Album title", "Artist changes first" });
             albumFilter.SelectedIndex = albumSort.SelectedIndex = 0;
-            albumFilter.SelectedIndexChanged += (s, e) => { if (!busy) RefreshAlbums(); };
-            albumSort.SelectedIndexChanged += (s, e) => { if (!busy) RefreshAlbums(); };
+            albumFilter.SelectedIndexChanged += (s, e) => { if (!busy && !changingAlbumView) RefreshAlbums(); };
+            albumSort.SelectedIndexChanged += (s, e) => { if (!busy && !changingAlbumView) RefreshAlbums(); };
             findDuplicates.Click += async (s, e) => await FindDuplicatesAsync();
             manageLibrary.Click += (s, e) => ShowLibraryManager();
             ((ThemeButton)manageLibrary).Primary = true;
@@ -87,11 +87,18 @@ namespace AlbumArtTool
             return panel;
         }
 
+        private bool changingAlbumView;
+        private void SetViewFilter(int index)
+        {
+            changingAlbumView = true;
+            try { albumFilter.SelectedIndex = index; }
+            finally { changingAlbumView = false; }
+        }
         private void SwitchArtists()
         {
             if (busy) return;
             showingArtists = true;
-            if (albumFilter.SelectedIndex != 1) albumFilter.SelectedIndex = 1;
+            SetViewFilter(1);
             StyleTabs(); RefreshAlbums();
         }
         private void StyleTabs()

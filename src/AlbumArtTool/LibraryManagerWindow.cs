@@ -21,7 +21,8 @@ namespace AlbumArtTool
         private readonly CheckBox convert = Check("Convert lossless / over 320 kbps to MP3 320", true), square = Check("Center-crop embedded artwork to squares", true),
             duplicates = Check("Remove confirmed duplicate songs / albums", true), organize = Check("Organize all folders into Artist / Album", true),
             archive = Check("Move old tool backups off the music player", true), compatibility = Check("Also convert other non-MP3 audio (compatibility)", false),
-            rename = Check("Rename song files from Title tags", false);
+            rename = Check("Rename song files from Title tags", false), combine = Check("Combine multi-disc albums", false),
+            cleanTitles = Check("Remove featured artists from titles", false);
         private readonly TextBox backup = new TextBox();
         private readonly Label state = new Label(), encoderState = new Label();
         private readonly ProgressBar progress = new ThemeProgressBar();
@@ -32,7 +33,7 @@ namespace AlbumArtTool
         private LibraryPlan plan;
         private LibraryJournal undoJournal;
         private string encoder;
-        private bool populatingFiles;
+        private bool populatingFiles, syncingMergeSelection;
         internal bool IsWorking { get; private set; }
         internal LibraryPlan CurrentPlan => plan;
 
@@ -42,20 +43,22 @@ namespace AlbumArtTool
             Text = "Manage music library"; ClientSize = new Size(1000, 660); MinimumSize = new Size(960, 620);
             StartPosition = FormStartPosition.CenterParent; AutoScaleMode = AutoScaleMode.Dpi; BackColor = MainForm.Surface; ForeColor = MainForm.Ink; Font = new Font("Segoe UI", 10);
             var layout = new FrostCanvas { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 8, Padding = new Padding(12) };
-            foreach (int height in new[] { 38, 132, 38, 38, 44, 48 }) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+            foreach (int height in new[] { 38, 162, 38, 38, 44, 48 }) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
             var path = new Label { Text = "Music folder: " + root, Dock = DockStyle.Fill, ForeColor = MainForm.Ink, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
-            var options = new BufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty, AccessibleName = "Library management options" };
+            var options = new BufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 5, Margin = Padding.Empty, AccessibleName = "Library management options" };
             options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            foreach (int unused in new[] { 1, 2, 3, 4 }) options.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
+            foreach (int unused in new[] { 1, 2, 3, 4, 5 }) options.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
             options.Controls.Add(convert, 0, 0); options.Controls.Add(square, 1, 0); options.Controls.Add(duplicates, 0, 1); options.Controls.Add(organize, 1, 1);
             options.Controls.Add(archive, 0, 2); options.Controls.Add(compatibility, 1, 2);
             rename.AccessibleName = "Rename song files from Title tags"; options.Controls.Add(rename, 0, 3);
-            options.Controls.Add(new Label { Text = "01 - World Eater.mp3 → World Eater.mp3", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
-                Font = new Font("Segoe UI", 9), ForeColor = MainForm.Muted, AutoEllipsis = true, Margin = new Padding(3) }, 1, 3);
+            combine.AccessibleName = "Combine multi-disc albums"; cleanTitles.AccessibleName = "Remove featured artists from titles";
+            options.Controls.Add(combine, 1, 3); options.Controls.Add(cleanTitles, 0, 4);
+            options.Controls.Add(new Label { Text = "Cleans feat. / ft. / featuring credits", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
+                Font = new Font("Segoe UI", 9), ForeColor = MainForm.Muted, AutoEllipsis = true, Margin = new Padding(3) }, 1, 4);
             var optionsCard = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(10, 5, 10, 5), Margin = new Padding(0, 0, 0, 5) };
             optionsCard.Controls.Add(options);
-            foreach (var check in new[] { convert, square, duplicates, organize, archive, compatibility, rename }) check.CheckedChanged += (s, e) => InvalidatePlan();
+            foreach (var check in new[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles }) check.CheckedChanged += (s, e) => InvalidatePlan();
             var tools = Row(165, 160); encoderState.ForeColor = MainForm.Muted; encoderState.Dock = DockStyle.Fill; encoderState.TextAlign = ContentAlignment.MiddleLeft; encoderState.AutoEllipsis = true;
             tools.Controls.Add(encoderState, 0, 0); tools.Controls.Add(download, 1, 0); tools.Controls.Add(chooseEncoder, 2, 0);
             var backups = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
@@ -74,7 +77,20 @@ namespace AlbumArtTool
             files.BackColor = MainForm.Surface; files.ForeColor = MainForm.Ink; files.BorderStyle = BorderStyle.FixedSingle; files.HideSelection = false;
             files.Columns.Add("Action", 205); files.Columns.Add("Source", 285); files.Columns.Add("Destination / retained copy", 300); files.Columns.Add("Details", 420);
             files.AccessibleName = "Planned library changes"; files.ShowItemToolTips = true; files.ItemChecked += (s, e) => UpdateApply();
-            files.ItemCheck += (s, e) => { if (IsWorking && !populatingFiles) e.NewValue = e.CurrentValue; };
+            files.ItemCheck += (s, e) =>
+            {
+                if (IsWorking && !populatingFiles) { e.NewValue = e.CurrentValue; return; }
+                if (populatingFiles || syncingMergeSelection || e.Index < 0 || e.Index >= files.Items.Count) return;
+                var row = files.Items[e.Index].Tag as LibraryAction;
+                if (string.IsNullOrEmpty(row?.MergeGroup)) return;
+                syncingMergeSelection = true;
+                try
+                {
+                    foreach (ListViewItem other in files.Items)
+                        if (other.Index != e.Index && other.Tag is LibraryAction action && action.MergeGroup == row.MergeGroup) other.Checked = e.NewValue == CheckState.Checked;
+                }
+                finally { syncingMergeSelection = false; }
+            };
             progress.Dock = DockStyle.Fill; progress.Margin = new Padding(0, 8, 0, 2); progress.Visible = false; progress.AccessibleName = "Library management progress";
             var filesCard = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(10), Margin = new Padding(0, 2, 0, 0) }; filesCard.Controls.Add(files);
             layout.Controls.Add(path, 0, 0); layout.Controls.Add(optionsCard, 0, 1); layout.Controls.Add(tools, 0, 2); layout.Controls.Add(backups, 0, 3);
@@ -103,7 +119,7 @@ namespace AlbumArtTool
         private void SetWorking(bool value)
         {
             IsWorking = value;
-            foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, rename, backup, preview, undo, download, chooseEncoder, chooseBackup }) control.Enabled = !value;
+            foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles, backup, preview, undo, download, chooseEncoder, chooseBackup }) control.Enabled = !value;
             stop.Enabled = value; progress.Visible = value; UpdateApply();
             AppTheme.PrepareSurface(this);
         }
@@ -126,7 +142,7 @@ namespace AlbumArtTool
         {
             if (IsWorking || !Ready()) return;
             var options = new LibraryOptions { Root = root, BackupRoot = backup.Text, EncoderPath = encoder, Convert = convert.Checked, ConvertOtherLossy = compatibility.Checked,
-                Square = square.Checked, Duplicates = duplicates.Checked, Organize = organize.Checked, ArchiveOldBackups = archive.Checked, RenameFromTitle = rename.Checked };
+                Square = square.Checked, Duplicates = duplicates.Checked, Organize = organize.Checked, ArchiveOldBackups = archive.Checked, RenameFromTitle = rename.Checked, CombineDiscs = combine.Checked, RemoveFeaturedTitles = cleanTitles.Checked };
             source?.Dispose(); source = new CancellationTokenSource(); SetWorking(true); exclusive(true); files.Items.Clear(); plan = null; undoJournal = null;
             try
             {
@@ -143,7 +159,7 @@ namespace AlbumArtTool
                     foreach (string issue in plan.Issues) { var item = new ListViewItem("Skipped") { ForeColor = MainForm.Muted }; item.SubItems.Add(issue); files.Items.Add(item); }
                 }
                 finally { populatingFiles = false; files.EndUpdate(); }
-                long bytes = plan.Actions.Where(a => a.HasWork && (a.Archive || a.Convert || a.Square)).Sum(a => a.Stamp.Length);
+                long bytes = plan.Actions.Where(a => a.HasWork && (a.Archive || a.Convert || a.Square || a.ChangesTags)).Sum(a => a.Stamp.Length);
                 state.Text = plan.Actions.Count(a => a.HasWork) + " changes across " + plan.Actions.Count + " files · originals need about " + (bytes / 1048576.0).ToString("N0") + " MB in the backup folder · " + plan.Issues.Count + " skipped/problems. Review, uncheck unwanted changes, then Apply.";
             }
             catch (OperationCanceledException) { state.Text = "Preview stopped. No files were changed."; }

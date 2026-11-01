@@ -18,6 +18,8 @@ namespace AlbumArtTool.Management
         public bool Square { get; set; }
         public bool Organize { get; set; }
         public bool RenameFromTitle { get; set; }
+        public bool CombineDiscs { get; set; }
+        public bool RemoveFeaturedTitles { get; set; }
         public bool Duplicates { get; set; }
         public bool ArchiveOldBackups { get; set; }
     }
@@ -34,12 +36,21 @@ namespace AlbumArtTool.Management
         public bool Square { get; set; }
         public bool Archive { get; set; }
         public bool Selected { get; set; } = true;
+        public string NewTitle { get; set; }
+        public bool MergeDiscs { get; set; }
+        public string MergeGroup { get; set; }
+        public string MergeSourceRoot { get; set; }
+        public string MergedAlbum { get; set; }
+        public string MergedArtist { get; set; }
+        public uint MergedTrack { get; set; }
+        public uint MergedTrackCount { get; set; }
+        internal bool ChangesTags => MergeDiscs || NewTitle != null;
         internal FileStamp Stamp;
         internal bool Move => !string.IsNullOrEmpty(Target) && !Source.Equals(Target, StringComparison.OrdinalIgnoreCase);
         internal bool Rename => !string.IsNullOrEmpty(Target) && !Path.GetFileNameWithoutExtension(Source).Equals(Path.GetFileNameWithoutExtension(Target), StringComparison.Ordinal);
-        internal bool HasWork => Archive || Convert || Square || Move || Rename;
+        internal bool HasWork => Archive || Convert || Square || Move || Rename || ChangesTags;
         internal string Description => Archive ? Keeper != null ? "Remove duplicate (backed up)" : "Archive old backup" :
-            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, Rename ? "Rename" : null,
+            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, MergeDiscs ? "Combine discs · track " + MergedTrack : null, NewTitle != null ? "Clean title" : null, Rename ? "Rename" : null,
                 Move && !Path.GetDirectoryName(Source).Equals(Path.GetDirectoryName(Target), StringComparison.OrdinalIgnoreCase) ? "Move" : null }.Where(s => s != null));
     }
     internal sealed class LibraryPlan
@@ -141,6 +152,15 @@ namespace AlbumArtTool.Management
                         if (title.Length == 0) AddReason(row, "Filename kept: missing usable Title tag.");
                         else row.Target = Path.Combine(Path.GetDirectoryName(row.Target), title + Path.GetExtension(row.Target));
                     }
+                    if (options.RemoveFeaturedTitles)
+                    {
+                        string title = track.HasTitleTag ? TitleCleanup.Clean(track.Title) : null;
+                        if (title != null && !title.Equals(track.Title, StringComparison.Ordinal)) row.NewTitle = title;
+                        string previousName = Path.GetFileNameWithoutExtension(row.Target);
+                        string name = TitleCleanup.Clean(previousName);
+                        if (name != previousName && !string.IsNullOrWhiteSpace(name)) row.Target = Path.Combine(Path.GetDirectoryName(row.Target), LibraryPaths.Component(name) + Path.GetExtension(row.Target));
+                        if (row.NewTitle != null) AddReason(row, "Title: " + track.Title + " → " + row.NewTitle);
+                    }
                     if (row.Convert) row.Target = Path.ChangeExtension(row.Target, ".mp3");
                     LibraryPaths.Safe(row.Target, options.Root);
                     if (row.Target.Length > 250) throw new IOException("The planned path is longer than 250 characters. Shorten the artist/album/file names first.");
@@ -189,11 +209,13 @@ namespace AlbumArtTool.Management
                 while (actions.TryGetValue(row.Keeper, out var next) && next.Archive && next.Keeper != null && seen.Add(row.Keeper)) row.Keeper = next.Keeper;
                 row.KeeperHash = CoverEditor.Hash(row.Keeper);
             }
+            if (options.CombineDiscs) MultiDisc.Plan(plan, scan, actions, token);
             var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var row in actions.Values.Where(a => !a.Archive).OrderBy(a => a.Move ? 1 : 0))
                 row.Target = LibraryPaths.Available(row.Target, row.Source, reserved);
             plan.Actions.AddRange(actions.Values.Where(a => !a.Archive));
             if (options.Organize) AddAssets(plan, scan, actions, reserved, token);
+            if (options.CombineDiscs) MultiDisc.AddAssets(plan, scan, actions, reserved, token);
             plan.Actions.AddRange(actions.Values.Where(a => a.Archive));
             if (options.ArchiveOldBackups) AddOldBackups(plan, token);
             return plan;
@@ -237,9 +259,15 @@ namespace AlbumArtTool.Management
                 {
                     if (!assetExtensions.Contains(Path.GetExtension(path)) || actions.ContainsKey(path)) continue;
                     string relative = path.Substring(source.TrimEnd(Path.DirectorySeparatorChar).Length + 1);
+                    string mergeGroup = live.FirstOrDefault(a => a.MergeDiscs)?.MergeGroup;
+                    if (mergeGroup != null)
+                    {
+                        var parts = relative.Split(Path.DirectorySeparatorChar);
+                        if (parts.Length > 1 && MultiDisc.IsDiscFolder(parts[0])) relative = Path.Combine(parts.Skip(1).ToArray());
+                    }
                     string target = Path.Combine(destination, relative);
                     if (path.Equals(target, StringComparison.OrdinalIgnoreCase)) continue;
-                    var row = new LibraryAction { Source = path, Target = LibraryPaths.Available(target, path, reserved), Stamp = FileStamp.Read(path), Reason = "Album artwork/booklet/sidecar kept with its album." };
+                    var row = new LibraryAction { Source = path, Target = LibraryPaths.Available(target, path, reserved), Stamp = FileStamp.Read(path), MergeGroup = mergeGroup, Reason = "Album artwork/booklet/sidecar kept with its album." };
                     plan.Actions.Add(row);
                 }
             }

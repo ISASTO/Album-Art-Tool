@@ -142,6 +142,7 @@ internal static partial class Tests
         SetArtists(two, new[] { "BENEE", "Featured Artist" }, new[] { "BENEE" }, "A collaboration");
         System.IO.File.Copy(one, Path.Combine(copy, "one.mp3")); System.IO.File.Copy(two, Path.Combine(copy, "two.mp3"));
         SetArtists(Path.Combine(copy, "one.mp3"), new[] { "BENEE" }, new[] { "BENEE" }, "A different opener");
+        Editor.Apply(ScanAlbum(first), Cover, false, false);
         string cleanFile = CopyTrack(second, "one.flac", "A clean album", "Another Artist"); SetArtists(cleanFile, new[] { "Another Artist" }, new string[0]);
         var service = new GatedCoverSearch(); Exception failure = null;
         using (var form = new MainForm(root, false, service))
@@ -156,6 +157,12 @@ internal static partial class Tests
                     Assert(list.AlbumCount == 2, "artist cleanup tab finds eligible albums regardless of whether they have covers");
                     var filter = Descendants(form).OfType<ComboBox>().Single(c => c.AccessibleName == "Album filter");
                     var sort = Descendants(form).OfType<ComboBox>().Single(c => c.AccessibleName == "Album sort order");
+                    Descendants(form).OfType<Button>().Single(b => b.Text.StartsWith("Change existing album art (")).PerformClick();
+                    Assert(filter.SelectedIndex == 0 && list.AlbumCount > 0, "the existing-art tab starts on All albums instead of inheriting artist cleanup");
+                    Descendants(form).OfType<Button>().Single(b => b.Text.StartsWith("Track artists (")).PerformClick();
+                    Descendants(form).OfType<Button>().Single(b => b.Text.StartsWith("Add missing album art (")).PerformClick();
+                    Assert(filter.SelectedIndex == 0, "the missing-art tab also resets the inherited artist filter");
+                    Descendants(form).OfType<Button>().Single(b => b.Text.StartsWith("Track artists (")).PerformClick();
                     filter.SelectedIndex = 0; Assert(list.AlbumCount == 3, "all albums can be reviewed including manually specified artist names");
                     sort.SelectedIndex = 2;
                     Assert(list.SelectedAlbum.ArtistChangeCount > 0, "artist changes first sort promotes eligible albums");
