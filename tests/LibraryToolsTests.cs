@@ -170,6 +170,13 @@ internal static partial class Tests
                     var preview = Descendants(form).OfType<ListView>().Single(l => l.AccessibleName == "Current track artists");
                     Assert(preview.Items.Cast<ListViewItem>().Count(i => i.SubItems[2].Text == "Unchanged") == 1 && preview.Items.Cast<ListViewItem>().Count(i => i.SubItems[2].Text == "BENEE") == 1,
                         "artist preview distinguishes unchanged tracks from the actual proposed credits");
+                    ProcessStartInfo opened = null; form.StartExplorer = info => opened = info;
+                    var albumFolder = Descendants(form).OfType<Button>().Single(b => b.AccessibleName == "Open artist-tab album folder");
+                    var showTrack = Descendants(form).OfType<Button>().Single(b => b.AccessibleName == "Reveal artist-tab selected track");
+                    Assert(albumFolder.Visible && albumFolder.Enabled && !showTrack.Enabled, "artist tab offers album folder access and waits for a selected track before revealing a file");
+                    albumFolder.PerformClick(); Assert(opened.FileName == list.SelectedAlbum.Folder && opened.UseShellExecute, "artist-tab album button opens the currently selected album folder");
+                    preview.Items[1].Selected = true; showTrack.PerformClick();
+                    Assert(opened.FileName == "explorer.exe" && opened.Arguments == "/select," + UpdatesQuote(((Track)preview.Items[1].Tag).Path), "selected-track action reveals that exact file in Explorer with a quoted path");
                     Directory.CreateDirectory(output);
                     using (var bitmap = new Bitmap(form.Width, form.Height))
                     { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "track-artists.png"), ImageFormat.Png); }

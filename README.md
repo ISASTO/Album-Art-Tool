@@ -71,6 +71,8 @@ The suggestion uses a specific tagged album artist first, or a consistent lead a
 
 Artist jobs share the artwork queue, freeze the selected album/name at enqueue time, and use the same full-file backups, stale-file protection and **Undo last change**. Already-correct tracks are skipped. Failed writes are listed in Details. Artist cleanup does not rename or move files/folders. The cleanup filter removes an album once its artist fields match.
 
+Use **Open album folder** below the artist preview to open the selected album in File Explorer. Select a track row and click **Show selected track** to open its folder with that song highlighted. Scrollbars use slim rounded thumbs that match both themes; native wheel, page, keyboard and drag behavior are retained.
+
 [Track artist cleanup preview](docs/track-artists.png)
 
 ## Find duplicate songs and albums

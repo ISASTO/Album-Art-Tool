@@ -143,6 +143,7 @@ namespace AlbumArtTool.Design
                     picture.BackColor = Input; picture.SizeChanged += (s, e) => ClipRound(picture, 10); ClipRound(picture, 10);
                 }
                 else if (c is TableLayoutPanel || c.GetType() == typeof(Panel)) c.BackColor = Color.Transparent;
+                if (c is ListView || c is TreeView || c is ListBox || c is FlowLayoutPanel || c is TextBox multiline && multiline.Multiline) ThemeScrollbars.Apply(c);
             }
         }
         private static Control[] Snapshot(Control root)

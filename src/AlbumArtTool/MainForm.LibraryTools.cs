@@ -18,6 +18,7 @@ namespace AlbumArtTool
         private readonly ComboBox albumFilter = new ThemeComboBox(), albumSort = new ThemeComboBox();
         private readonly TextBox mainArtist = new TextBox();
         private readonly Button applyArtist = Button("Set track artists");
+        private readonly Button openArtistAlbum = Button("Open album folder"), showArtistTrack = Button("Show selected track");
         private readonly Label artistHeading = Label("Select an album", 13, true), artistSummary = Label("", 10);
         private readonly ListView artistPreview = new ListView();
         private Control artistPanel, coverPanel;
@@ -51,9 +52,9 @@ namespace AlbumArtTool
         private Control BuildArtistPanel()
         {
             ((ThemeButton)applyArtist).Primary = true;
-            var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, Padding = new Padding(15), BackColor = Surface, Margin = Padding.Empty };
+            var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 8, Padding = new Padding(15), BackColor = Surface, Margin = Padding.Empty };
             foreach (int height in new[] { 32, 60, 30, 38, 40 }) panel.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
-            panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+            panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 36)); panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             panel.Controls.Add(artistHeading, 0, 0);
             artistHeading.AccessibleName = "Selected album for artist cleanup";
             var help = Label("Collapse guest credits into the main artist. Already-correct track artists are left alone; review the proposed changes below.", 10); help.ForeColor = Muted;
@@ -71,7 +72,16 @@ namespace AlbumArtTool
                 artistPreview.Columns[2].Width = width - artistPreview.Columns[0].Width - artistPreview.Columns[1].Width;
             };
             artistPreview.AccessibleName = "Current track artists"; artistPreview.ShowItemToolTips = true;
-            panel.Controls.Add(artistPreview, 0, 5); panel.Controls.Add(applyArtist, 0, 6);
+            artistPreview.SelectedIndexChanged += (s, e) => UpdateArtistLocations();
+            var locations = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
+            locations.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); locations.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            openArtistAlbum.AccessibleName = "Open artist-tab album folder"; showArtistTrack.AccessibleName = "Reveal artist-tab selected track";
+            openArtistAlbum.Click += (s, e) => OpenSelectedFolder();
+            showArtistTrack.Click += (s, e) => { if (artistPreview.SelectedItems.Count > 0 && artistPreview.SelectedItems[0].Tag is Track track) OpenLocation(track.Path, true); };
+            tips.SetToolTip(openArtistAlbum, "Open this album's folder in File Explorer.");
+            tips.SetToolTip(showArtistTrack, "Select a track above, then open its folder with that song highlighted in File Explorer.");
+            locations.Controls.Add(openArtistAlbum, 0, 0); locations.Controls.Add(showArtistTrack, 1, 0);
+            panel.Controls.Add(artistPreview, 0, 5); panel.Controls.Add(locations, 0, 6); panel.Controls.Add(applyArtist, 0, 7);
             applyArtist.Click += async (s, e) => await ApplyArtistAsync();
             return panel;
         }
@@ -129,6 +139,12 @@ namespace AlbumArtTool
                     (changes && track.AlbumArtists.Length > 0 ? "\nAlbum artist will also be set to " + name : "") + "\n" + track.Path;
             }
             artistPreview.EndUpdate();
+            UpdateArtistLocations();
+        }
+        private void UpdateArtistLocations()
+        {
+            openArtistAlbum.Enabled = albums.SelectedAlbum != null;
+            showArtistTrack.Enabled = artistPreview.SelectedItems.Count > 0 && artistPreview.SelectedItems[0].Tag is Track;
         }
         internal Task ApplyArtistAsync()
         {

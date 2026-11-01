@@ -20,6 +20,7 @@ namespace AlbumArtTool
         internal static Color Muted => AppTheme.Muted;
         internal static Color Accent => AppTheme.Accent;
         private readonly Button appearance = Button("Light mode");
+        internal Action<ProcessStartInfo> StartExplorer = info => { using (var process = Process.Start(info)) { } };
         private readonly TextBox folder = new TextBox();
         private readonly TextBox search = new TextBox();
         private readonly Button browse = Button("Choose folder…");
@@ -546,7 +547,15 @@ namespace AlbumArtTool
         private void OpenSelectedFolder()
         {
             if (albums.SelectedAlbum == null) return;
-            try { Process.Start(new ProcessStartInfo(albums.SelectedAlbum.Folder) { UseShellExecute = true }); }
+            OpenLocation(albums.SelectedAlbum.Folder, false);
+        }
+        private void OpenLocation(string path, bool selectFile)
+        {
+            try
+            {
+                StartExplorer(selectFile ? new ProcessStartInfo("explorer.exe", "/select," + Updates.UpdateInstaller.Quote(path)) { UseShellExecute = true } :
+                    new ProcessStartInfo(path) { UseShellExecute = true });
+            }
             catch (Exception e) { MessageBox.Show(this, e.Message, "Could not open folder"); }
         }
 
