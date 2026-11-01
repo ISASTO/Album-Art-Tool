@@ -117,9 +117,11 @@ namespace AlbumArtTool
         {
             if (duplicatesWindow != null && !duplicatesWindow.IsDisposed) { duplicatesWindow.Activate(); return; }
             if (busy || library.Albums.Count == 0) return;
-            duplicatesWindow = new DuplicateWindow(library.Albums.ToArray());
-            duplicatesWindow.Show(this);
-            await duplicatesWindow.ScanAsync();
+            var window = new DuplicateWindow(library.Albums.ToArray(), () => library.Albums.ToArray());
+            duplicatesWindow = window;
+            window.FormClosed += (s, e) => { if (duplicatesWindow == window) duplicatesWindow = null; };
+            window.Show(this);
+            await window.ScanAsync();
         }
     }
 }

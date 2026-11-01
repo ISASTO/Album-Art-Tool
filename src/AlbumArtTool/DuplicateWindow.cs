@@ -14,6 +14,7 @@ namespace AlbumArtTool
     internal sealed class DuplicateWindow : Form
     {
         private readonly Album[] albums;
+        private readonly Func<Album[]> currentAlbums;
         private readonly TreeView matches = new TreeView();
         private readonly Label message = new Label();
         private readonly ProgressBar progress = new ProgressBar();
@@ -22,9 +23,9 @@ namespace AlbumArtTool
         internal DuplicateResult Result { get; private set; }
         internal bool IsScanning { get; private set; }
 
-        internal DuplicateWindow(Album[] snapshot)
+        internal DuplicateWindow(Album[] snapshot, Func<Album[]> latest = null)
         {
-            albums = snapshot;
+            albums = snapshot; currentAlbums = latest;
             Text = "Find duplicates"; BackColor = MainForm.Surface; ForeColor = MainForm.Ink; Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(960, 570); MinimumSize = new Size(720, 460); StartPosition = FormStartPosition.CenterParent;
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(16) };
@@ -64,11 +65,12 @@ namespace AlbumArtTool
             });
             try
             {
-                Result = await Task.Run(() => new DuplicateScanner().Scan(albums, token, reporter), token);
+                var snapshot = currentAlbums == null ? albums : currentAlbums();
+                Result = await Task.Run(() => new DuplicateScanner().Scan(snapshot, token, reporter), token);
                 if (IsDisposed) return;
                 ShowMatches();
-                message.Text = Result.Songs.Count(g => g.Confirmed) + " confirmed song groups · " + Result.Songs.Count(g => !g.Confirmed) +
-                    " possible song groups · " + Result.Albums.Count + " album groups" + (Result.Issues.Count > 0 ? " · " + Result.Issues.Count + " files skipped (see below)" : "");
+                message.Text = "Song groups: " + Result.Songs.Count(g => g.Confirmed) + " confirmed, " + Result.Songs.Count(g => !g.Confirmed) +
+                    " possible · Album groups: " + Result.Albums.Count + (Result.Issues.Count > 0 ? " · " + Result.Issues.Count + " files skipped (see below)" : "");
                 save.Enabled = true;
             }
             catch (OperationCanceledException) { if (!IsDisposed) message.Text = "Duplicate scan stopped. Run it again to compare the whole snapshot."; }

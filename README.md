@@ -38,9 +38,11 @@ The suggestion uses a specific tagged album artist first, or a consistent lead a
 
 Artist jobs share the artwork queue, freeze the selected album/name at enqueue time, and use the same full-file backups, stale-file protection and **Undo last change**. Already-correct tracks are skipped. Failed writes are listed in Details. Artist cleanup does not rename or move files/folders. The cleanup filter removes an album once its artist fields match.
 
+[Track artist cleanup preview](docs/track-artists.png)
+
 ## Find duplicate songs and albums
 
-After scanning a music folder, click **Find duplicates**. A separate window scans the successfully read tracks in that folder tree, with a progress bar, percentage, checked/total counter and Stop button. Album browsing remains available. **Open selected folder** takes you to a result's location, and **Save report** exports a CSV with paths and the evidence for each match. Start a new scan from the main window after rescanning the library to include newly added music.
+After scanning a music folder, click **Find duplicates**. A separate window scans the successfully read tracks in that folder tree, with a progress bar, percentage, checked/total counter and Stop button. Album browsing remains available. **Open selected folder** takes you to a result's location, and **Save report** exports a CSV with paths and the evidence for each match. Rescan the main library to include newly added music, then click Scan again in the duplicate window.
 
 - **Confirmed song copies** have identical SHA-256 hashes of the entire file, or identical encoded MP3/FLAC audio data. MP3 tag blocks and FLAC metadata/artwork blocks are excluded from the audio comparison. Hover over a match to see which test confirmed it.
 - **Confirmed album copies** have the same complete set of verified song contents in different folders. A folder containing only part of an album is not labeled a complete copy. Repeated tracks count separately when comparing album contents.
@@ -48,7 +50,9 @@ After scanning a music folder, click **Find duplicates**. A separate window scan
 
 The scanner only reads music. It does **not** delete, move or select copies for removal. Repeated music on a compilation can be an intentional duplicate. Other codecs get whole-file verification and metadata comparisons; they do not get a claim of identical audio across retagging or re-encoding. MP3 and FLAC audio checks compare encoded data, not perceptual fingerprints, so a re-encode can appear only as a possible match. Missing, linked or changed files are skipped with an explanation. Backups and temporary editor files remain excluded.
 
-The first pass uses small audio samples and file sizes to find candidates; full hashes are then calculated for candidate files, rather than reading every complete song by default. The window uses a snapshot of the main library scan. If you change tags or covers while it is working, changed files are skipped; rescan the library and reopen the duplicate scanner to get current results. App installation waits for an active duplicate scan before restarting.
+The first pass uses small audio samples and file sizes to find candidates; full hashes are then calculated for candidate files, rather than reading every complete song by default. Each run uses a snapshot of the main library scan. If you change tags or covers while it is working, changed files are skipped; rescan the library and click Scan again to get current results. App installation waits for an active duplicate scan before restarting.
+
+[Duplicate scanner preview](docs/duplicates.png)
 
 ## App updates
 

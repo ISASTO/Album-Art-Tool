@@ -76,7 +76,7 @@ namespace AlbumArtTool
             search.AccessibleName = "Search albums, artists or folders";
             BuildLayout();
             albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? (currentJob.Artist == null ? "Applying cover…" : "Updating artists…") : "Queued") :
-                showingArtists ? (album.ArtistChangeCount > 0 ? album.ArtistChangeCount + " tracks with artist changes" : "No artist changes suggested") : null;
+                showingArtists ? (album.ArtistChangeCount > 0 ? album.ArtistChangeCount + (album.ArtistChangeCount == 1 ? " track with artist changes" : " tracks with artist changes") : "No artist changes suggested") : null;
             queueButton.Click += (s, e) => ShowQueue();
             getUpdates.Click += async (s, e) => await GetUpdatesAsync();
             browse.Click += async (s, e) =>
