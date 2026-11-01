@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace AlbumArtTool.Core
 {
-    public sealed class CoverEditor
+    public sealed partial class CoverEditor
     {
         public EditResult Apply(Album album, byte[] jpeg, bool onlyMissing, bool saveFolderCover, IProgress<ProgressInfo> progress = null)
         {

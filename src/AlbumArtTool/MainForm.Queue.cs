@@ -27,7 +27,7 @@ namespace AlbumArtTool
         private sealed class CoverJob
         {
             internal Album Album;
-            internal string Source, Phase = "Waiting";
+            internal string Source, Artist, Phase = "Waiting";
             internal bool OnlyMissing, FolderCover;
             internal Func<Task<byte[]>> LoadImage;
             internal readonly TaskCompletionSource<bool> Completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -40,6 +40,13 @@ namespace AlbumArtTool
             // Freeze this album, image source and options before the user moves to another row.
             var job = new CoverJob { Album = album, Source = source, LoadImage = loadImage,
                 OnlyMissing = onlyMissing.Checked, FolderCover = folderCover.Enabled && folderCover.Checked };
+            return EnqueueJob(job);
+        }
+
+        private Task EnqueueJob(CoverJob job)
+        {
+            var album = job.Album;
+            if (busy || queuedAlbums.Contains(album.Key)) return Task.CompletedTask;
             if (!queueRunning) { jobsFinished = jobsWithIssues = 0; issues.Clear(); }
             waitingJobs.Enqueue(job); queuedAlbums.Add(album.Key);
             status.Text = "Queued " + album.Title + ". You can continue with another album.";
@@ -60,9 +67,9 @@ namespace AlbumArtTool
             {
                 var job = currentJob = waitingJobs.Dequeue();
                 bool succeeded = false;
-                job.Phase = "Loading cover";
+                job.Phase = job.Artist == null ? "Loading cover" : "Updating artists";
                 progress.Value = 0; progress.Style = ProgressBarStyle.Marquee; progressPercent.Text = "";
-                status.Text = "Loading cover · " + job.Name;
+                status.Text = job.Phase + " · " + job.Name;
                 UpdateQueueControls();
                 var reporter = new Progress<ProgressInfo>(p =>
                 {
@@ -77,16 +84,22 @@ namespace AlbumArtTool
                 });
                 try
                 {
-                    byte[] image = await Task.Run(job.LoadImage);
-                    job.Phase = "Saving covers"; UpdateQueueDisplay();
-                    var result = await Task.Run(() => editor.Apply(job.Album, image, job.OnlyMissing, job.FolderCover, reporter));
+                    EditResult result;
+                    if (job.Artist != null)
+                        result = await Task.Run(() => editor.ApplyArtist(job.Album, job.Artist, reporter));
+                    else
+                    {
+                        byte[] image = await Task.Run(job.LoadImage);
+                        job.Phase = "Saving covers"; UpdateQueueDisplay();
+                        result = await Task.Run(() => editor.Apply(job.Album, image, job.OnlyMissing, job.FolderCover, reporter));
+                    }
                     issues.AddRange(result.Issues);
                     if (result.Entries.Count > 0) { lastEdit = result; lastEditedFolder = job.Album.Folder; }
-                    if (albums.SelectedAlbum?.Key == job.Album.Key) pending = null;
+                    if (job.Artist == null && albums.SelectedAlbum?.Key == job.Album.Key) pending = null;
                     // Refresh only this folder, preserving whatever the user is preparing elsewhere.
                     await RefreshFolderAsync(job.Album.Folder, null, preserveStaged: true);
                     succeeded = result.Issues.Count == 0;
-                    RememberJob((succeeded ? "Done" : "Needs attention") + " · " + job.Name + " · " + result.TracksWritten + " tracks");
+                    RememberJob((succeeded ? "Done" : "Needs attention") + " · " + job.Name + " · " + result.TracksWritten + " tracks" + (job.Artist != null ? " · artist: " + job.Artist : ""));
                 }
                 catch (Exception e)
                 {
@@ -120,9 +133,9 @@ namespace AlbumArtTool
             choose.Enabled = onlyMissing.Enabled = canEdit;
             bool shared = selected != null && library.Albums.Count(a => string.Equals(a.Folder, selected.Folder, StringComparison.OrdinalIgnoreCase)) > 1;
             folderCover.Enabled = canEdit && !shared;
-            online.SetActive(canEdit);
+            online.SetActive(canEdit && !showingArtists);
             if (queueRunning) { progress.Visible = true; progressPercent.Visible = true; }
-            UpdateApplyButton(); albums.Invalidate(); UpdateQueueDisplay();
+            UpdateApplyButton(); UpdateLibraryTools(); albums.Invalidate(); UpdateQueueDisplay();
         }
 
         private void RememberJob(string message)
@@ -157,7 +170,7 @@ namespace AlbumArtTool
         private void ShowQueue()
         {
             if (queueWindow != null && !queueWindow.IsDisposed) { queueWindow.Activate(); return; }
-            queueWindow = new Form { Text = "Album artwork queue", ClientSize = new Size(720, 350), MinimumSize = new Size(500, 250),
+            queueWindow = new Form { Text = "Album work queue", ClientSize = new Size(720, 350), MinimumSize = new Size(500, 250),
                 StartPosition = FormStartPosition.CenterParent, BackColor = Surface, ForeColor = Ink, Font = new Font("Segoe UI", 10) };
             queueList = new ListBox { Dock = DockStyle.Fill, BackColor = Surface, ForeColor = Ink, BorderStyle = BorderStyle.None,
                 HorizontalScrollbar = true, IntegralHeight = false, AccessibleName = "Queued albums and recent results" };

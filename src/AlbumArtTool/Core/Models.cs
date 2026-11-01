@@ -27,6 +27,15 @@ namespace AlbumArtTool.Core
         public string Path { get; set; }
         public string Title { get; set; }
         public string Performer { get; set; }
+        public string[] Performers { get; set; } = new string[0];
+        public string[] AlbumArtists { get; set; } = new string[0];
+        public TimeSpan Duration { get; set; }
+        public bool HasTitleTag { get; set; }
+        public long AudioStart { get; set; } = -1;
+        public long AudioEnd { get; set; } = -1;
+        public int SampleRate { get; set; }
+        public int Channels { get; set; }
+        public string ArtistText => string.Join(", ", Performers);
         public bool HasCover { get; set; }
         public FileStamp Stamp { get; set; }
     }
@@ -37,6 +46,9 @@ namespace AlbumArtTool.Core
         public string Folder { get; set; }
         public string Title { get; set; }
         public string Artist { get; set; }
+        public string TaggedArtist { get; set; }
+        public string MainArtist { get; set; }
+        public int ArtistChangeCount => string.IsNullOrEmpty(MainArtist) ? 0 : Tracks.Count(t => ArtistRules.NeedsChange(t, MainArtist));
         public List<Track> Tracks { get; } = new List<Track>();
         public byte[] Thumbnail { get; set; }
         public string PreviewTrack { get; set; }

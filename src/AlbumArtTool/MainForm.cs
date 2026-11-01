@@ -75,7 +75,8 @@ namespace AlbumArtTool
             folder.AccessibleName = "Music folder";
             search.AccessibleName = "Search albums, artists or folders";
             BuildLayout();
-            albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? "Applying cover…" : "Queued") : null;
+            albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? (currentJob.Artist == null ? "Applying cover…" : "Updating artists…") : "Queued") :
+                showingArtists ? (album.ArtistChangeCount > 0 ? album.ArtistChangeCount + " tracks with artist changes" : "No artist changes suggested") : null;
             queueButton.Click += (s, e) => ShowQueue();
             getUpdates.Click += async (s, e) => await GetUpdatesAsync();
             browse.Click += async (s, e) =>
@@ -86,9 +87,10 @@ namespace AlbumArtTool
             scan.Click += async (s, e) => { if (busy) cancellation?.Cancel(); else await ScanAsync(); };
             missingTab.Click += (s, e) => SwitchTab(true);
             existingTab.Click += (s, e) => SwitchTab(false);
+            artistsTab.Click += (s, e) => SwitchArtists();
             search.TextChanged += (s, e) => { if (!busy) RefreshAlbums(); };
             albums.SelectedIndexChanged += (s, e) => { if (!refreshing) ShowSelection(); };
-            albums.CoverDropped += (album, path) => { if (!busy) StageImage(path); };
+            albums.CoverDropped += (album, path) => { if (!busy && !showingArtists) StageImage(path); };
             choose.Click += (s, e) =>
             {
                 using (var dialog = new OpenFileDialog { Filter = "Cover images|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All files|*.*", Title = "Choose an album cover" })
@@ -127,10 +129,11 @@ namespace AlbumArtTool
 
         private void BuildLayout()
         {
-            var outer = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(22, 16, 22, 12), ColumnCount = 1, RowCount = 5 };
+            var outer = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(22, 16, 22, 12), ColumnCount = 1, RowCount = 6 };
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1 };
@@ -149,19 +152,20 @@ namespace AlbumArtTool
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
             StyleTextBox(folder); pathRow.Controls.Add(folder, 0, 0); pathRow.Controls.Add(browse, 1, 0); pathRow.Controls.Add(scan, 2, 0);
-            var tabs = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Padding = new Padding(0, 6, 0, 6) };
+            var tabs = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1, Padding = new Padding(0, 6, 0, 6) };
             tabs.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 238));
             tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 263));
+            tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 165));
             tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 226));
-            missingTab.AccessibleRole = existingTab.AccessibleRole = AccessibleRole.PageTab;
-            tabs.Controls.Add(missingTab, 0, 0); tabs.Controls.Add(existingTab, 1, 0);
+            missingTab.AccessibleRole = existingTab.AccessibleRole = artistsTab.AccessibleRole = AccessibleRole.PageTab;
+            tabs.Controls.Add(missingTab, 0, 0); tabs.Controls.Add(existingTab, 1, 0); tabs.Controls.Add(artistsTab, 2, 0);
             var searchRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
             searchRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             searchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 55)); searchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             var searchLabel = Label("Search", 9); searchLabel.TextAlign = ContentAlignment.MiddleLeft;
-            StyleTextBox(search); searchRow.Controls.Add(searchLabel, 0, 0); searchRow.Controls.Add(search, 1, 0); tabs.Controls.Add(searchRow, 3, 0);
+            StyleTextBox(search); searchRow.Controls.Add(searchLabel, 0, 0); searchRow.Controls.Add(search, 1, 0); tabs.Controls.Add(searchRow, 4, 0);
             var body = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Margin = new Padding(0), RowCount = 1 };
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 580));
@@ -197,7 +201,10 @@ namespace AlbumArtTool
             selectedPath.ForeColor = Muted; selectedPath.AutoEllipsis = true; selectedPath.TextAlign = ContentAlignment.MiddleLeft;
             path.Controls.Add(selectedPath, 0, 0); path.Controls.Add(openFolder, 1, 0);
             sidebar.Controls.Add(selectedTitle, 0, 0); sidebar.Controls.Add(selectedArtist, 0, 1); sidebar.Controls.Add(online, 0, 2); sidebar.Controls.Add(manual, 0, 3); sidebar.Controls.Add(path, 0, 4);
-            body.Controls.Add(listPanel, 0, 0); body.Controls.Add(sidebar, 1, 0);
+            var panels = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
+            coverPanel = sidebar; artistPanel = BuildArtistPanel();
+            panels.Controls.Add(sidebar); panels.Controls.Add(artistPanel); artistPanel.Visible = false;
+            body.Controls.Add(listPanel, 0, 0); body.Controls.Add(panels, 1, 0);
             var bottom = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Padding = new Padding(0, 8, 0, 0) };
             bottom.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190)); bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86));
@@ -211,7 +218,7 @@ namespace AlbumArtTool
             progressArea.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); progressArea.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 47));
             progressArea.Controls.Add(progress, 0, 0); progressArea.Controls.Add(progressPercent, 1, 0);
             bottom.Controls.Add(status, 0, 0); bottom.Controls.Add(progressArea, 1, 0); bottom.Controls.Add(issuesButton, 2, 0);
-            outer.Controls.Add(header, 0, 0); outer.Controls.Add(pathRow, 0, 1); outer.Controls.Add(tabs, 0, 2); outer.Controls.Add(body, 0, 3); outer.Controls.Add(bottom, 0, 4);
+            outer.Controls.Add(header, 0, 0); outer.Controls.Add(pathRow, 0, 1); outer.Controls.Add(tabs, 0, 2); outer.Controls.Add(BuildLibraryToolbar(), 0, 3); outer.Controls.Add(body, 0, 4); outer.Controls.Add(bottom, 0, 5);
             Controls.Add(outer);
             tips.SetToolTip(onlyMissing, "Keeps existing embedded front covers. Uncheck to replace the cover on every track in this album.");
             tips.SetToolTip(folderCover, "Updates recognized cover/folder/front/album/albumart images, or creates cover.jpg. Disabled when multiple albums share a folder.");
@@ -229,12 +236,9 @@ namespace AlbumArtTool
         private void SwitchTab(bool missing)
         {
             if (busy) return;
-            showingMissing = missing;
+            showingMissing = missing; showingArtists = false;
             onlyMissing.Checked = missing;
-            missingTab.BackColor = missing ? Color.FromArgb(37, 65, 59) : Surface;
-            existingTab.BackColor = !missing ? Color.FromArgb(37, 65, 59) : Surface;
-            missingTab.ForeColor = missing ? Accent : Muted;
-            existingTab.ForeColor = !missing ? Accent : Muted;
+            StyleTabs();
             RefreshAlbums();
         }
 
@@ -245,18 +249,25 @@ namespace AlbumArtTool
             byte[] previousImage = preserveStaged ? pending : null;
             key = key ?? albums.SelectedAlbum?.Key;
             string query = search.Text.Trim();
-            var visible = library.Albums.Where(a => showingMissing ? a.MissingCount > 0 : a.HasAnyCover)
+            var visible = library.Albums.Where(a => showingArtists || (showingMissing ? a.MissingCount > 0 : a.HasAnyCover))
+                .Where(a => albumFilter.SelectedIndex != 1 || a.ArtistChangeCount > 0)
                 .Where(a => query.Length == 0 || (a.Title + " " + a.Artist + " " + a.Folder).IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0).ToList();
+            visible = (albumSort.SelectedIndex == 2 ? visible.OrderByDescending(a => a.ArtistChangeCount).ThenBy(a => a.Artist, StringComparer.CurrentCultureIgnoreCase).ThenBy(a => a.Title, StringComparer.CurrentCultureIgnoreCase) :
+                albumSort.SelectedIndex == 1 ? visible.OrderBy(a => a.Title, StringComparer.CurrentCultureIgnoreCase).ThenBy(a => a.Artist, StringComparer.CurrentCultureIgnoreCase) :
+                visible.OrderBy(a => a.Artist, StringComparer.CurrentCultureIgnoreCase).ThenBy(a => a.Title, StringComparer.CurrentCultureIgnoreCase)).ToList();
             refreshing = true;
             albums.SetAlbums(visible, key);
             refreshing = false;
             missingTab.Text = "Add missing album art (" + library.Albums.Count(a => a.MissingCount > 0) + ")";
             existingTab.Text = "Change existing album art (" + library.Albums.Count(a => a.HasAnyCover) + ")";
+            artistsTab.Text = "Track artists (" + library.Albums.Count(a => a.ArtistChangeCount > 0) + ")";
             empty.Visible = visible.Count == 0;
             albums.Visible = !empty.Visible;
             empty.Text = query.Length > 0 ? "No albums match your search." : !hasScanned ? "Scan a folder to find your albums." :
                 library.Albums.Count == 0 ? "No supported music files found.\nChoose a folder containing your albums." : showingMissing ?
                 "Every scanned track has cover art.\nUse the other tab to change a cover." : "No existing covers found yet.\nAdd your first cover in the other tab.";
+            if (visible.Count == 0 && library.Albums.Count > 0 && (showingArtists || albumFilter.SelectedIndex == 1))
+                empty.Text = "No albums match this filter.\nChoose All albums in this tab to review other artists.";
             if (empty.Visible) empty.BringToFront();
             ShowSelection();
             if (previousImage != null && albums.SelectedAlbum?.Key == previousKey) SetPendingImage(previousImage);
@@ -275,7 +286,7 @@ namespace AlbumArtTool
             detail.Text = album == null ? "" : album.Tracks.Count + " tracks · " + album.MissingCount + " missing covers";
             coverCaption.Text = album?.Thumbnail != null ? (album.PreviewTrack != null ? "Current embedded cover" : "Current folder cover") : "Drop a cover image here";
             SetPreview(album?.Thumbnail);
-            if (album?.Thumbnail != null) _ = LoadPreviewAsync(album, version);
+            if (!showingArtists && album?.Thumbnail != null) _ = LoadPreviewAsync(album, version);
             bool shared = album != null && library.Albums.Count(a => string.Equals(a.Folder, album.Folder, StringComparison.OrdinalIgnoreCase)) > 1;
             folderCover.Enabled = !busy && album != null && !shared;
             folderCover.Text = shared ? "Folder shared by multiple albums" : "Update folder cover images too";
@@ -283,7 +294,8 @@ namespace AlbumArtTool
             openFolder.Enabled = album != null && !busy;
             folderCover.Enabled &= album != null && !queuedAlbums.Contains(album.Key);
             UpdateApplyButton();
-            online.SetAlbum(album, !busy && (album == null || !queuedAlbums.Contains(album.Key)));
+            online.SetAlbum(showingArtists ? null : album, !showingArtists && !busy && (album == null || !queuedAlbums.Contains(album.Key)));
+            ShowArtistSelection(); UpdateLibraryTools();
         }
 
         private async Task LoadPreviewAsync(Album album, int version)
@@ -371,14 +383,14 @@ namespace AlbumArtTool
             progress.Value = 0;
             choose.Enabled = openFolder.Enabled = onlyMissing.Enabled = !value && albums.SelectedAlbum != null;
             if (value) folderCover.Enabled = false;
-            online.SetActive(!value);
+            online.SetActive(!value && !showingArtists);
             if (value && !edit)
             {
                 empty.Text = "Scanning your music…\nAlbums appear when the scan finishes.";
                 albums.Visible = false; empty.Visible = true; empty.BringToFront();
             }
             issuesButton.Enabled = issues.Count > 0;
-            UpdateApplyButton();
+            UpdateApplyButton(); UpdateLibraryTools();
         }
 
         private IProgress<ProgressInfo> Reporter()

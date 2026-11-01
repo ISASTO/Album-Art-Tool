@@ -32,9 +32,12 @@ internal static partial class Tests
             OnlineTests().GetAwaiter().GetResult();
             UpdateTests().GetAwaiter().GetResult();
             foreach (var path in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) RoundTrip(path);
+            ArtistRulesTests(); DuplicateTests();
+            foreach (var path in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) ArtistRoundTrip(path);
             PartialAlbums(); MixedAlbums(); Guards(); FolderArt(); CancelScan(); CountedScanProgress(); InvalidArt(); UntaggedMp3();
             GuiSmoke(args.Length > 0 ? args[0] : workspace);
             QueueGuiSmoke(args.Length > 0 ? args[0] : workspace);
+            LibraryToolsGuiSmoke(args.Length > 0 ? args[0] : workspace);
             Console.WriteLine("PASS: " + assertions + " assertions, real codec round trips, audio integrity and GUI smoke checks.");
             return 0;
         }

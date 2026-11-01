@@ -53,12 +53,16 @@ namespace AlbumArtTool.Core
                             string key = title + "\u001f" + albumArtist;
                             if (!albums.TryGetValue(key, out Album album))
                             {
-                                album = new Album { Key = folder + "\u001f" + key, Folder = folder, Title = title, Artist = albumArtist };
+                                album = new Album { Key = folder + "\u001f" + key, Folder = folder, Title = title, Artist = albumArtist, TaggedArtist = albumArtist };
                                 albums.Add(key, album);
                             }
                             byte[] cover = Artwork.GetCover(file.Tag);
                             album.Tracks.Add(new Track { Path = path, Title = file.Tag.Title ?? Path.GetFileNameWithoutExtension(path),
-                                Performer = file.Tag.FirstPerformer ?? "", HasCover = cover != null, Stamp = stamp });
+                                Performer = file.Tag.FirstPerformer ?? "", Performers = file.Tag.Performers.ToArray(), AlbumArtists = file.Tag.AlbumArtists.ToArray(),
+                                Duration = file.Properties.Duration, HasTitleTag = !string.IsNullOrWhiteSpace(file.Tag.Title),
+                                AudioStart = file.InvariantStartPosition, AudioEnd = file.InvariantEndPosition,
+                                SampleRate = file.Properties.AudioSampleRate, Channels = file.Properties.AudioChannels,
+                                HasCover = cover != null, Stamp = stamp });
                             if (album.Thumbnail == null && cover != null)
                             { album.Thumbnail = Artwork.Thumbnail(cover); album.PreviewTrack = path; }
                         }
@@ -102,6 +106,8 @@ namespace AlbumArtTool.Core
                         string[] performers = album.Tracks.Select(t => t.Performer).Where(p => p.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(2).ToArray();
                         album.Artist = performers.Length == 1 ? performers[0] : performers.Length > 1 ? "Various artists" : "Unknown artist";
                     }
+                    album.MainArtist = ArtistRules.Suggest(album);
+                    if (string.IsNullOrEmpty(album.TaggedArtist) && album.MainArtist.Length > 0) album.Artist = album.MainArtist;
                     result.Albums.Add(album);
                 }
             }
