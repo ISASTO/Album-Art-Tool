@@ -36,7 +36,8 @@ namespace AlbumArtTool
         internal CoverSearchPanel(ICoverSearch service)
         {
             this.service = service;
-            Dock = DockStyle.Fill; BackColor = MainForm.Surface; ForeColor = MainForm.Ink;
+            SetStyle(ControlStyles.SupportsTransparentBackColor | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+            Dock = DockStyle.Fill; BackColor = Color.Transparent; ForeColor = MainForm.Ink;
             var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 25));
@@ -58,7 +59,7 @@ namespace AlbumArtTool
                 TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 9) }, 0, 0);
             automatic.Font = new Font("Segoe UI", 9); automatic.ForeColor = MainForm.Muted; automatic.Dock = DockStyle.Fill;
             instructions.Controls.Add(automatic, 1, 0);
-            choices.Dock = DockStyle.Fill; choices.AutoScroll = true; choices.BackColor = AppTheme.Input;
+            choices.Dock = DockStyle.Fill; choices.AutoScroll = true; choices.BackColor = Color.Transparent;
             choices.WrapContents = true; choices.Padding = new Padding(3); choices.Margin = Padding.Empty;
             choices.SizeChanged += (s, e) =>
             {

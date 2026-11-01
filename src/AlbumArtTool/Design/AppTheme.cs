@@ -133,7 +133,7 @@ namespace AlbumArtTool.Design
                 if (c is TextBox text) WrapInput(text);
                 else if (c is ComboBox combo) StyleCombo(combo);
                 else if (c is ListView list && !(list is AlbumList)) StyleList(list);
-                else if (c is FlowLayoutPanel flow) { flow.BackColor = Input; flow.SizeChanged += (s, e) => ClipRound(flow, 12); ClipRound(flow, 12); }
+                else if (c is FlowLayoutPanel flow) { flow.BackColor = Color.Transparent; flow.SizeChanged += (s, e) => ClipRound(flow, 12); ClipRound(flow, 12); }
                 else if (c is TreeView tree) { tree.BackColor = Surface; tree.ForeColor = Ink; tree.LineColor = Border; tree.BorderStyle = BorderStyle.None; tree.ItemHeight = Scale(tree, 27); }
                 else if (c is ListBox box) StyleQueue(box);
                 else if (c is LinkLabel link) { link.LinkColor = Accent; link.ActiveLinkColor = Ink; link.VisitedLinkColor = Accent; link.BackColor = Color.Transparent; }
