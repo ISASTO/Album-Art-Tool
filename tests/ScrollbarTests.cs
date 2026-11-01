@@ -56,6 +56,53 @@ internal static partial class Tests
         finally { mouse_event(4, 0, 0, 0, UIntPtr.Zero); }
         await Task.Delay(40);
     }
+    private static void OtherScrollControlsGuiSmoke(string output)
+    {
+        Exception failure = null;
+        using (var form = new Form { Text = "Other scrolling controls", StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(900, 660), Font = new Font("Segoe UI", 10) })
+        {
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Padding = new Padding(12) };
+            for (int n = 0; n < 2; n++) { layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50)); }
+            var queue = new ListBox { Dock = DockStyle.Fill };
+            var tree = new TreeView { Dock = DockStyle.Fill };
+            var text = new TextBox { Dock = DockStyle.Fill, Multiline = true, WordWrap = false, ScrollBars = ScrollBars.Both };
+            var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, WrapContents = false, FlowDirection = FlowDirection.TopDown };
+            for (int n = 0; n < 200; n++)
+            {
+                queue.Items.Add("Queued album " + (n + 1)); tree.Nodes.Add("Duplicate match " + (n + 1));
+                flow.Controls.Add(new Label { Text = "Artwork result " + (n + 1), Size = new Size(300, 28) });
+            }
+            text.Lines = Enumerable.Range(1, 200).Select(n => "Details line " + n + ": " + new string('x', 120)).ToArray();
+            layout.Controls.Add(queue, 0, 0); layout.Controls.Add(tree, 1, 0); layout.Controls.Add(text, 0, 1); layout.Controls.Add(flow, 1, 1);
+            form.Controls.Add(layout); AppTheme.Apply(form);
+            form.Shown += async (s, e) =>
+            {
+                try
+                {
+                    await Task.Delay(80);
+                    foreach (var control in new Control[] { queue, tree, text, flow })
+                    {
+                        var host = ThemeScrollbars.For(control);
+                        Assert(host.VerticalBar.Visible && control.ClientSize == host.VisibleContent.Size, control.GetType().Name + " keeps its native scrollbar outside the visible viewport");
+                        var info = new TestScrollInfo { Size = Marshal.SizeOf(typeof(TestScrollInfo)), Mask = 7 }; GetScrollInfo(control.Handle, 1, ref info);
+                        host.VerticalBar.AccessibilityObject.Value = ((info.Max - info.Page + 1) / 2).ToString(); await Task.Delay(30);
+                        Assert(ScrollPosition(control, true) > 0, control.GetType().Name + " follows its rounded scrollbar position");
+                    }
+                    Assert(queue.TopIndex > 0 && tree.TopNode.Index > 0 && SendMessage(text.Handle, 0x00CE, IntPtr.Zero, IntPtr.Zero).ToInt32() > 0 && flow.AutoScrollPosition.Y < 0,
+                        "queue, duplicate tree, details text and artwork flow actually scroll their content");
+                    using (var screen = ScreenImage(new Rectangle(form.Location, form.Size))) screen.Save(Path.Combine(output, "other-rounded-scroll-controls.png"), ImageFormat.Png);
+                }
+                catch (Exception ex)
+                {
+                    using (var screen = ScreenImage(new Rectangle(form.Location, form.Size))) screen.Save(Path.Combine(output, "other-scroll-failure.png"), ImageFormat.Png);
+                    failure = ex;
+                }
+                finally { form.Close(); }
+            };
+            Application.Run(form);
+        }
+        if (failure != null) throw failure;
+    }
     private static void ScrollbarGuiSmoke(string output)
     {
         Exception failure = null;
@@ -138,5 +185,6 @@ internal static partial class Tests
             Application.Run(form);
         }
         if (failure != null) throw failure;
+        OtherScrollControlsGuiSmoke(output);
     }
 }

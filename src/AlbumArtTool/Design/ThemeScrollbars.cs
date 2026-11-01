@@ -218,6 +218,9 @@ namespace AlbumArtTool.Design
             private void Destroyed(object sender, EventArgs e) { if (Handle != IntPtr.Zero) ReleaseHandle(); }
             protected override void WndProc(ref Message message)
             {
+                // WM_PRINT otherwise includes the hidden native nonclient bars in
+                // exported control images even though the screen viewport clips them.
+                if (message.Msg == 0x0317) message.LParam = new IntPtr(message.LParam.ToInt64() & ~2L);
                 base.WndProc(ref message);
                 int kind = message.Msg;
                 if (kind == 0x000F || kind == 0x0085 || kind == 0x0005 || kind == 0x000B || kind == 0x007D ||

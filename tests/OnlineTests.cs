@@ -123,6 +123,7 @@ internal static partial class Tests
             "the first cover action is fully visible without scrolling");
         using (var bitmap = new Bitmap(form.Width, form.Height))
         { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "online-cover-search.png"), ImageFormat.Png); }
+        using (var screen = ScreenImage(new Rectangle(form.Location, form.Size))) screen.Save(Path.Combine(output, "online-cover-search-screen.png"), ImageFormat.Png);
         var bad = new CoverCandidate { Source = "Broken source", ImageUrl = "invalid" };
         await form.ApplyOnlineCoverAsync(selected.Key, bad);
         Assert(CoverEditor.Hash(selected.Tracks[0].Path) == before, "failed image downloads leave album files unchanged");

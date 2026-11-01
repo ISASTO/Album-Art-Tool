@@ -232,6 +232,12 @@ internal static partial class Tests
                     Assert(button.Enabled && !form.IsWorking, "manager exposes an explicit reviewable Apply action after preview");
                     Directory.CreateDirectory(output);
                     using (var bitmap = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "library-manager.png"), ImageFormat.Png); }
+                    setWorking.Invoke(form, new object[] { true });
+                    bool checkedBefore = planned.Items[0].Checked; planned.Items[0].Checked = !checkedBefore;
+                    Assert(planned.Enabled && planned.Items[0].Checked == checkedBefore, "running management keeps preview rows readable while locking selected changes");
+                    await Task.Delay(40);
+                    using (var screen = ScreenImage(new Rectangle(form.Location, form.Size))) screen.Save(Path.Combine(output, "manager-working-readable-list.png"), ImageFormat.Png);
+                    setWorking.Invoke(form, new object[] { false });
                     await form.ApplyAsync();
                     Assert(File.Exists(Path.Combine(root, "BENEE", "Hey u x", "Happen to Me.mp3")), "manager UI applies conversion, canonical organization and the metadata filename");
                 }
