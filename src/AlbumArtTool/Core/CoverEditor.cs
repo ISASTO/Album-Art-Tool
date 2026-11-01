@@ -42,7 +42,8 @@ namespace AlbumArtTool.Core
                     string hash = Hash(temp);
                     Directory.CreateDirectory(backupDirectory);
                     string backup = Path.Combine(backupDirectory, Path.GetFileName(track.Path));
-                    System.IO.File.Replace(temp, track.Path, backup);
+                    BackupOriginal(track.Path, backup, track.Stamp);
+                    System.IO.File.Replace(temp, track.Path, null);
                     result.Entries.Add(new BackupEntry { Original = track.Path, Backup = backup, WrittenHash = hash });
                     result.TracksWritten++;
                 }
@@ -69,7 +70,8 @@ namespace AlbumArtTool.Core
                         if (exists)
                         {
                             if (!stamp.Matches(path)) throw new IOException("Folder cover changed during the edit. Original kept.");
-                            System.IO.File.Replace(temp, path, backup);
+                            BackupOriginal(path, backup, stamp);
+                            System.IO.File.Replace(temp, path, null);
                         }
                         else System.IO.File.Move(temp, path);
                         result.Entries.Add(new BackupEntry { Original = path, Backup = exists ? backup : null, WrittenHash = hash, Created = !exists });
@@ -113,6 +115,16 @@ namespace AlbumArtTool.Core
         {
             using (var stream = System.IO.File.OpenRead(path))
             using (var hash = SHA256.Create()) return Convert.ToBase64String(hash.ComputeHash(stream));
+        }
+        // Backups may be on a PC drive while the source is on a player/SD card.
+        // File.Replace receives only same-volume paths; verified backups are copied separately.
+        private static void BackupOriginal(string source, string backup, FileStamp stamp)
+        {
+            if (!stamp.Matches(source)) throw new IOException("The source changed before backup. Original kept.");
+            string hash = Hash(source);
+            System.IO.File.Copy(source, backup, false);
+            if (Hash(backup) != hash || !stamp.Matches(source) || Hash(source) != hash)
+                throw new IOException("The original backup could not be verified. Original kept.");
         }
         private static string TemporaryPath(string path) => Path.Combine(Path.GetDirectoryName(path), ".aat-" + Guid.NewGuid().ToString("N") + Path.GetExtension(path));
         private static void CheckWritable(string path)

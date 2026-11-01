@@ -32,7 +32,10 @@ namespace AlbumArtTool.Management
                 using (var output = new MemoryStream()) { await Fetch(Api, output, 2 * 1024 * 1024, null, token); json = Encoding.UTF8.GetString(output.ToArray()); }
                 var metadata = new JavaScriptSerializer { MaxJsonLength = 2 * 1024 * 1024 }.DeserializeObject(json) as Dictionary<string, object>;
                 var assets = (object[])metadata["assets"];
-                var asset = assets.Cast<Dictionary<string, object>>().Single(a => (string)a["name"] == "ffmpeg-master-latest-win64-lgpl.zip");
+                var asset = assets.Cast<Dictionary<string, object>>()
+                    .Where(a => ((string)a["name"]).StartsWith("ffmpeg-", StringComparison.Ordinal) && ((string)a["name"]).EndsWith("-win64-lgpl.zip", StringComparison.Ordinal))
+                    .OrderBy(a => (string)a["name"] == "ffmpeg-master-latest-win64-lgpl.zip" ? 0 : 1).FirstOrDefault();
+                if (asset == null) throw new IOException("The latest encoder release does not contain the Windows static LGPL build yet. Try again shortly or choose a local ffmpeg.exe.");
                 string url = (string)asset["browser_download_url"], digest = (string)asset["digest"];
                 long size = Convert.ToInt64(asset["size"]);
                 if (!url.StartsWith(Repository + "/releases/download/", StringComparison.Ordinal) || size <= 0 || size > 256L * 1024 * 1024 ||

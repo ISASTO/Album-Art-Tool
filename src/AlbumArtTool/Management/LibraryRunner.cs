@@ -104,7 +104,7 @@ namespace AlbumArtTool.Management
             catch (ArgumentException) { } // Some network-share roots do not expose DriveInfo.
             var journal = new LibraryJournal { Root = options.Root, Directory = Path.Combine(options.BackupRoot, "library-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 10)) };
             journal.Save(); Directory.CreateDirectory(BackupSettings.AppData); File.WriteAllText(LibraryJournal.LastFile, journal.FilePath);
-            var selected = plan.Actions.Where(a => a.Selected && a.HasWork).ToArray();
+            var selected = plan.Actions.Where(a => a.Selected && a.HasWork).OrderBy(a => a.Archive ? a.Keeper == null ? 0 : 1 : 2).ToArray();
             var completed = new Dictionary<string, JournalEntry>(StringComparer.OrdinalIgnoreCase);
             int done = 0;
             foreach (var row in selected)

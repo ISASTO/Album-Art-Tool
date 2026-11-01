@@ -39,7 +39,8 @@ namespace AlbumArtTool.Core
                     string hash = Hash(temp);
                     Directory.CreateDirectory(backups);
                     string backup = Path.Combine(backups, Path.GetFileName(track.Path));
-                    System.IO.File.Replace(temp, track.Path, backup);
+                    BackupOriginal(track.Path, backup, track.Stamp);
+                    System.IO.File.Replace(temp, track.Path, null);
                     result.Entries.Add(new BackupEntry { Original = track.Path, Backup = backup, WrittenHash = hash });
                     result.TracksWritten++;
                 }

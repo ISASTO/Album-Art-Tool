@@ -64,7 +64,7 @@ namespace AlbumArtTool
             state.AccessibleName = "Library management status";
             files.View = View.Details; files.CheckBoxes = true; files.FullRowSelect = true; files.GridLines = false; files.Dock = DockStyle.Fill;
             files.BackColor = MainForm.Surface; files.ForeColor = MainForm.Ink; files.BorderStyle = BorderStyle.FixedSingle; files.HideSelection = false;
-            files.Columns.Add("Action", 150); files.Columns.Add("Source", 330); files.Columns.Add("Destination / retained copy", 340); files.Columns.Add("Details", 420);
+            files.Columns.Add("Action", 205); files.Columns.Add("Source", 285); files.Columns.Add("Destination / retained copy", 300); files.Columns.Add("Details", 420);
             files.AccessibleName = "Planned library changes"; files.ShowItemToolTips = true; files.ItemChecked += (s, e) => UpdateApply();
             progress.Dock = DockStyle.Fill; progress.Margin = new Padding(0, 8, 0, 2); progress.Visible = false; progress.AccessibleName = "Library management progress";
             layout.Controls.Add(path, 0, 0); layout.Controls.Add(options, 0, 1); layout.Controls.Add(tools, 0, 2); layout.Controls.Add(backups, 0, 3);
@@ -85,6 +85,7 @@ namespace AlbumArtTool
             var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
             panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, second)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, third)); return panel;
         }
+        private string Relative(string path) => BackupSettings.Within(path, root) ? path.Substring(root.TrimEnd(Path.DirectorySeparatorChar).Length).TrimStart(Path.DirectorySeparatorChar) : path;
         private void UpdateEncoder() => encoderState.Text = encoder == null ? "Conversion needs FFmpeg. Download once or choose your copy." : "FFmpeg: " + encoder;
         private void InvalidatePlan() { if (IsWorking) return; plan = null; undoJournal = null; files.Items.Clear(); UpdateApply(); }
         private void SetWorking(bool value)
@@ -120,8 +121,8 @@ namespace AlbumArtTool
                 files.BeginUpdate();
                 foreach (var action in plan.Actions)
                 {
-                    var item = new ListViewItem(action.HasWork ? action.Description : "Keep") { Tag = action, Checked = action.HasWork, ToolTipText = action.Reason ?? "" };
-                    item.SubItems.Add(action.Source); item.SubItems.Add(action.Keeper != null ? "Keep: " + action.Keeper : action.Target ?? "PC backup folder"); item.SubItems.Add(action.Reason ?? "");
+                    var item = new ListViewItem(action.HasWork ? action.Description : "Keep") { Tag = action, Checked = action.HasWork, ToolTipText = action.Source + "\n" + (action.Target ?? action.Keeper ?? "PC backup folder") + "\n" + (action.Reason ?? "") };
+                    item.SubItems.Add(Relative(action.Source)); item.SubItems.Add(action.Keeper != null ? "Keep: " + Relative(action.Keeper) : action.Target != null ? Relative(action.Target) : "PC backup folder"); item.SubItems.Add(action.Reason ?? "");
                     if (!action.HasWork) item.ForeColor = MainForm.Muted; files.Items.Add(item);
                 }
                 foreach (string issue in plan.Issues) { var item = new ListViewItem("Skipped") { ForeColor = MainForm.Muted }; item.SubItems.Add(issue); files.Items.Add(item); }
