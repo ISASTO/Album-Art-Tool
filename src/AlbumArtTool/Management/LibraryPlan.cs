@@ -187,8 +187,11 @@ namespace AlbumArtTool.Management
             string artist = album.MainArtist;
             if (string.IsNullOrEmpty(artist)) artist = string.IsNullOrWhiteSpace(album.TaggedArtist) ? track.Performer : album.TaggedArtist;
             string title = track.HasTitleTag ? track.Title : Regex.Replace(Path.GetFileNameWithoutExtension(track.Path), @"(?i)\s*(\(\d+\)|[-_ ]+(copy|duplicate))\s*$", "");
+            // Missing metadata cannot establish that tracks in different folders belong to one album.
+            string scope = string.IsNullOrWhiteSpace(track.AlbumTitle) || !(ArtistRules.Specific(artist) || string.Equals(artist, "Various Artists", StringComparison.OrdinalIgnoreCase))
+                ? "folder:" + ArtistRules.Normalize(Path.GetDirectoryName(track.Path)) + "\u001f" : "";
             // Repeated audio in different albums or different titled/numbered tracks is kept.
-            return ArtistRules.Normalize(artist) + "\u001f" + ArtistRules.Normalize(track.AlbumTitle) + "\u001f" + ArtistRules.Normalize(title);
+            return scope + ArtistRules.Normalize(artist) + "\u001f" + ArtistRules.Normalize(track.AlbumTitle) + "\u001f" + ArtistRules.Normalize(title);
         }
         private static void AddAssets(LibraryPlan plan, ScanResult scan, Dictionary<string, LibraryAction> actions, HashSet<string> reserved, CancellationToken token)
         {

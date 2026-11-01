@@ -52,7 +52,7 @@ internal static partial class Tests
         Assert(LibraryPaths.ShouldConvert(new Track { Path = "x.m4a", Bitrate = 128 }, new LibraryOptions { Convert = true, ConvertOtherLossy = true }), "explicit compatibility mode converts other non-MP3 audio");
         Assert(LibraryPaths.Component("AC/DC: Live?") == "AC_DC- Live_" && LibraryPaths.Component("CON") == "_CON", "Windows folder names are sanitized without creating extra directory levels");
         foreach (string fixture in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) SquareRoundTrip(fixture);
-        ManagementCombined(); ManagementConflicts(); ManagementStaleAndCancel(); ManagementRecovery();
+        ManagementCombined(); ManagementConflicts(); ManagementStaleAndCancel(); ManagementRecovery(); ManagementUnknownDuplicates();
     }
     private static void SquareRoundTrip(string fixture)
     {
@@ -142,6 +142,20 @@ internal static partial class Tests
         options.BackupRoot = Path.Combine(root, "bad-backups");
         Assert(Throws(() => LibraryPlanner.Build(options, CancellationToken.None)), "backups inside the active music/player tree are rejected");
     }
+    private static void ManagementUnknownDuplicates()
+    {
+        string root = NewFolder("manager-unknown-duplicates"), backup = NewFolder("manager-unknown-duplicate-backups"), a = Path.Combine(root, "Unknown album A"), b = Path.Combine(root, "Unknown album B");
+        Directory.CreateDirectory(a); Directory.CreateDirectory(b);
+        string track = CopyTrack(a, "01.mp3");
+        using (var audio = TagLib.File.Create(track)) { audio.RemoveTags(TagLib.TagTypes.AllTags); audio.Save(); }
+        File.Copy(track, Path.Combine(b, "01.mp3"));
+        var options = Options(root, backup); options.Duplicates = true;
+        var plan = LibraryPlanner.Build(options, CancellationToken.None);
+        Assert(plan.Actions.All(x => !x.Archive), "untagged identical audio in different unknown albums is not automatically removed");
+        File.Copy(track, Path.Combine(a, "01 (1).mp3"));
+        plan = LibraryPlanner.Build(options, CancellationToken.None);
+        Assert(plan.Actions.Count(x => x.Archive) == 1, "an obvious same-folder untagged file copy can still be removed safely");
+    }
     private static void ManagementRecovery()
     {
         string root = NewFolder("manager-recovery"), backups = NewFolder("manager-recovery-backup");
@@ -164,7 +178,9 @@ internal static partial class Tests
         {
             string exe = await setup.InstallAsync(null, CancellationToken.None);
             Encoder.Validate(exe, CancellationToken.None);
-            Console.WriteLine("LIVE ENCODER: verified upstream checksum, safely extracted FFmpeg with license notices, executable starts successfully.");
+            string folder = NewFolder("live-encoder-conversion"), input = CopyTrack(folder, "input.flac"); AddRectangleArt(input);
+            Encoder.Convert(exe, ScanAlbum(folder).Tracks.Single(), Path.Combine(folder, "verified.mp3"), CancellationToken.None, null);
+            Console.WriteLine("LIVE ENCODER: verified upstream checksum, license extraction, startup and actual MP3 320 conversion with retained artwork.");
         }
         return 0;
     }

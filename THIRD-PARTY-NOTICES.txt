@@ -13,3 +13,13 @@ as needed to debug your modifications, as permitted by the LGPL.
 The application source and build project are available in this repository.
 
 The .NET Framework runtime is supplied by Windows and is not redistributed.
+
+Optional FFmpeg command-line program
+------------------------------------
+FFmpeg is not embedded in this EXE or bundled in the default app ZIP.
+The app can use a user-supplied ffmpeg.exe or download a Windows static LGPL
+build directly from https://github.com/BtbN/FFmpeg-Builds/releases.
+That download retains upstream LICENSE/COPYING notices and a SOURCE.txt
+record of the release URL and verified GitHub SHA-256 digest in the cache.
+FFmpeg project and source: https://ffmpeg.org/ and https://git.ffmpeg.org/ffmpeg.git
+The downloaded program is governed by its own accompanying licenses.

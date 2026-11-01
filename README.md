@@ -1,6 +1,6 @@
-# Album Art Tool
+# Music Library Manager (Album Art Tool)
 
-A small, portable Windows app for album covers, duplicate scanning, and track artist cleanup, with built-in online artwork search.
+One Windows app for album artwork, artist cleanup, MP3 conversion, duplicate removal, square embedded covers, and recursive music organization.
 
 **[Download the Windows app](https://github.com/ISASTO/Album-Art-Tool/releases/latest)** · Single portable EXE.
 
@@ -27,6 +27,32 @@ No installer, accounts, API keys or background service. Online suggestions use t
 Scanning first counts supported music files using directory listings, without reading audio tags. It then shows a filling progress bar, a percentage, and an exact counter such as **2751/3867 tracks scanned**. Files that fail to open still count as checked and appear in Details. The initial counting phase can also be stopped. Disabled options keep readable text on the dark background.
 
 [Scan progress preview](docs/scanning.png) · [Background queue preview](docs/queue.png)
+
+## Manage the whole library
+
+Click **Manage library** in the main window. Choose any combination of:
+
+- **Convert lossless / over 320 kbps to MP3 320.** Lossless sources and audio reporting more than 320 kbps are eligible. Existing MP3s at 320 kbps or below and lower-bitrate lossy sources are left alone. Bitrate is a practical rule, not a way to measure perceptual quality across codecs. If compatibility matters more than avoiding another lossy encode, explicitly check **Also convert other non-MP3 audio**. That option does not improve the quality of a low-bitrate source. Conversion retains standard tags and embedded images, verifies the output's bitrate and duration, and decodes the complete new MP3 before replacing its source. Originals stay in the PC backup folder.
+- **Remove confirmed duplicate songs / albums.** Only verified matching file/audio contents within the same logical album and titled track are eligible. Conflicting known disc/track numbers are preserved. Copies on different albums, copies across folders without enough artist/album metadata, possible metadata-only matches, and distinct recordings are kept. A copy with embedded artwork is preferred; suffixes such as `(1)` or `copy` are disfavored. The preview names the retained copy. Removed copies go to verified PC backups, outside the active music tree. With FFmpeg available, matching demuxed audio packets can also verify retagged copies in other containers.
+- **Center-crop embedded artwork to squares.** Every nonsquare embedded image is cropped from its center at its native resolution. A 1800 × 1000 image becomes 1000 × 1000; it is not stretched or scaled down to a thumbnail. Already-square pictures keep their original image bytes. JPEG input stays JPEG; other input is saved as PNG. Cropping applies to all embedded pictures, including back covers; image order, types where supported by the format, and descriptions remain. Folder images are moved with albums but are not cropped by this option.
+- **Organize all folders into Artist / Album.** The app searches every level and builds a canonical path under the selected music root from embedded album-artist/artist and album tags. It does not trust or reproduce intermediate artist, year, downloads, or redundant folders. Existing filenames are preserved, apart from a changed `.mp3` extension after conversion and conflict suffixes when necessary. Disc subfolders are retained for identified multidisc releases. Tagged Various Artists albums stay together. Missing usable artist/album tags leave that track in place with an explanation. Empty old directories are removed after successful changes.
+- **Move old tool backups off the music player.** Old `.album-art-backups`, `.before-square-crop`, and `.covercrop-tmp-` backup files can be archived to the PC. Some players index hidden backup folders as more music, which can create apparent duplicates even when the active album itself is correct. This option is included in the preview and can be unchecked.
+
+Set **Backups** to a folder on your PC, outside the selected music folder. The default is `%LOCALAPPDATA%\AlbumArtTool\LibraryBackups`. The preview estimates backup space; original-changing operations require that space before starting. Choose the top music folder rather than a whole PC drive if the backup folder would otherwise be inside the source tree.
+
+Click **Preview changes**. Nothing is moved, replaced, cropped or removed during the preview. Review the source/destination paths and uncheck unwanted actions. Then click **Apply selected changes**. You can stop the run; already completed work remains recorded and originals are protected. The rest of the app remains responsive, while conflicting artwork/artist writes and rescans wait for the bulk task to finish. A full scan refreshes the library afterward.
+
+For example, both `Music/Artist/Artist/Album/song.flac` and `Music/Artist/2020/Album/song.flac` resolve to `Music/Artist/Album/song.mp3` when their tags identify the same artist/album and conversion is selected. Loose tagged tracks in `Music/Downloads/Unsorted/` are organized under that same top-level `Music/Artist/Album/` structure. This differs deliberately from the old Python script's per-collection output: the selected music root is now the single destination root.
+
+Recognizable album folders keep artwork, booklets, cue sheets, lyrics and common sidecar files with their album. Ambiguous assets beside mixed loose collections stay in place. Playlist and cue-sheet references are preserved as written, not rewritten for changed filenames; review them after conversion or moves. Conflicting filenames preserve both files using a numbered suffix; existing files are never silently overwritten. Unsupported files, unreadable directories, invalid artwork, stale previews and write failures are reported or skipped while their originals remain available.
+
+**Undo:** click **Preview Undo**, review/check the saved changes, then **Undo selected changes**. The last bulk run can be undone after an app restart. Undo uses a persistent journal and refuses to overwrite files edited afterward. **Open backups** opens the backup location. Each bulk run includes `journal.json`, an incremental operation log while running, original files when needed, and a readable `report.csv`. Simple moves keep location/history hashes rather than duplicating every song into the backup folder.
+
+### FFmpeg setup
+
+Cropping, organization, artist edits and MP3/FLAC duplicate verification do not need an encoder. Conversion uses the separate **FFmpeg** command-line tool. **Download FFmpeg** installs a verified Windows static LGPL build from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) into the app's PC cache, including upstream license notices and download-source information. The one-time ZIP download is currently roughly 170 MB. The app checks GitHub's SHA-256 digest before extracting or launching it. Automatic setup requires 64-bit Windows.
+
+You can instead click **Choose FFmpeg** to select an existing `ffmpeg.exe`, or put it beside the app/on PATH. The chosen location is remembered. No Python, PowerShell scripts, ffprobe, account or separate installer is required. An internet connection is only needed for setup, artwork lookup or app updates; once FFmpeg is present, all library processing works locally. The app does not send music files to the internet. High sample rates and multichannel inputs are adapted to MP3's supported output; the original higher-quality file remains backed up.
 
 ## Track artist cleanup
 
@@ -58,7 +84,7 @@ The first pass uses small audio samples and file sizes to find candidates; full 
 
 Click **Get updates** in the header. The app checks this repository's latest published stable release, downloads a newer EXE with progress, verifies GitHub's SHA-256 checksum and the EXE's version, then restarts in the same music folder. If you are already current, it reports your installed version. Checks only happen when you click the button; there is no background update service or account requirement.
 
-You can keep working during the download. Installation waits for scans, Undo, and every queued artwork job to finish. If you have a staged cover, apply it or press Esc to discard it before the update can restart. The update window has a Cancel button until installation starts. As with any restart, the in-memory queue history and Undo session end; your music and saved artwork backups remain in place.
+You can keep working during the download. Installation waits for scans, library management/encoder setup, Undo, and every queued artwork job to finish. If you have a staged cover, apply it or press Esc to discard it before the update can restart. The update window has a Cancel button until installation starts. As with any restart, the in-memory artwork/artist queue history and its Undo session end; the bulk library journal and original backups remain available for Preview Undo.
 
 A temporary copy of the current app waits for the running EXE to exit, verifies the download again, replaces it while retaining a rollback copy, and starts the new version. The rollback copy is removed only after the new window confirms startup. If launch fails, the previous EXE is restored and reopened. If startup cannot be confirmed while the new process is still running, it is left running and the backup location is reported. Read-only folders, locked files, network errors, and invalid downloads produce an error without installing an unverified EXE. Automatic replacement requires a writable application folder and a filesystem that supports file replacement.
 
@@ -80,7 +106,7 @@ A temporary copy of the current app waits for the running EXE to exit, verifies 
 
 ## What gets changed
 
-- Artwork is embedded into the audio files. Audio is not re-encoded. Existing music metadata and explicitly typed back covers, booklet pages and disc pictures are preserved. Existing front-cover and unclassified artwork slots are replaced by the new front cover.
+- Artwork-only and artist-only edits do not re-encode audio. Optional MP3 conversion in Manage library does re-encode audio. Artwork is embedded into the audio files. Existing music metadata and explicitly typed back covers, booklet pages and disc pictures are preserved. Existing front-cover and unclassified artwork slots are replaced by the new front cover.
 - On the missing-art tab, **Only fill tracks missing covers** starts checked. Tracks that already have an embedded cover are left alone. Uncheck it to give the whole album the same cover.
 - On the existing-art tab, the default is to replace the cover on every track in the selected album.
 - **Update folder cover images too** updates recognized `cover`, `folder`, `front`, `album` and `albumart` images in that album's folder, preserving their file format. If there are none, it creates `cover.jpg`. This option is disabled when multiple albums share the folder. Unrelated images are untouched.
@@ -98,13 +124,9 @@ Scans run in the background and can be stopped. Stopping keeps fully scanned fol
 
 ## Backups and Undo
 
-Every audio update is written to a temporary copy, reopened to verify its artwork, and atomically swapped into place. The complete original is kept beside the album in:
+Artwork/artist changes use temporary copies, verify the changed metadata, save and verify a full original in the PC backup folder, then replace the original safely. Backups can be on a different drive from the music player. New backups are no longer stored as playable files underneath each album. The default backup folder is `%LOCALAPPDATA%\AlbumArtTool\LibraryBackups`; **Manage library** shows the configured location. Bulk management also verifies original backups before removing or replacing source files.
 
-```text
-.album-art-backups/YYYYMMDD-HHMMSS-id/
-```
-
-**Undo last change** restores your most recent completed edit during the current app session, once the queue is idle. Backups remain after you close the app; to recover an older edit, close music players and copy the wanted original from its backup folder over the changed file. Backups contain full audio files and use disk space; you can delete them once satisfied with your edits.
+**Undo last change** restores the most recent completed artwork/artist edit in the current session once the queue is idle. **Preview Undo** in Manage library restores the last bulk run, including moves, removals, conversions and crops, and survives an app restart. Full originals remain in the PC backup folders for manual recovery. Backups use disk space; keep them until you have reviewed the results. Old album-local backups can be moved to the PC using the dedicated bulk option. A bulk run clears the artwork/artist Undo shortcut because those paths may have moved; the bulk journal records that run separately.
 
 Files changed since the scan, read-only files, and files locked against replacement are skipped with an explanation. Undo also refuses to overwrite a file edited by another program after this app's change. Changes are independent per file: if one track fails, successfully updated tracks stay updated and the remaining errors are listed in **Details**. Filesystems must support atomic file replacement; if they do not, the affected file is left unchanged.
 
@@ -134,10 +156,10 @@ tests/bin/Release/net48/AlbumArtTool.Tests.exe TestResults
 
 Tests also exercise provider parsing and ranking, unavailable sources, search caching, cancellation, bounded image-header checks, redirect validation, source resolutions, counted scan progress, direct folder-cover application, and the responsive work queue. Queue checks cover captured targets/options, preserved staged images, duplicate clicks, failures and clearing waiting work. Library-tool tests cover artist inference, mixed compilations and band names, nine audio-format artist edits with decoded-audio and artwork preservation, exact Undo, shared queue behavior, eligible-album filters, confirmed file/audio/album copies, partial albums, possible matches, cancellation and read-only duplicate scans. Updater checks additionally verify release versions and checksums, rejected download redirects, cancellation, rollback, a real separate-process EXE replacement/restart, the reopened music-folder path, and scan/queue/staged-cover interlocks. A separate live GitHub check downloads the latest published EXE and verifies it without installing it. A separate live-service check reports source availability and downloads a real high-resolution cover; public-site outages do not fail the deterministic integration suite.
 
-Tests verify audio decoding hashes before/after edits, existing metadata, exact backup restoration, partial albums, corrupt files, stale scans, read-only files, folder images, preserved back covers, cancellation, GUI tab behavior and cover previews. CI additionally opens the isolated EXE with no adjacent DLLs to check the portable dependency loader. Test audio fixtures are short synthesized tones, generated by `tests/generate_fixtures.py`; they contain no copyrighted music. FFmpeg and Python are test tools only and are not included in the app.
+Management tests cover the combined preview/apply/Undo workflow, native-resolution image crops in nine formats, MP3 320 validation, preservation of lower-bitrate audio, nested/duplicated artist and year folders, loose/missing tags, sidecar files, conflict preservation, old-backup migration, stale inputs, cancellation, incremental-journal crash recovery and GUI behavior. A separate live step verifies the real encoder download, digest, license extraction and startup. Tests verify audio decoding hashes before/after edits, existing metadata, exact backup restoration, partial albums, corrupt files, stale scans, read-only files, folder images, preserved back covers, cancellation, GUI tab behavior and cover previews. CI additionally opens the isolated EXE with no adjacent DLLs to check the portable dependency loader. Test audio fixtures are short synthesized tones, generated by `tests/generate_fixtures.py`; they contain no copyrighted music. Python is test-only and is not required by the app. FFmpeg is also used by the optional conversion workflow; it can be downloaded inside the app or supplied separately, and is not embedded in the GUI EXE.
 
 Push a `v*` tag, or include `[release]` in a commit message on `main`, to build, test and publish a downloadable release. For a main-branch release, the version comes from the app's project file. A release is published only after the Windows checks pass; existing releases are never replaced automatically.
 
 ## License
 
-The app is MIT licensed. The embedded TagLibSharp library is LGPL-2.1-or-later; see `THIRD-PARTY-NOTICES.txt` and `licenses/`. A compatible external `TagLibSharp.dll` next to the EXE takes precedence over the embedded copy, so the library can be replaced independently. Its upstream source and this app's build instructions are available for rebuilding.
+The GUI app is MIT licensed. FFmpeg is a separate optional program with its own licenses; automatic setup retains its upstream notices and source URL in the encoder cache. The embedded TagLibSharp library is LGPL-2.1-or-later; see `THIRD-PARTY-NOTICES.txt` and `licenses/`. A compatible external `TagLibSharp.dll` next to the EXE takes precedence over the embedded copy, so the library can be replaced independently. Its upstream source and this app's build instructions are available for rebuilding.
