@@ -20,7 +20,8 @@ namespace AlbumArtTool
         private readonly Func<string, Task> refreshLibrary;
         private readonly CheckBox convert = Check("Convert lossless / over 320 kbps to MP3 320", true), square = Check("Center-crop embedded artwork to squares", true),
             duplicates = Check("Remove confirmed duplicate songs / albums", true), organize = Check("Organize all folders into Artist / Album", true),
-            archive = Check("Move old tool backups off the music player", true), compatibility = Check("Also convert other non-MP3 audio (compatibility)", false);
+            archive = Check("Move old tool backups off the music player", true), compatibility = Check("Also convert other non-MP3 audio (compatibility)", false),
+            rename = Check("Rename song files from Title tags", false);
         private readonly TextBox backup = new TextBox();
         private readonly Label state = new Label(), encoderState = new Label();
         private readonly ProgressBar progress = new ThemeProgressBar();
@@ -40,17 +41,20 @@ namespace AlbumArtTool
             Text = "Manage music library"; ClientSize = new Size(1000, 660); MinimumSize = new Size(960, 620);
             StartPosition = FormStartPosition.CenterParent; AutoScaleMode = AutoScaleMode.Dpi; BackColor = MainForm.Surface; ForeColor = MainForm.Ink; Font = new Font("Segoe UI", 10);
             var layout = new FrostCanvas { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 8, Padding = new Padding(12) };
-            foreach (int height in new[] { 38, 102, 38, 38, 44, 48 }) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+            foreach (int height in new[] { 38, 132, 38, 38, 44, 48 }) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
             var path = new Label { Text = "Music folder: " + root, Dock = DockStyle.Fill, ForeColor = MainForm.Ink, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
-            var options = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3, Margin = Padding.Empty };
+            var options = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, Margin = Padding.Empty };
             options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            foreach (int unused in new[] { 1, 2, 3 }) options.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
+            foreach (int unused in new[] { 1, 2, 3, 4 }) options.RowStyles.Add(new RowStyle(SizeType.Percent, 25));
             options.Controls.Add(convert, 0, 0); options.Controls.Add(square, 1, 0); options.Controls.Add(duplicates, 0, 1); options.Controls.Add(organize, 1, 1);
             options.Controls.Add(archive, 0, 2); options.Controls.Add(compatibility, 1, 2);
+            rename.AccessibleName = "Rename song files from Title tags"; options.Controls.Add(rename, 0, 3);
+            options.Controls.Add(new Label { Text = "01 - World Eater.mp3 → World Eater.mp3", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
+                Font = new Font("Segoe UI", 9), ForeColor = MainForm.Muted, AutoEllipsis = true, Margin = new Padding(3) }, 1, 3);
             var optionsCard = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(10, 5, 10, 5), Margin = new Padding(0, 0, 0, 5) };
             optionsCard.Controls.Add(options);
-            foreach (var check in new[] { convert, square, duplicates, organize, archive, compatibility }) check.CheckedChanged += (s, e) => InvalidatePlan();
+            foreach (var check in new[] { convert, square, duplicates, organize, archive, compatibility, rename }) check.CheckedChanged += (s, e) => InvalidatePlan();
             var tools = Row(165, 160); encoderState.ForeColor = MainForm.Muted; encoderState.Dock = DockStyle.Fill; encoderState.TextAlign = ContentAlignment.MiddleLeft; encoderState.AutoEllipsis = true;
             tools.Controls.Add(encoderState, 0, 0); tools.Controls.Add(download, 1, 0); tools.Controls.Add(chooseEncoder, 2, 0);
             var backups = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
@@ -97,7 +101,7 @@ namespace AlbumArtTool
         private void SetWorking(bool value)
         {
             IsWorking = value;
-            foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, backup, preview, undo, download, chooseEncoder, chooseBackup, files }) control.Enabled = !value;
+            foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, rename, backup, preview, undo, download, chooseEncoder, chooseBackup, files }) control.Enabled = !value;
             stop.Enabled = value; progress.Visible = value; UpdateApply();
         }
         private void UpdateApply()
@@ -119,7 +123,7 @@ namespace AlbumArtTool
         {
             if (IsWorking || !Ready()) return;
             var options = new LibraryOptions { Root = root, BackupRoot = backup.Text, EncoderPath = encoder, Convert = convert.Checked, ConvertOtherLossy = compatibility.Checked,
-                Square = square.Checked, Duplicates = duplicates.Checked, Organize = organize.Checked, ArchiveOldBackups = archive.Checked };
+                Square = square.Checked, Duplicates = duplicates.Checked, Organize = organize.Checked, ArchiveOldBackups = archive.Checked, RenameFromTitle = rename.Checked };
             source?.Dispose(); source = new CancellationTokenSource(); SetWorking(true); exclusive(true); files.Items.Clear(); plan = null; undoJournal = null;
             try
             {

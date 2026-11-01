@@ -17,6 +17,7 @@ namespace AlbumArtTool.Management
         public bool ConvertOtherLossy { get; set; }
         public bool Square { get; set; }
         public bool Organize { get; set; }
+        public bool RenameFromTitle { get; set; }
         public bool Duplicates { get; set; }
         public bool ArchiveOldBackups { get; set; }
     }
@@ -35,9 +36,11 @@ namespace AlbumArtTool.Management
         public bool Selected { get; set; } = true;
         internal FileStamp Stamp;
         internal bool Move => !string.IsNullOrEmpty(Target) && !Source.Equals(Target, StringComparison.OrdinalIgnoreCase);
-        internal bool HasWork => Archive || Convert || Square || Move;
+        internal bool Rename => !string.IsNullOrEmpty(Target) && !Path.GetFileNameWithoutExtension(Source).Equals(Path.GetFileNameWithoutExtension(Target), StringComparison.Ordinal);
+        internal bool HasWork => Archive || Convert || Square || Move || Rename;
         internal string Description => Archive ? Keeper != null ? "Remove duplicate (backed up)" : "Archive old backup" :
-            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, Move ? "Move" : null }.Where(s => s != null));
+            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, Rename ? "Rename" : null,
+                Move && !Path.GetDirectoryName(Source).Equals(Path.GetDirectoryName(Target), StringComparison.OrdinalIgnoreCase) ? "Move" : null }.Where(s => s != null));
     }
     internal sealed class LibraryPlan
     {
@@ -53,7 +56,12 @@ namespace AlbumArtTool.Management
             foreach (char c in "<>:\"/\\|?*") value = value.Replace(c, c == ':' ? '-' : '_');
             value = new string(value.Where(c => !char.IsControl(c)).ToArray()).TrimEnd(' ', '.');
             if (Regex.IsMatch(value, @"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)", RegexOptions.IgnoreCase)) value = "_" + value;
-            return value.Length <= 120 ? value : value.Substring(0, 120).TrimEnd(' ', '.');
+            if (value.Length > 120)
+            {
+                int length = char.IsHighSurrogate(value[119]) ? 119 : 120;
+                value = value.Substring(0, length).TrimEnd(' ', '.');
+            }
+            return value;
         }
         internal static void Safe(string path, string root)
         {
@@ -126,11 +134,18 @@ namespace AlbumArtTool.Management
                             row.Target = Path.Combine(dest, Path.GetFileName(track.Path));
                         }
                     }
+                    if (options.RenameFromTitle)
+                    {
+                        // Scanner titles fall back to filenames; only real Title metadata can name a file.
+                        string title = track.HasTitleTag ? LibraryPaths.Component(track.Title) : "";
+                        if (title.Length == 0) AddReason(row, "Filename kept: missing usable Title tag.");
+                        else row.Target = Path.Combine(Path.GetDirectoryName(row.Target), title + Path.GetExtension(row.Target));
+                    }
                     if (row.Convert) row.Target = Path.ChangeExtension(row.Target, ".mp3");
                     LibraryPaths.Safe(row.Target, options.Root);
-                    if (row.Target.Length > 250) throw new IOException("The organized path is longer than 250 characters. Shorten the artist/album/file names first.");
-                    if (track.HasVideo && options.Convert) row.Reason = "This file has video; automatic audio conversion is skipped.";
-                    if (!track.HasVideo && !row.Convert && options.Convert) row.Reason = (row.Reason ?? "") + (track.Lossless ? "" : " Existing MP3/lower-bitrate lossy audio is not re-encoded.");
+                    if (row.Target.Length > 250) throw new IOException("The planned path is longer than 250 characters. Shorten the artist/album/file names first.");
+                    if (track.HasVideo && options.Convert) AddReason(row, "This file has video; automatic audio conversion is skipped.");
+                    if (!track.HasVideo && !row.Convert && options.Convert && !track.Lossless) AddReason(row, "Existing MP3/lower-bitrate lossy audio is not re-encoded.");
                     actions.Add(track.Path, row);
                 }
                 catch (Exception e) when (Scanner.IsFileError(e) || Artwork.IsImageError(e)) { plan.Issues.Add(track.Path + ": " + e.Message); }
@@ -183,6 +198,7 @@ namespace AlbumArtTool.Management
             if (options.ArchiveOldBackups) AddOldBackups(plan, token);
             return plan;
         }
+        private static void AddReason(LibraryAction row, string reason) => row.Reason = string.IsNullOrEmpty(row.Reason) ? reason : row.Reason + " " + reason;
         private static string SongKey(Track track, Album album)
         {
             string artist = album.MainArtist;

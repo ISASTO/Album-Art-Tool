@@ -152,7 +152,11 @@ namespace AlbumArtTool.Management
                         if (row.Square) SquarePictures(temp);
                         entry.WrittenHash = CoverEditor.Hash(temp); entry.State = "Prepared"; journal.Save(entry);
                         token.ThrowIfCancellationRequested(); CheckOriginal(entry);
-                        if (row.Source.Equals(row.Target, StringComparison.OrdinalIgnoreCase)) { File.Replace(temp, row.Source, null); changed = true; }
+                        if (row.Source.Equals(row.Target, StringComparison.OrdinalIgnoreCase))
+                        {
+                            File.Replace(temp, row.Source, null); changed = true;
+                            if (!Path.GetFileName(row.Source).Equals(Path.GetFileName(row.Target), StringComparison.Ordinal)) File.Move(row.Source, row.Target);
+                        }
                         else
                         {
                             File.Move(temp, row.Target); changed = true; entry.State = "TargetCreated"; journal.Save(entry);
@@ -250,6 +254,7 @@ namespace AlbumArtTool.Management
                         string current = CoverEditor.Hash(entry.Source);
                         if (current != entry.OriginalHash)
                         { if (current != entry.WrittenHash) throw new IOException("File changed after this run. Backup kept."); RestoreBackup(entry, true, token); }
+                        if (!Path.GetFileName(entry.Source).Equals(Path.GetFileName(entry.Target), StringComparison.Ordinal)) File.Move(entry.Target, entry.Source);
                     }
                     else
                     {

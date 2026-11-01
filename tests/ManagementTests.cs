@@ -54,6 +54,7 @@ internal static partial class Tests
         Assert(LibraryPaths.Component("AC/DC: Live?") == "AC_DC- Live_" && LibraryPaths.Component("CON") == "_CON", "Windows folder names are sanitized without creating extra directory levels");
         foreach (string fixture in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) SquareRoundTrip(fixture);
         ManagementCombined(); ManagementConflicts(); ManagementStaleAndCancel(); ManagementRecovery(); ManagementUnknownDuplicates();
+        FilenameTests();
     }
     private static void SquareRoundTrip(string fixture)
     {
@@ -188,7 +189,7 @@ internal static partial class Tests
     private static void ManagementGuiSmoke(string output)
     {
         string root = NewFolder("manager-gui"), backups = NewFolder("manager-gui-backups"), folder = Path.Combine(root, "BENEE", "BENEE", "2020", "Hey u x"); Directory.CreateDirectory(folder);
-        string file = CopyTrack(folder, "01 - Happen to Me.flac", "Hey u x", "BENEE"); AddRectangleArt(file);
+        string file = CopyTrack(folder, "01 - Happen to Me.flac", "Hey u x", "BENEE"); AddRectangleArt(file); SetFilenameTitle(file, "Happen to Me");
         File.Copy(file, Path.Combine(folder, "01 - Happen to Me (1).flac"));
         Exception failure = null;
         using (var form = new LibraryManagerWindow(root, () => true, _ => { }, _ => Task.CompletedTask))
@@ -200,12 +201,18 @@ internal static partial class Tests
                     Descendants(form).OfType<TextBox>().Single(t => t.AccessibleName == "PC backup folder").Text = backups;
                     await form.PreviewAsync();
                     Assert(form.CurrentPlan != null && form.CurrentPlan.Actions.Any(a => a.Convert) && form.CurrentPlan.Actions.Any(a => a.Keeper != null), "manager UI previews conversion and duplicate removal together");
+                    var rename = Descendants(form).OfType<CheckBox>().Single(c => c.AccessibleName == "Rename song files from Title tags");
+                    Assert(!rename.Checked && form.CurrentPlan.Actions.Where(a => !a.Archive).All(a => !a.Rename), "filename cleanup is an explicit optional setting");
+                    rename.Checked = true;
+                    Assert(form.CurrentPlan == null, "changing filename cleanup invalidates the previous preview");
+                    await form.PreviewAsync();
+                    Assert(form.CurrentPlan.Actions.Any(a => a.Rename && a.Convert && a.Target.EndsWith("Happen to Me.mp3")), "manager previews Title filenames together with conversion, cropping, duplicates and folder organization");
                     var button = Descendants(form).OfType<Button>().Single(b => b.Text == "Apply selected changes");
                     Assert(button.Enabled && !form.IsWorking, "manager exposes an explicit reviewable Apply action after preview");
                     Directory.CreateDirectory(output);
                     using (var bitmap = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "library-manager.png"), ImageFormat.Png); }
                     await form.ApplyAsync();
-                    Assert(File.Exists(Path.Combine(root, "BENEE", "Hey u x", "01 - Happen to Me.mp3")), "manager UI applies the planned conversion and canonical organization");
+                    Assert(File.Exists(Path.Combine(root, "BENEE", "Hey u x", "Happen to Me.mp3")), "manager UI applies conversion, canonical organization and the metadata filename");
                 }
                 catch (Exception ex) { failure = ex; }
                 finally { form.Close(); }
