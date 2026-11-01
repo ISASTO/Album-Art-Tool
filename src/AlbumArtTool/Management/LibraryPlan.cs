@@ -121,7 +121,7 @@ namespace AlbumArtTool.Management
                         {
                             string dest = Path.Combine(options.Root, folder, title);
                             string parent = Path.GetFileName(Path.GetDirectoryName(track.Path));
-                            if (track.DiscCount > 1 || Regex.IsMatch(parent, @"^(CD|DISC|DISK)\s*[-_. ]*\d+$", RegexOptions.IgnoreCase))
+                            if (track.Disc > 1 || track.DiscCount > 1 && track.Disc > 0 || Regex.IsMatch(parent, @"^(CD|DISC|DISK)\s*[-_. ]*\d+$", RegexOptions.IgnoreCase))
                                 dest = Path.Combine(dest, "Disc " + (track.Disc > 0 ? track.Disc.ToString() : Regex.Match(parent, @"\d+").Value));
                             row.Target = Path.Combine(dest, Path.GetFileName(track.Path));
                         }

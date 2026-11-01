@@ -61,7 +61,7 @@ namespace AlbumArtTool
         {
             coverSearch = onlineService ?? new CoverSearchService();
             online = new CoverSearchPanel(coverSearch) { UseCover = ApplyOnlineCoverAsync };
-            Text = "Album Art Tool";
+            Text = "Music Library Manager";
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Color.FromArgb(15, 16, 18);
             ForeColor = Ink;
@@ -143,7 +143,7 @@ namespace AlbumArtTool
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
             header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            header.Controls.Add(Label("Album Art Tool", 23, true), 0, 0);
+            header.Controls.Add(Label("Music Library Manager", 23, true), 0, 0);
             header.Controls.Add(undo, 1, 0);
             header.Controls.Add(queueButton, 2, 0);
             header.Controls.Add(getUpdates, 3, 0);

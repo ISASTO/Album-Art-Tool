@@ -94,6 +94,14 @@ namespace AlbumArtTool.Management
         {
             var options = plan.Options;
             if (BackupSettings.Within(options.BackupRoot, options.Root)) throw new IOException("Backups must be outside the active music tree.");
+            long backupBytes = plan.Actions.Where(a => a.Selected && a.HasWork && (a.Archive || a.Convert || a.Square)).Sum(a => a.Stamp.Length);
+            try
+            {
+                var drive = new DriveInfo(Path.GetPathRoot(options.BackupRoot));
+                if (drive.IsReady && backupBytes > drive.AvailableFreeSpace - 16L * 1024 * 1024)
+                    throw new IOException("Not enough free space for original backups. Choose a backup folder with at least " + (backupBytes / 1048576.0).ToString("N0") + " MB free.");
+            }
+            catch (ArgumentException) { } // Some network-share roots do not expose DriveInfo.
             var journal = new LibraryJournal { Root = options.Root, Directory = Path.Combine(options.BackupRoot, "library-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 10)) };
             journal.Save(); Directory.CreateDirectory(BackupSettings.AppData); File.WriteAllText(LibraryJournal.LastFile, journal.FilePath);
             var selected = plan.Actions.Where(a => a.Selected && a.HasWork).ToArray();

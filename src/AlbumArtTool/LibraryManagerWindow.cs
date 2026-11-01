@@ -72,7 +72,7 @@ namespace AlbumArtTool
             preview.Click += async (s, e) => await PreviewAsync(); apply.Click += async (s, e) => await ApplyAsync();
             undo.Click += (s, e) => PreviewUndo(); stop.Click += (s, e) => source?.Cancel();
             download.Click += async (s, e) => await DownloadAsync();
-            chooseEncoder.Click += (s, e) => { using (var dialog = new OpenFileDialog { Filter = "FFmpeg|ffmpeg.exe|Executables|*.exe", Title = "Choose ffmpeg.exe" }) if (dialog.ShowDialog(this) == DialogResult.OK) { encoder = dialog.FileName; UpdateEncoder(); InvalidatePlan(); } };
+            chooseEncoder.Click += (s, e) => { using (var dialog = new OpenFileDialog { Filter = "FFmpeg|ffmpeg.exe|Executables|*.exe", Title = "Choose ffmpeg.exe" }) if (dialog.ShowDialog(this) == DialogResult.OK) { encoder = dialog.FileName; Directory.CreateDirectory(BackupSettings.AppData); File.WriteAllText(Path.Combine(BackupSettings.AppData, "encoder-path.txt"), encoder); UpdateEncoder(); InvalidatePlan(); } };
             chooseBackup.Click += (s, e) => { using (var dialog = new FolderBrowserDialog { Description = "Choose a backup folder on your PC, outside the music folder", SelectedPath = backup.Text }) if (dialog.ShowDialog(this) == DialogResult.OK) backup.Text = dialog.SelectedPath; };
             openBackup.Click += (s, e) => { try { Directory.CreateDirectory(backup.Text); Process.Start(new ProcessStartInfo(backup.Text) { UseShellExecute = true }); } catch (Exception ex) { state.Text = ex.Message; } };
             FormClosing += (s, e) => { if (IsWorking) { e.Cancel = true; state.Text = "Task is running. Click Stop; the current file is kept safe before stopping."; } };
@@ -126,7 +126,8 @@ namespace AlbumArtTool
                 }
                 foreach (string issue in plan.Issues) { var item = new ListViewItem("Skipped") { ForeColor = MainForm.Muted }; item.SubItems.Add(issue); files.Items.Add(item); }
                 files.EndUpdate();
-                state.Text = plan.Actions.Count(a => a.HasWork) + " changes planned across " + plan.Actions.Count + " files · " + plan.Issues.Count + " skipped/problems. Uncheck any changes you do not want, then Apply selected changes.";
+                long bytes = plan.Actions.Where(a => a.HasWork && (a.Archive || a.Convert || a.Square)).Sum(a => a.Stamp.Length);
+                state.Text = plan.Actions.Count(a => a.HasWork) + " changes across " + plan.Actions.Count + " files · originals need about " + (bytes / 1048576.0).ToString("N0") + " MB in the backup folder · " + plan.Issues.Count + " skipped/problems. Review, uncheck unwanted changes, then Apply.";
             }
             catch (OperationCanceledException) { state.Text = "Preview stopped. No files were changed."; }
             catch (Exception e) { state.Text = "Preview could not finish: " + e.Message; }

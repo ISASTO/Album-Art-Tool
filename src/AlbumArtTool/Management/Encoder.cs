@@ -16,6 +16,8 @@ namespace AlbumArtTool.Management
         {
             string[] folders = new[] { AppDomain.CurrentDomain.BaseDirectory, Cache }.Concat((Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)).ToArray();
             string explicitPath = Environment.GetEnvironmentVariable("ALBUMART_FFMPEG");
+            if (string.IsNullOrWhiteSpace(explicitPath))
+                try { explicitPath = File.ReadAllText(Path.Combine(BackupSettings.AppData, "encoder-path.txt")).Trim(); } catch { }
             if (!string.IsNullOrWhiteSpace(explicitPath) && File.Exists(explicitPath)) return Path.GetFullPath(explicitPath);
             foreach (string folder in folders)
                 try { string file = Path.Combine(folder.Trim('"'), "ffmpeg.exe"); if (File.Exists(file)) return Path.GetFullPath(file); } catch { }

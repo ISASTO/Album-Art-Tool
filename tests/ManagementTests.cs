@@ -59,6 +59,8 @@ internal static partial class Tests
         string extension = Path.GetExtension(fixture), root = NewFolder("manager-square-" + extension.Substring(1)), backups = NewFolder("manager-square-backup-" + extension.Substring(1));
         string path = CopyTrack(root, "one" + extension); AddRectangleArt(path);
         string original = CoverEditor.Hash(path), audio = AudioHash(path), metadata = Metadata(path);
+        TagLib.PictureType[] originalTypes;
+        using (var file = TagLib.File.Create(path)) originalTypes = file.Tag.Pictures.Select(p => p.Type).ToArray();
         var options = Options(root, backups); options.Square = true;
         var plan = LibraryPlanner.Build(options, CancellationToken.None);
         Assert(plan.Actions.Count(a => a.Square) == 1 && CoverEditor.Hash(path) == original, extension + " crop preview leaves original untouched");
@@ -66,7 +68,7 @@ internal static partial class Tests
         Assert(journal.Issues.Count == 0 && journal.Entries.Single().State == "Committed", extension + " square crop commits successfully");
         using (var file = TagLib.File.Create(path))
         {
-            Assert(file.Tag.Pictures.Length == 2 && file.Tag.Pictures[1].Type == TagLib.PictureType.BackCover, extension + " square crop preserves embedded image count, types and order");
+            Assert(file.Tag.Pictures.Select(p => p.Type).SequenceEqual(originalTypes), extension + " square crop preserves embedded image count, types and order");
             using (var art = Artwork.Decode(file.Tag.Pictures[0].Data.Data)) Assert(art.Width == 1000 && art.Height == 1000, extension + " full-size front artwork is square");
             using (var art = Artwork.Decode(file.Tag.Pictures[1].Data.Data)) Assert(art.Width == 400 && art.Height == 400, extension + " other embedded artwork is square too");
         }
