@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using AlbumArtTool.Design;
 using AlbumArtTool.Core;
 
 namespace AlbumArtTool
@@ -177,10 +178,12 @@ namespace AlbumArtTool
             clearWaiting = Button("Clear waiting jobs");
             clearWaiting.Dock = DockStyle.Right; clearWaiting.Width = 165;
             clearWaiting.Click += (s, e) => ClearWaitingJobs();
-            var footer = new Panel { Dock = DockStyle.Bottom, Height = 42, Padding = new Padding(5) };
+            var footer = new Panel { Dock = DockStyle.Bottom, Height = 50, Padding = new Padding(8) };
             footer.Controls.Add(clearWaiting);
+            queueWindow.Padding = new Padding(14);
             queueWindow.Controls.Add(queueList); queueWindow.Controls.Add(footer);
             queueWindow.FormClosed += (s, e) => { queueWindow = null; queueList = null; clearWaiting = null; };
+            AppTheme.Apply(queueWindow);
             UpdateQueueDisplay(); queueWindow.Show(this);
         }
     }

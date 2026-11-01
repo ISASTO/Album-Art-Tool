@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using AlbumArtTool.Design;
 using AlbumArtTool.Core;
 using AlbumArtTool.Online;
 
@@ -46,18 +47,18 @@ namespace AlbumArtTool
             searchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             searchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 72));
             searchRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 103));
-            query.Dock = DockStyle.Fill; query.BackColor = Color.FromArgb(31, 33, 36); query.ForeColor = MainForm.Ink;
+            query.Dock = DockStyle.Fill; query.BackColor = AppTheme.Input; query.ForeColor = MainForm.Ink;
             query.BorderStyle = BorderStyle.FixedSingle; query.Font = new Font("Segoe UI", 9); query.Margin = new Padding(0, 3, 5, 3);
             query.AccessibleName = "Online artwork search query";
             searchRow.Controls.Add(query, 0, 0); searchRow.Controls.Add(find, 1, 0); searchRow.Controls.Add(bandcamp, 2, 0);
             var instructions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
             instructions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             instructions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); instructions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
-            instructions.Controls.Add(new Label { Text = "Click a cover to queue it.", ForeColor = MainForm.Accent, Dock = DockStyle.Fill,
+            instructions.Controls.Add(new Label { Text = "Click a cover to queue it.", ForeColor = MainForm.Muted, Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 9) }, 0, 0);
             automatic.Font = new Font("Segoe UI", 9); automatic.ForeColor = MainForm.Muted; automatic.Dock = DockStyle.Fill;
             instructions.Controls.Add(automatic, 1, 0);
-            choices.Dock = DockStyle.Fill; choices.AutoScroll = true; choices.BackColor = Color.FromArgb(18, 19, 22);
+            choices.Dock = DockStyle.Fill; choices.AutoScroll = true; choices.BackColor = AppTheme.Input;
             choices.WrapContents = true; choices.Padding = new Padding(3); choices.Margin = Padding.Empty;
             choices.SizeChanged += (s, e) =>
             {
@@ -193,7 +194,7 @@ namespace AlbumArtTool
             base.Dispose(disposing);
         }
 
-        private sealed class CoverChoice : Panel
+        private sealed class CoverChoice : FrostPanel
         {
             private readonly PictureBox image;
             private readonly Label title, artist, resolution;
@@ -205,7 +206,7 @@ namespace AlbumArtTool
             public CoverChoice(CoverCandidate candidate, ToolTip tips)
             {
                 this.candidate = candidate;
-                Size = new Size(163, 212); Margin = new Padding(4); BackColor = MainForm.Surface;
+                Size = new Size(166, 212); Margin = new Padding(5); BackColor = Color.Transparent; Padding = Padding.Empty; CornerRadius = 12;
                 AccessibleName = candidate.Title + " by " + candidate.Artist + " from " + candidate.Source;
                 image = new PictureBox { Location = new Point(6, 5), Size = new Size(151, 104), SizeMode = PictureBoxSizeMode.Zoom,
                     Cursor = Cursors.Hand, Image = Artwork.Decode(candidate.Thumbnail), AccessibleName = "Apply " + AccessibleName };
@@ -218,7 +219,7 @@ namespace AlbumArtTool
                 resolution = new Label { Text = candidate.Resolution, Location = new Point(6, 164), Size = new Size(151, 18),
                     ForeColor = MainForm.Ink, Font = new Font("Segoe UI", 8), AccessibleName = "Full-size cover resolution" };
                 use = new ThemeButton { Text = "Apply this cover", Location = new Point(6, 183), Size = new Size(151, 24),
-                    BackColor = Color.FromArgb(37, 65, 59), ForeColor = MainForm.Accent, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5f), Cursor = Cursors.Hand };
+                    BackColor = AppTheme.Surface, ForeColor = MainForm.Accent, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5f), Cursor = Cursors.Hand };
                 image.Click += (s, e) => Apply?.Invoke(this, EventArgs.Empty);
                 title.Click += (s, e) => Apply?.Invoke(this, EventArgs.Empty);
                 artist.Click += (s, e) => Apply?.Invoke(this, EventArgs.Empty);
@@ -228,11 +229,13 @@ namespace AlbumArtTool
                 tips.SetToolTip(title, candidate.Title); tips.SetToolTip(origin, candidate.PageUrl);
                 tips.SetToolTip(resolution, "Dimensions of the full-size image at the source. Embedded artwork is limited to 1600 pixels on the longest side.");
                 Controls.AddRange(new Control[] { image, title, artist, origin, resolution, use });
+                ((ThemeButton)use).Chrome = true;
+                AppTheme.ApplyTree(this);
             }
             internal void FitHeight(int viewportHeight)
             {
                 // Keep the action visible on smaller laptop screens; extra results still scroll.
-                int imageHeight = Math.Max(40, Math.Min(104, viewportHeight - 122));
+                int imageHeight = Math.Max(46, Math.Min(104, viewportHeight - 122));
                 Height = imageHeight + 108; image.Height = imageHeight;
                 title.Top = imageHeight + 7; artist.Top = imageHeight + 26;
                 origin.Top = imageHeight + 43; resolution.Top = imageHeight + 60; use.Top = imageHeight + 79;

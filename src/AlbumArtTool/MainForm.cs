@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using AlbumArtTool.Design;
 using AlbumArtTool.Core;
 using AlbumArtTool.Online;
 
@@ -14,10 +15,10 @@ namespace AlbumArtTool
 {
     internal sealed partial class MainForm : Form
     {
-        internal static readonly Color Surface = Color.FromArgb(23, 24, 27);
-        internal static readonly Color Ink = Color.FromArgb(237, 239, 241);
-        internal static readonly Color Muted = Color.FromArgb(163, 169, 175);
-        internal static readonly Color Accent = Color.FromArgb(138, 221, 196);
+        internal static readonly Color Surface = AppTheme.Surface;
+        internal static readonly Color Ink = AppTheme.Ink;
+        internal static readonly Color Muted = AppTheme.Muted;
+        internal static readonly Color Accent = AppTheme.Accent;
         private readonly TextBox folder = new TextBox();
         private readonly TextBox search = new TextBox();
         private readonly Button browse = Button("Choose folder…");
@@ -40,7 +41,7 @@ namespace AlbumArtTool
         private readonly Label selectedPath = Label("", 8.5f);
         private readonly Label empty = Label("Scanning your music…", 12);
         private readonly Label status = Label("Ready", 9);
-        private readonly ProgressBar progress = new ProgressBar();
+        private readonly ProgressBar progress = new ThemeProgressBar();
         private readonly Label progressPercent = Label("", 9);
         private readonly CheckBox onlyMissing = new ThemeCheckBox { Text = "Only fill tracks missing covers", Checked = true };
         private readonly CheckBox folderCover = new ThemeCheckBox { Text = "Update folder cover images too", Checked = true };
@@ -63,7 +64,7 @@ namespace AlbumArtTool
             online = new CoverSearchPanel(coverSearch) { UseCover = ApplyOnlineCoverAsync };
             Text = "Music Library Manager";
             StartPosition = FormStartPosition.CenterScreen;
-            BackColor = Color.FromArgb(15, 16, 18);
+            BackColor = AppTheme.Canvas;
             ForeColor = Ink;
             Font = new Font("Segoe UI", 10f);
             AutoScaleDimensions = new SizeF(96, 96);
@@ -75,6 +76,9 @@ namespace AlbumArtTool
             folder.AccessibleName = "Music folder";
             search.AccessibleName = "Search albums, artists or folders";
             BuildLayout();
+            ((ThemeButton)apply).Primary = true;
+            foreach (var button in new[] { undo, queueButton, getUpdates }) ((ThemeButton)button).Chrome = true;
+            AppTheme.Apply(this);
             albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? (currentJob.Artist == null ? "Applying cover…" : "Updating artists…") : "Queued") :
                 showingArtists ? (album.ArtistChangeCount > 0 ? album.ArtistChangeCount + (album.ArtistChangeCount == 1 ? " track with artist changes" : " tracks with artist changes") : "No artist changes suggested") : null;
             queueButton.Click += (s, e) => ShowQueue();
@@ -130,11 +134,10 @@ namespace AlbumArtTool
 
         private void BuildLayout()
         {
-            var outer = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(22, 16, 22, 12), ColumnCount = 1, RowCount = 6 };
+            var outer = new FrostCanvas { Dock = DockStyle.Fill, Padding = new Padding(24, 18, 24, 12), ColumnCount = 1, RowCount = 5 };
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
-            outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
             var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1 };
@@ -143,16 +146,18 @@ namespace AlbumArtTool
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
             header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            header.Controls.Add(Label("Music Library Manager", 23, true), 0, 0);
+            header.Controls.Add(new BrandTitle { Dock = DockStyle.Fill }, 0, 0);
             header.Controls.Add(undo, 1, 0);
             header.Controls.Add(queueButton, 2, 0);
             header.Controls.Add(getUpdates, 3, 0);
-            var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
+            var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1 };
             pathRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
-            pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
-            StyleTextBox(folder); pathRow.Controls.Add(folder, 0, 0); pathRow.Controls.Add(browse, 1, 0); pathRow.Controls.Add(scan, 2, 0);
+            pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 124));
+            pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 78));
+            pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 132));
+            pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145));
+            StyleTextBox(folder); pathRow.Controls.Add(folder, 0, 0); pathRow.Controls.Add(browse, 1, 0); pathRow.Controls.Add(scan, 2, 0); pathRow.Controls.Add(findDuplicates, 3, 0); pathRow.Controls.Add(manageLibrary, 4, 0);
             var tabs = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1, Padding = new Padding(0, 6, 0, 6) };
             tabs.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             tabs.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 238));
@@ -170,11 +175,15 @@ namespace AlbumArtTool
             var body = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, Margin = new Padding(0), RowCount = 1 };
             body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 580));
-            var listPanel = new Panel { Dock = DockStyle.Fill, BackColor = Surface, Margin = new Padding(0, 0, 16, 0) };
+            var listPanel = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(8, 10, 8, 10), Margin = new Padding(0, 0, 18, 0) };
             albums.Dock = DockStyle.Fill; empty.Dock = DockStyle.Fill; empty.TextAlign = ContentAlignment.MiddleCenter;
             empty.ForeColor = Muted; empty.Padding = new Padding(35); empty.BackColor = Surface;
-            listPanel.Controls.Add(albums); listPanel.Controls.Add(empty);
-            var sidebar = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = Surface, Padding = new Padding(12), ColumnCount = 1, RowCount = 5, Margin = Padding.Empty };
+            var listLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
+            listLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 57)); listLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            var listHost = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
+            listHost.Controls.Add(albums); listHost.Controls.Add(empty);
+            listLayout.Controls.Add(BuildLibraryToolbar(), 0, 0); listLayout.Controls.Add(listHost, 0, 1); listPanel.Controls.Add(listLayout);
+            var sidebar = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = Surface, Padding = Padding.Empty, ColumnCount = 1, RowCount = 5, Margin = Padding.Empty };
             sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 29));
             sidebar.RowStyles.Add(new RowStyle(SizeType.Absolute, 23));
             sidebar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -186,7 +195,7 @@ namespace AlbumArtTool
             manual.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 145)); manual.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             var preview = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
             preview.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); preview.RowStyles.Add(new RowStyle(SizeType.Absolute, 19)); preview.RowStyles.Add(new RowStyle(SizeType.Absolute, 19));
-            cover.Dock = DockStyle.Fill; cover.SizeMode = PictureBoxSizeMode.Zoom; cover.BackColor = Color.FromArgb(31, 33, 36);
+            cover.Dock = DockStyle.Fill; cover.SizeMode = PictureBoxSizeMode.Zoom; cover.BackColor = AppTheme.Input;
             cover.Margin = new Padding(4, 0, 8, 2); cover.Cursor = Cursors.Hand; cover.AccessibleName = "Album cover preview and image drop target";
             coverCaption.TextAlign = ContentAlignment.MiddleCenter; coverCaption.ForeColor = Muted; coverCaption.Font = new Font("Segoe UI", 8); coverCaption.AutoEllipsis = true;
             detail.ForeColor = Muted; detail.TextAlign = ContentAlignment.MiddleCenter; detail.Font = new Font("Segoe UI", 8); detail.AutoEllipsis = true;
@@ -202,7 +211,7 @@ namespace AlbumArtTool
             selectedPath.ForeColor = Muted; selectedPath.AutoEllipsis = true; selectedPath.TextAlign = ContentAlignment.MiddleLeft;
             path.Controls.Add(selectedPath, 0, 0); path.Controls.Add(openFolder, 1, 0);
             sidebar.Controls.Add(selectedTitle, 0, 0); sidebar.Controls.Add(selectedArtist, 0, 1); sidebar.Controls.Add(online, 0, 2); sidebar.Controls.Add(manual, 0, 3); sidebar.Controls.Add(path, 0, 4);
-            var panels = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
+            var panels = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(9, 9, 9, 11), Margin = Padding.Empty };
             coverPanel = sidebar; artistPanel = BuildArtistPanel();
             panels.Controls.Add(sidebar); panels.Controls.Add(artistPanel); artistPanel.Visible = false;
             body.Controls.Add(listPanel, 0, 0); body.Controls.Add(panels, 1, 0);
@@ -219,7 +228,7 @@ namespace AlbumArtTool
             progressArea.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); progressArea.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 47));
             progressArea.Controls.Add(progress, 0, 0); progressArea.Controls.Add(progressPercent, 1, 0);
             bottom.Controls.Add(status, 0, 0); bottom.Controls.Add(progressArea, 1, 0); bottom.Controls.Add(issuesButton, 2, 0);
-            outer.Controls.Add(header, 0, 0); outer.Controls.Add(pathRow, 0, 1); outer.Controls.Add(tabs, 0, 2); outer.Controls.Add(BuildLibraryToolbar(), 0, 3); outer.Controls.Add(body, 0, 4); outer.Controls.Add(bottom, 0, 5);
+            outer.Controls.Add(header, 0, 0); outer.Controls.Add(pathRow, 0, 1); outer.Controls.Add(tabs, 0, 2); outer.Controls.Add(body, 0, 3); outer.Controls.Add(bottom, 0, 4);
             Controls.Add(outer);
             tips.SetToolTip(onlyMissing, "Keeps existing embedded front covers. Uncheck to replace the cover on every track in this album.");
             tips.SetToolTip(folderCover, "Updates recognized cover/folder/front/album/albumart images, or creates cover.jpg. Disabled when multiple albums share a folder.");
@@ -365,8 +374,9 @@ namespace AlbumArtTool
             apply.Enabled = !busy && !maintenanceRunning && !queued && hasImage && album != null && (count > 0 || (folderCover.Enabled && folderCover.Checked));
             tips.SetToolTip(apply, queued ? "This album is already in the queue. You can work on another album." :
                 pending != null ? "Add the chosen cover to the work queue." : "Apply the displayed cover using the full-size image already in your album.");
-            apply.BackColor = apply.Enabled ? Accent : Color.FromArgb(39, 44, 44);
-            apply.ForeColor = apply.Enabled ? Color.FromArgb(16, 33, 29) : Muted;
+            apply.BackColor = apply.Enabled ? Accent : AppTheme.Input;
+            apply.ForeColor = apply.Enabled ? Color.White : Muted;
+            ((ThemeButton)apply).Invalidate();
         }
 
         private void SetBusy(bool value, bool edit = false)
@@ -507,7 +517,7 @@ namespace AlbumArtTool
             using (var dialog = new Form { Text = "Scan and update details", Size = new Size(850, 450), StartPosition = FormStartPosition.CenterParent, BackColor = Surface, ForeColor = Ink })
             using (var text = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Dock = DockStyle.Fill,
                 BackColor = Surface, ForeColor = Ink, Font = new Font("Consolas", 10), Text = string.Join(Environment.NewLine + Environment.NewLine, issues) })
-            { dialog.Controls.Add(text); dialog.ShowDialog(this); }
+            { dialog.Controls.Add(text); AppTheme.Apply(dialog); dialog.ShowDialog(this); }
         }
 
         protected override void Dispose(bool disposing)

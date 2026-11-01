@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using AlbumArtTool.Design;
 using AlbumArtTool.Core;
 using AlbumArtTool.Management;
 
@@ -22,7 +23,7 @@ namespace AlbumArtTool
             archive = Check("Move old tool backups off the music player", true), compatibility = Check("Also convert other non-MP3 audio (compatibility)", false);
         private readonly TextBox backup = new TextBox();
         private readonly Label state = new Label(), encoderState = new Label();
-        private readonly ProgressBar progress = new ProgressBar();
+        private readonly ProgressBar progress = new ThemeProgressBar();
         private readonly Button preview = Button("Preview changes"), apply = Button("Apply selected changes"), undo = Button("Preview Undo"), stop = Button("Stop"),
             download = Button("Download FFmpeg"), chooseEncoder = Button("Choose FFmpeg…"), chooseBackup = Button("Choose backup…"), openBackup = Button("Open backups");
         private readonly ListView files = new ListView();
@@ -38,7 +39,7 @@ namespace AlbumArtTool
             root = musicRoot; canStart = ready; exclusive = setExclusive; refreshLibrary = refresh;
             Text = "Manage music library"; ClientSize = new Size(1000, 660); MinimumSize = new Size(960, 620);
             StartPosition = FormStartPosition.CenterParent; AutoScaleMode = AutoScaleMode.Dpi; BackColor = MainForm.Surface; ForeColor = MainForm.Ink; Font = new Font("Segoe UI", 10);
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 8, Padding = new Padding(12) };
+            var layout = new FrostCanvas { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 8, Padding = new Padding(12) };
             foreach (int height in new[] { 38, 94, 38, 38, 44, 48 }) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
             var path = new Label { Text = "Music folder: " + root, Dock = DockStyle.Fill, ForeColor = MainForm.Ink, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
@@ -76,6 +77,8 @@ namespace AlbumArtTool
             chooseBackup.Click += (s, e) => { using (var dialog = new FolderBrowserDialog { Description = "Choose a backup folder on your PC, outside the music folder", SelectedPath = backup.Text }) if (dialog.ShowDialog(this) == DialogResult.OK) backup.Text = dialog.SelectedPath; };
             openBackup.Click += (s, e) => { try { Directory.CreateDirectory(backup.Text); Process.Start(new ProcessStartInfo(backup.Text) { UseShellExecute = true }); } catch (Exception ex) { state.Text = ex.Message; } };
             FormClosing += (s, e) => { if (IsWorking) { e.Cancel = true; state.Text = "Task is running. Click Stop; the current file is kept safe before stopping."; } };
+            ((ThemeButton)apply).Primary = true;
+            AppTheme.Apply(this);
             encoder = Encoder.Find(); UpdateEncoder(); SetWorking(false);
         }
         private static CheckBox Check(string text, bool value) => new ThemeCheckBox { Text = text, Checked = value, Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9), ForeColor = MainForm.Ink, Margin = new Padding(3) };

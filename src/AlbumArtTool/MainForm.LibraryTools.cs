@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using AlbumArtTool.Design;
 using AlbumArtTool.Core;
 
 namespace AlbumArtTool
@@ -25,11 +26,11 @@ namespace AlbumArtTool
 
         private Control BuildLibraryToolbar()
         {
-            var bar = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 7, RowCount = 1, Margin = Padding.Empty };
-            foreach (int width in new[] { 175, 170, 45, 245, 43, 210 }) bar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, width));
-            bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); bar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            var bar = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty };
+            bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            bar.RowStyles.Add(new RowStyle(SizeType.Absolute, 18)); bar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             foreach (var combo in new[] { albumFilter, albumSort })
-            { combo.DropDownStyle = ComboBoxStyle.DropDownList; combo.Dock = DockStyle.Fill; combo.BackColor = Surface; combo.ForeColor = Ink; combo.FlatStyle = FlatStyle.Flat; combo.Font = new Font("Segoe UI", 9); combo.Margin = new Padding(3, 8, 8, 3); }
+            { combo.DropDownStyle = ComboBoxStyle.DropDownList; combo.Dock = DockStyle.Fill; combo.BackColor = Surface; combo.ForeColor = Ink; combo.FlatStyle = FlatStyle.Flat; combo.Font = new Font("Segoe UI", 9); combo.Margin = new Padding(3, 0, 4, 6); }
             albumFilter.AccessibleName = "Album filter"; albumSort.AccessibleName = "Album sort order";
             albumFilter.Items.AddRange(new object[] { "All albums in this tab", "Artist cleanup available" });
             albumSort.Items.AddRange(new object[] { "Artist and album", "Album title", "Artist changes first" });
@@ -38,13 +39,17 @@ namespace AlbumArtTool
             albumSort.SelectedIndexChanged += (s, e) => { if (!busy) RefreshAlbums(); };
             findDuplicates.Click += async (s, e) => await FindDuplicatesAsync();
             manageLibrary.Click += (s, e) => ShowLibraryManager();
-            bar.Controls.Add(findDuplicates, 0, 0); bar.Controls.Add(manageLibrary, 1, 0); bar.Controls.Add(Label("Show", 9), 2, 0); bar.Controls.Add(albumFilter, 3, 0);
-            bar.Controls.Add(Label("Sort", 9), 4, 0); bar.Controls.Add(albumSort, 5, 0);
+            ((ThemeButton)manageLibrary).Primary = true;
+            var showLabel = Label("SHOW", 7.8f, true); showLabel.ForeColor = Muted;
+            var sortLabel = Label("SORT BY", 7.8f, true); sortLabel.ForeColor = Muted;
+            showLabel.Margin = sortLabel.Margin = new Padding(8, 0, 0, 0);
+            bar.Controls.Add(showLabel, 0, 0); bar.Controls.Add(sortLabel, 1, 0); bar.Controls.Add(albumFilter, 0, 1); bar.Controls.Add(albumSort, 1, 1);
             return bar;
         }
 
         private Control BuildArtistPanel()
         {
+            ((ThemeButton)applyArtist).Primary = true;
             var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7, Padding = new Padding(15), BackColor = Surface, Margin = Padding.Empty };
             foreach (int height in new[] { 32, 60, 30, 38, 40 }) panel.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
             panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
@@ -75,7 +80,7 @@ namespace AlbumArtTool
             foreach (var tab in new[] { missingTab, existingTab, artistsTab })
             {
                 bool selected = tab == artistsTab ? showingArtists : !showingArtists && (tab == missingTab ? showingMissing : !showingMissing);
-                tab.BackColor = selected ? Color.FromArgb(37, 65, 59) : Surface; tab.ForeColor = selected ? Accent : Muted;
+                ((ThemeButton)tab).Selected = selected; ((ThemeButton)tab).Chrome = !selected; tab.BackColor = selected ? Surface : AppTheme.Input; tab.ForeColor = selected ? Accent : Muted; tab.Invalidate();
             }
             if (coverPanel != null) coverPanel.Visible = !showingArtists;
             if (artistPanel != null) artistPanel.Visible = showingArtists;

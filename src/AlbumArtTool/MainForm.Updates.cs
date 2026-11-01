@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using AlbumArtTool.Design;
 using AlbumArtTool.Updates;
 
 namespace AlbumArtTool
@@ -25,14 +26,14 @@ namespace AlbumArtTool
             var dialog = updateWindow = new Form { Text = "Get updates", ClientSize = new Size(530, 222), MinimumSize = new Size(530, 260),
                 StartPosition = FormStartPosition.CenterParent, BackColor = Surface, ForeColor = Ink, Font = new Font("Segoe UI", 10),
                 MaximizeBox = false, MinimizeBox = false, AutoScaleMode = AutoScaleMode.Dpi };
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(18) };
+            var layout = new FrostCanvas { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(18) };
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             var version = Label("Installed version: " + UpdateService.DisplayVersion, 10, true);
             var message = Label("Checking GitHub for a newer release…", 10); message.AccessibleName = "App update status";
-            var downloadProgress = new ProgressBar { Dock = DockStyle.Fill, Style = ProgressBarStyle.Marquee, Margin = new Padding(0, 4, 0, 4), AccessibleName = "App download progress" };
+            var downloadProgress = new ThemeProgressBar { Dock = DockStyle.Fill, Style = ProgressBarStyle.Marquee, Margin = new Padding(0, 4, 0, 4), AccessibleName = "App download progress" };
             var close = Button("Cancel"); close.Dock = DockStyle.Right; close.Width = 110;
             close.Click += (s, e) => dialog.Close();
             layout.Controls.Add(version, 0, 0); layout.Controls.Add(message, 0, 1);
@@ -41,6 +42,8 @@ namespace AlbumArtTool
             FormClosedEventHandler cancel = (s, e) => source.Cancel();
             dialog.FormClosed += cancel;
             dialog.FormClosing += (s, e) => { if (installingUpdate && !restartForUpdate) e.Cancel = true; };
+            AppTheme.Apply(dialog);
+            ((ThemeButton)close).Primary = true;
             dialog.Show(this);
             string directory = null;
             bool handedOff = false, downloading = false;

@@ -1,14 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using AlbumArtTool.Core;
+using AlbumArtTool.Design;
 
 namespace AlbumArtTool
 {
     internal sealed class AlbumList : ListView
     {
+        private int hoverIndex = -1;
         private List<Album> albums = new List<Album>();
         private readonly Dictionary<string, Image> images = new Dictionary<string, Image>();
         private readonly Queue<string> imageOrder = new Queue<string>();
@@ -49,6 +52,8 @@ namespace AlbumArtTool
             Resize += (s, e) => { if (Columns.Count > 0) Columns[0].Width = Math.Max(80, ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 2); };
             DrawColumnHeader += (s, e) => e.DrawDefault = true;
             DrawSubItem += DrawAlbum;
+            MouseMove += (s, e) => SetHover(GetItemAt(e.X, e.Y)?.Index ?? -1);
+            MouseLeave += (s, e) => SetHover(-1);
             AllowDrop = true;
             DragEnter += (s, e) => e.Effect = MainForm.SingleImagePath(e.Data) != null ? DragDropEffects.Copy : DragDropEffects.None;
             DragOver += (s, e) => e.Effect = GetItemAt(PointToClient(new Point(e.X, e.Y)).X, PointToClient(new Point(e.X, e.Y)).Y) != null
@@ -73,6 +78,7 @@ namespace AlbumArtTool
         internal void SetAlbums(IEnumerable<Album> values, string selectedKey = null)
         {
             BeginUpdate();
+            hoverIndex = -1;
             SelectedIndices.Clear();
             VirtualListSize = 0;
             foreach (var image in images.Values) image.Dispose();
@@ -102,36 +108,58 @@ namespace AlbumArtTool
             return image;
         }
 
+        private void SetHover(int index)
+        {
+            if (hoverIndex == index) return;
+            int previous = hoverIndex; hoverIndex = index;
+            foreach (int value in new[] { previous, index })
+                if (value >= 0 && value < VirtualListSize) Invalidate(GetItemRect(value));
+        }
         private void DrawAlbum(object sender, DrawListViewSubItemEventArgs e)
         {
             if (e.ItemIndex >= albums.Count || e.ColumnIndex != 0) return;
-            var album = albums[e.ItemIndex];
-            var bounds = e.Bounds;
+            var album = albums[e.ItemIndex]; var bounds = e.Bounds;
             int S(int value) => (int)Math.Round(value * bounds.Height / 86.0);
-            bool selected = SelectedIndices.Contains(e.ItemIndex);
-            using (var fill = new SolidBrush(selected ? Color.FromArgb(32, 55, 52) : MainForm.Surface)) e.Graphics.FillRectangle(fill, bounds);
-            int coverSize = bounds.Height - S(18);
-            var cover = new Rectangle(bounds.X + S(9), bounds.Y + S(9), coverSize, coverSize);
-            using (var fill = new SolidBrush(Color.FromArgb(40, 41, 44))) e.Graphics.FillRectangle(fill, cover);
-            var image = GetThumbnail(album);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var fill = new SolidBrush(AppTheme.Surface)) e.Graphics.FillRectangle(fill, bounds);
+            bool selected = SelectedIndices.Contains(e.ItemIndex), hovered = hoverIndex == e.ItemIndex;
+            var tile = new Rectangle(bounds.X + S(3), bounds.Y + S(3), Math.Max(1, bounds.Width - S(6)), bounds.Height - S(6));
+            using (var path = AppTheme.Rounded(tile, S(12)))
+            using (var fill = new SolidBrush(selected ? AppTheme.Selection : hovered ? AppTheme.Input : AppTheme.Surface)) e.Graphics.FillPath(fill, path);
+            if (selected)
+                using (var path = AppTheme.Rounded(tile, S(12)))
+                using (var border = new Pen(Color.FromArgb(211, 223, 251))) e.Graphics.DrawPath(border, path);
+            int coverSize = bounds.Height - S(22);
+            var cover = new Rectangle(bounds.X + S(12), bounds.Y + S(11), coverSize, coverSize);
+            using (var shadow = AppTheme.Rounded(new Rectangle(cover.X, cover.Y + S(2), cover.Width, cover.Height), S(9)))
+            using (var fill = new SolidBrush(Color.FromArgb(20, 39, 57, 92))) e.Graphics.FillPath(fill, shadow);
+            var image = GetThumbnail(album); var state = e.Graphics.Save();
+            using (var shape = AppTheme.Rounded(cover, S(9))) e.Graphics.SetClip(shape);
+            using (var fill = new LinearGradientBrush(cover, Color.FromArgb(224, 235, 253), Color.FromArgb(231, 225, 247), 45)) e.Graphics.FillRectangle(fill, cover);
             if (image != null)
             {
                 float scale = Math.Min((float)cover.Width / image.Width, (float)cover.Height / image.Height);
                 var size = new Size((int)(image.Width * scale), (int)(image.Height * scale));
+                e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
                 e.Graphics.DrawImage(image, cover.X + (cover.Width - size.Width) / 2, cover.Y + (cover.Height - size.Height) / 2, size.Width, size.Height);
             }
-            else
-                TextRenderer.DrawText(e.Graphics, "♪", titleFont, cover, MainForm.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            int left = cover.Right + S(13), width = Math.Max(1, bounds.Right - left - S(12));
+            else TextRenderer.DrawText(e.Graphics, "♪", titleFont, cover, AppTheme.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            e.Graphics.Restore(state);
+            int left = cover.Right + S(13), width = Math.Max(1, bounds.Right - left - S(15));
             var flags = TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix;
-            TextRenderer.DrawText(e.Graphics, album.Title, titleFont, new Rectangle(left, bounds.Y + S(10), width, S(23)), MainForm.Ink, flags);
-            TextRenderer.DrawText(e.Graphics, album.Artist + "  ·  " + album.Tracks.Count + " tracks", detailFont,
-                new Rectangle(left, bounds.Y + S(35), width, S(20)), MainForm.Muted, flags);
-            string work = WorkStatus?.Invoke(album);
-            TextRenderer.DrawText(e.Graphics, work ?? album.Coverage, detailFont, new Rectangle(left, bounds.Y + S(57), width, S(20)),
-                work != null ? MainForm.Accent : album.MissingCount > 0 ? Color.FromArgb(236, 190, 112) : MainForm.Accent, flags);
-            using (var line = new Pen(Color.FromArgb(43, 44, 47))) e.Graphics.DrawLine(line, bounds.X + 9, bounds.Bottom - 1, bounds.Right - 9, bounds.Bottom - 1);
-            if (selected && Focused) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(bounds, -2, -2), MainForm.Accent, MainForm.Surface);
+            TextRenderer.DrawText(e.Graphics, album.Title, titleFont, new Rectangle(left, bounds.Y + S(11), width, S(22)), AppTheme.Ink, flags);
+            TextRenderer.DrawText(e.Graphics, album.Artist + "  ·  " + album.Tracks.Count + (album.Tracks.Count == 1 ? " track" : " tracks"), detailFont,
+                new Rectangle(left, bounds.Y + S(35), width, S(19)), AppTheme.Muted, flags);
+            string work = WorkStatus?.Invoke(album), label = work ?? album.Coverage;
+            Color tone = work != null ? AppTheme.Accent : album.MissingCount > 0 ? AppTheme.Warning : AppTheme.Positive;
+            var badge = new Rectangle(left - S(1), bounds.Y + S(57), Math.Min(width, TextRenderer.MeasureText(label, detailFont).Width + S(13)), S(19));
+            using (var path = AppTheme.Rounded(badge, S(6)))
+            using (var fill = new SolidBrush(AppTheme.Blend(tone, Color.White, .92f))) e.Graphics.FillPath(fill, path);
+            var badgeText = badge; badgeText.X += S(6); badgeText.Width = Math.Max(1, badgeText.Width - S(10));
+            TextRenderer.DrawText(e.Graphics, label, detailFont, badgeText, tone, flags);
+            if (selected && Focused && ShowFocusCues)
+                using (var path = AppTheme.Rounded(Rectangle.Inflate(tile, -1, -1), S(11)))
+                using (var focus = new Pen(AppTheme.Accent, 1.2f)) e.Graphics.DrawPath(focus, path);
         }
 
         protected override void Dispose(bool disposing)

@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using AlbumArtTool.Design;
 using AlbumArtTool.Core;
 
 namespace AlbumArtTool
@@ -17,7 +18,7 @@ namespace AlbumArtTool
         private readonly Func<Album[]> currentAlbums;
         private readonly TreeView matches = new TreeView();
         private readonly Label message = new Label();
-        private readonly ProgressBar progress = new ProgressBar();
+        private readonly ProgressBar progress = new ThemeProgressBar();
         private readonly Button scan = new ThemeButton(), save = new ThemeButton(), open = new ThemeButton();
         private CancellationTokenSource source;
         internal DuplicateResult Result { get; private set; }
@@ -28,7 +29,7 @@ namespace AlbumArtTool
             albums = snapshot; currentAlbums = latest;
             Text = "Find duplicates"; BackColor = MainForm.Surface; ForeColor = MainForm.Ink; Font = new Font("Segoe UI", 10);
             AutoScaleMode = AutoScaleMode.Dpi; ClientSize = new Size(960, 570); MinimumSize = new Size(720, 460); StartPosition = FormStartPosition.CenterParent;
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(16) };
+            var layout = new FrostCanvas { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(16) };
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 45));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24)); layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 45));
             var help = new Label { Text = "Review song and album copies below. Confirmed matches use file/audio hashes; possible matches use tags and duration. This scanner does not delete files.", Dock = DockStyle.Fill, ForeColor = MainForm.Muted };
@@ -48,6 +49,7 @@ namespace AlbumArtTool
             buttons.Controls.Add(scan, 0, 0); buttons.Controls.Add(save, 1, 0); buttons.Controls.Add(open, 3, 0);
             layout.Controls.Add(help, 0, 0); layout.Controls.Add(message, 0, 1); layout.Controls.Add(progress, 0, 2); layout.Controls.Add(matches, 0, 3); layout.Controls.Add(buttons, 0, 4);
             Controls.Add(layout);
+            AppTheme.Apply(this);
             FormClosed += (s, e) => source?.Cancel();
         }
 
