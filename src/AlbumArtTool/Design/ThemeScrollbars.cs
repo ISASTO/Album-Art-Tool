@@ -69,7 +69,15 @@ namespace AlbumArtTool.Design
             catch (ExternalException) { } // An invalidated drawing context must not interrupt a library task.
             finally { painting = false; }
         }
-        private Color Surface => owner.BackColor.A == 255 ? owner.BackColor : AppTheme.Surface;
+        private Color Surface
+        {
+            get
+            {
+                if (owner.BackColor.A == 255) return owner.BackColor;
+                for (Control parent = owner.Parent; parent != null; parent = parent.Parent) if (parent is InsetPanel) return AppTheme.Inset;
+                return AppTheme.Surface;
+            }
+        }
         private Rectangle DrawBar(Graphics graphics, NativeRect window, bool vertical)
         {
             var info = new ScrollbarInfo { Size = Marshal.SizeOf(typeof(ScrollbarInfo)), States = new int[6] };

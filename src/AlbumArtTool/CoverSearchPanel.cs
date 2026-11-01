@@ -67,7 +67,8 @@ namespace AlbumArtTool
             };
             summary.Dock = DockStyle.Fill; summary.ForeColor = MainForm.Muted; summary.Font = new Font("Segoe UI", 8.5f);
             summary.AutoEllipsis = true; summary.TextAlign = ContentAlignment.MiddleLeft;
-            layout.Controls.Add(searchRow, 0, 0); layout.Controls.Add(instructions, 0, 1); layout.Controls.Add(choices, 0, 2); layout.Controls.Add(summary, 0, 3);
+            var results = new InsetPanel { Padding = new Padding(4), AccessibleName = "Artwork search results" }; results.Controls.Add(choices);
+            layout.Controls.Add(searchRow, 0, 0); layout.Controls.Add(instructions, 0, 1); layout.Controls.Add(results, 0, 2); layout.Controls.Add(summary, 0, 3);
             Controls.Add(layout);
             find.Click += (s, e) => CurrentSearch = SearchAsync(true);
             query.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; CurrentSearch = SearchAsync(true); } };

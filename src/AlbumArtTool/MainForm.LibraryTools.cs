@@ -81,7 +81,8 @@ namespace AlbumArtTool
             tips.SetToolTip(openArtistAlbum, "Open this album's folder in File Explorer.");
             tips.SetToolTip(showArtistTrack, "Select a track above, then open its folder with that song highlighted in File Explorer.");
             locations.Controls.Add(openArtistAlbum, 0, 0); locations.Controls.Add(showArtistTrack, 1, 0);
-            panel.Controls.Add(artistPreview, 0, 5); panel.Controls.Add(locations, 0, 6); panel.Controls.Add(applyArtist, 0, 7);
+            var trackSection = new InsetPanel { AccessibleName = "Track artist preview section" }; trackSection.Controls.Add(artistPreview);
+            panel.Controls.Add(trackSection, 0, 5); panel.Controls.Add(locations, 0, 6); panel.Controls.Add(applyArtist, 0, 7);
             applyArtist.Click += async (s, e) => await ApplyArtistAsync();
             return panel;
         }

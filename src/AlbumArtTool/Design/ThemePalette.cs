@@ -9,13 +9,14 @@ namespace AlbumArtTool.Design
     internal sealed class ThemePalette
     {
         internal readonly bool Dark;
-        internal readonly Color Canvas, Surface, Input, Ink, Muted, Accent, Selection, Border, Positive, Warning;
+        internal readonly Color Canvas, Surface, Input, Ink, Muted, Accent, Selection, Border, Positive, Warning, Inset;
         internal ThemePalette(bool dark)
         {
             Dark = dark;
             Canvas = dark ? Color.FromArgb(19, 23, 31) : Color.FromArgb(241, 244, 250);
             Surface = dark ? Color.FromArgb(32, 38, 51) : Color.FromArgb(253, 254, 255);
             Input = dark ? Color.FromArgb(25, 31, 41) : Color.FromArgb(246, 248, 252);
+            Inset = dark ? Color.FromArgb(27, 33, 44) : Color.FromArgb(241, 244, 249);
             Ink = dark ? Color.FromArgb(237, 242, 250) : Color.FromArgb(30, 36, 51);
             Muted = dark ? Color.FromArgb(172, 184, 205) : Color.FromArgb(101, 112, 133);
             Accent = dark ? Color.FromArgb(150, 185, 255) : Color.FromArgb(50, 103, 235);
@@ -24,7 +25,7 @@ namespace AlbumArtTool.Design
             Positive = dark ? Color.FromArgb(138, 217, 184) : Color.FromArgb(40, 126, 104);
             Warning = dark ? Color.FromArgb(239, 200, 143) : Color.FromArgb(155, 102, 36);
         }
-        internal Color[] Colors => new[] { Canvas, Surface, Input, Ink, Muted, Accent, Selection, Border, Positive, Warning };
+        internal Color[] Colors => new[] { Canvas, Surface, Input, Ink, Muted, Accent, Selection, Border, Positive, Warning, Inset };
     }
     internal static class ThemeSettings
     {

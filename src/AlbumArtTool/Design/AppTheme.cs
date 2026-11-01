@@ -14,6 +14,7 @@ namespace AlbumArtTool.Design
         internal static Color Canvas => palette.Canvas;
         internal static Color Surface => palette.Surface;
         internal static Color Input => palette.Input;
+        internal static Color Inset => palette.Inset;
         internal static Color Ink => palette.Ink;
         internal static Color Muted => palette.Muted;
         internal static Color Accent => palette.Accent;
@@ -184,7 +185,7 @@ namespace AlbumArtTool.Design
         }
         private static void StyleList(ListView list)
         {
-            list.BackColor = Surface; list.ForeColor = Ink; list.BorderStyle = BorderStyle.None; list.GridLines = false;
+            list.BackColor = list.Parent is InsetPanel ? Inset : Surface; list.ForeColor = Ink; list.BorderStyle = BorderStyle.None; list.GridLines = false;
             var rows = new ImageList { ImageSize = new Size(1, Scale(list, 30)), ColorDepth = ColorDepth.Depth32Bit };
             rows.Images.Add(new Bitmap(1, Scale(list, 30))); list.SmallImageList = rows;
             list.Disposed += (s, e) => rows.Dispose();
@@ -192,7 +193,7 @@ namespace AlbumArtTool.Design
             list.OwnerDraw = true;
             list.DrawColumnHeader += (s, e) =>
             {
-                using (var brush = new SolidBrush(Input)) e.Graphics.FillRectangle(brush, e.Bounds);
+                using (var brush = new SolidBrush(list.Parent is InsetPanel ? Blend(Inset, Ink, IsDark ? .025f : .02f) : Input)) e.Graphics.FillRectangle(brush, e.Bounds);
                 var text = e.Bounds; text.X += 10; text.Width = Math.Max(1, text.Width - 16);
                 TextRenderer.DrawText(e.Graphics, e.Header.Text, list.Font, text, Muted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
                 using (var pen = new Pen(Border)) e.Graphics.DrawLine(pen, e.Bounds.Left, e.Bounds.Bottom - 1, e.Bounds.Right, e.Bounds.Bottom - 1);
@@ -200,7 +201,8 @@ namespace AlbumArtTool.Design
             list.DrawItem += (s, e) => { if (list.View != View.Details) e.DrawDefault = true; };
             list.DrawSubItem += (s, e) =>
             {
-                using (var brush = new SolidBrush(e.Item.Selected ? Selection : e.ItemIndex % 2 == 0 ? Surface : Alternate)) e.Graphics.FillRectangle(brush, e.Bounds);
+                var alternate = list.Parent is InsetPanel ? Blend(list.BackColor, Ink, IsDark ? .025f : .015f) : Alternate;
+                using (var brush = new SolidBrush(e.Item.Selected ? Selection : e.ItemIndex % 2 == 0 ? list.BackColor : alternate)) e.Graphics.FillRectangle(brush, e.Bounds);
                 var text = e.Bounds; text.X += 10; text.Width = Math.Max(1, text.Width - 16);
                 if (e.ColumnIndex == 0 && list.CheckBoxes)
                 { DrawCheck(e.Graphics, new Rectangle(e.Bounds.Left + Scale(list, 4), e.Bounds.Top + (e.Bounds.Height - Scale(list, 14)) / 2, Scale(list, 14), Scale(list, 14)), e.Item.Checked, list.Enabled); text.X += Scale(list, 18); text.Width = Math.Max(1, text.Width - Scale(list, 18)); }

@@ -37,6 +37,22 @@ namespace AlbumArtTool.Design
             get { var parameters = base.CreateParams; parameters.ExStyle |= 0x02000000; return parameters; } // WS_EX_COMPOSITED: buffer child windows together.
         }
     }
+    internal sealed class InsetPanel : Panel
+    {
+        internal InsetPanel()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor | ControlStyles.ResizeRedraw, true);
+            BackColor = Color.Transparent; Padding = new Padding(6); Margin = Padding.Empty; Dock = DockStyle.Fill;
+        }
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            base.OnPaintBackground(e); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var shape = AppTheme.Rounded(new RectangleF(.5f, .5f, Math.Max(1, Width - 1), Math.Max(1, Height - 1)), AppTheme.Scale(this, 12)))
+            using (var fill = new SolidBrush(AppTheme.Inset))
+            using (var edge = new Pen(AppTheme.Blend(AppTheme.Border, AppTheme.Inset, .55f)))
+            { e.Graphics.FillPath(fill, shape); e.Graphics.DrawPath(edge, shape); }
+        }
+    }
     internal sealed class InputFrame : Panel
     {
         internal InputFrame(TextBox input)
