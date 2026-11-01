@@ -217,7 +217,7 @@ namespace AlbumArtTool.Design
         }
         private static void StyleQueue(ListBox box)
         {
-            box.BackColor = Surface; box.ForeColor = Ink; box.BorderStyle = BorderStyle.None; box.DrawMode = DrawMode.OwnerDrawFixed; box.ItemHeight = Scale(box, 36);
+            box.IntegralHeight = false; box.BackColor = Surface; box.ForeColor = Ink; box.BorderStyle = BorderStyle.None; box.DrawMode = DrawMode.OwnerDrawFixed; box.ItemHeight = Scale(box, 36);
             box.DrawItem += (s, e) =>
             {
                 if (e.Index < 0) return;

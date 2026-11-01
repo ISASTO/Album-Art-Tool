@@ -218,10 +218,18 @@ namespace AlbumArtTool.Design
             private void Destroyed(object sender, EventArgs e) { if (Handle != IntPtr.Zero) ReleaseHandle(); }
             protected override void WndProc(ref Message message)
             {
-                // WM_PRINT otherwise includes the hidden native nonclient bars in
-                // exported control images even though the screen viewport clips them.
-                if (message.Msg == 0x0317) message.LParam = new IntPtr(message.LParam.ToInt64() & ~2L);
-                base.WndProc(ref message);
+                // Native WM_PRINT implementations may leave the caller's DC origin
+                // and clip changed. Transparent buffered parents reuse that DC;
+                // preserve it so later child backgrounds cannot draw other controls.
+                int saved = message.Msg == 0x0317 && message.WParam != IntPtr.Zero ? SaveDC(message.WParam) : 0;
+                IntPtr flags = message.LParam;
+                if (message.Msg == 0x0317) message.LParam = new IntPtr(flags.ToInt64() & ~2L); // Native bars are outside the viewport.
+                try { base.WndProc(ref message); }
+                finally
+                {
+                    if (saved != 0) RestoreDC(message.WParam, saved);
+                    message.LParam = flags;
+                }
                 int kind = message.Msg;
                 if (kind == 0x000F || kind == 0x0085 || kind == 0x0005 || kind == 0x000B || kind == 0x007D ||
                     kind == 0x0114 || kind == 0x0115 || kind == 0x020A || kind == 0x020E || kind == 0x0100 || kind == 0x0102 ||
@@ -323,6 +331,8 @@ namespace AlbumArtTool.Design
         [StructLayout(LayoutKind.Sequential)] private struct ScrollInfo { internal int Size, Mask, Min, Max; internal uint Page; internal int Position, TrackPosition; }
         [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetScrollInfo(IntPtr window, int bar, ref ScrollInfo info);
         [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] private static extern int GetWindowLong(IntPtr window, int index);
+        [DllImport("gdi32.dll")] private static extern int SaveDC(IntPtr dc);
+        [DllImport("gdi32.dll")] private static extern bool RestoreDC(IntPtr dc, int state);
         [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr parameter, IntPtr data);
     }
 }

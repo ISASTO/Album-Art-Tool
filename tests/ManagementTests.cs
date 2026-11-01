@@ -218,6 +218,13 @@ internal static partial class Tests
                     }
                     var planned = Descendants(form).OfType<ListView>().Single(l => l.AccessibleName == "Planned library changes");
                     Assert(planned.Enabled, "the management list keeps its dark background and remains scrollable during work");
+                    var previewBounds = AlbumArtTool.Design.ThemeScrollbars.For(planned).VisibleContent;
+                    using (var image = ScreenImage(previewBounds))
+                    {
+                        var pixel = image.GetPixel(image.Width / 2, image.Height / 2);
+                        Assert(Math.Abs(pixel.R - planned.BackColor.R) < 5 && Math.Abs(pixel.G - planned.BackColor.G) < 5 && Math.Abs(pixel.B - planned.BackColor.B) < 5,
+                            "the actual on-screen management background stays dark during scanning");
+                    }
                     using (var screen = ScreenImage(new Rectangle(form.Location, form.Size))) screen.Save(Path.Combine(output, "manager-scanning-stable-options.png"), ImageFormat.Png);
                     setWorking.Invoke(form, new object[] { false });
                     await form.PreviewAsync();
