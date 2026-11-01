@@ -40,7 +40,7 @@ namespace AlbumArtTool
             Text = "Manage music library"; ClientSize = new Size(1000, 660); MinimumSize = new Size(960, 620);
             StartPosition = FormStartPosition.CenterParent; AutoScaleMode = AutoScaleMode.Dpi; BackColor = MainForm.Surface; ForeColor = MainForm.Ink; Font = new Font("Segoe UI", 10);
             var layout = new FrostCanvas { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 8, Padding = new Padding(12) };
-            foreach (int height in new[] { 38, 94, 38, 38, 44, 48 }) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
+            foreach (int height in new[] { 38, 102, 38, 38, 44, 48 }) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
             var path = new Label { Text = "Music folder: " + root, Dock = DockStyle.Fill, ForeColor = MainForm.Ink, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
             var options = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 3, Margin = Padding.Empty };
@@ -48,6 +48,8 @@ namespace AlbumArtTool
             foreach (int unused in new[] { 1, 2, 3 }) options.RowStyles.Add(new RowStyle(SizeType.Percent, 33.33f));
             options.Controls.Add(convert, 0, 0); options.Controls.Add(square, 1, 0); options.Controls.Add(duplicates, 0, 1); options.Controls.Add(organize, 1, 1);
             options.Controls.Add(archive, 0, 2); options.Controls.Add(compatibility, 1, 2);
+            var optionsCard = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(10, 5, 10, 5), Margin = new Padding(0, 0, 0, 5) };
+            optionsCard.Controls.Add(options);
             foreach (var check in new[] { convert, square, duplicates, organize, archive, compatibility }) check.CheckedChanged += (s, e) => InvalidatePlan();
             var tools = Row(165, 160); encoderState.ForeColor = MainForm.Muted; encoderState.Dock = DockStyle.Fill; encoderState.TextAlign = ContentAlignment.MiddleLeft; encoderState.AutoEllipsis = true;
             tools.Controls.Add(encoderState, 0, 0); tools.Controls.Add(download, 1, 0); tools.Controls.Add(chooseEncoder, 2, 0);
@@ -68,8 +70,9 @@ namespace AlbumArtTool
             files.Columns.Add("Action", 205); files.Columns.Add("Source", 285); files.Columns.Add("Destination / retained copy", 300); files.Columns.Add("Details", 420);
             files.AccessibleName = "Planned library changes"; files.ShowItemToolTips = true; files.ItemChecked += (s, e) => UpdateApply();
             progress.Dock = DockStyle.Fill; progress.Margin = new Padding(0, 8, 0, 2); progress.Visible = false; progress.AccessibleName = "Library management progress";
-            layout.Controls.Add(path, 0, 0); layout.Controls.Add(options, 0, 1); layout.Controls.Add(tools, 0, 2); layout.Controls.Add(backups, 0, 3);
-            layout.Controls.Add(actions, 0, 4); layout.Controls.Add(state, 0, 5); layout.Controls.Add(files, 0, 6); layout.Controls.Add(progress, 0, 7); Controls.Add(layout);
+            var filesCard = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(10), Margin = new Padding(0, 2, 0, 0) }; filesCard.Controls.Add(files);
+            layout.Controls.Add(path, 0, 0); layout.Controls.Add(optionsCard, 0, 1); layout.Controls.Add(tools, 0, 2); layout.Controls.Add(backups, 0, 3);
+            layout.Controls.Add(actions, 0, 4); layout.Controls.Add(state, 0, 5); layout.Controls.Add(filesCard, 0, 6); layout.Controls.Add(progress, 0, 7); Controls.Add(layout);
             preview.Click += async (s, e) => await PreviewAsync(); apply.Click += async (s, e) => await ApplyAsync();
             undo.Click += (s, e) => PreviewUndo(); stop.Click += (s, e) => source?.Cancel();
             download.Click += async (s, e) => await DownloadAsync();

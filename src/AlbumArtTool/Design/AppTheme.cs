@@ -21,6 +21,12 @@ namespace AlbumArtTool.Design
         private sealed class Applied { }
         private static readonly ConditionalWeakTable<Control, Applied> applied = new ConditionalWeakTable<Control, Applied>();
         private static readonly Bitmap grain = MakeGrain();
+        private static readonly Icon appIcon = LoadIcon();
+        private static Icon LoadIcon()
+        {
+            using (var stream = typeof(AppTheme).Assembly.GetManifestResourceStream("AlbumArtTool.AppIcon.ico"))
+            using (var icon = new Icon(stream)) return (Icon)icon.Clone();
+        }
         internal static int Scale(Control c, int n) => Math.Max(1, (int)Math.Round(n * c.DeviceDpi / 96.0));
         internal static GraphicsPath Rounded(RectangleF r, float radius)
         {
@@ -64,7 +70,7 @@ namespace AlbumArtTool.Design
         }
         internal static void Apply(Form form)
         {
-            form.BackColor = Canvas; form.ForeColor = Ink;
+            form.BackColor = Canvas; form.ForeColor = Ink; form.Icon = appIcon;
             form.HandleCreated += (s, e) => NativeEffects.Apply(form);
             if (form.IsHandleCreated) NativeEffects.Apply(form);
             ApplyTree(form);

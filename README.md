@@ -8,6 +8,8 @@ One Windows app for album artwork, artist cleanup, MP3 conversion, duplicate rem
 
 *Interface shown with test albums and example search results.*
 
+The interface uses a light palette, rounded artwork and controls, subtle hover transitions, and frosted-style panels. Windows 11 adds native rounded window corners and Mica where supported; older Windows versions use the same painted interface. Keyboard focus and disabled text remain visible. The redesign adds no UI framework or runtime dependency.
+
 ## Use it
 
 1. Download **AlbumArtTool.exe** from Releases. Put it in the top folder of your music collection and double-click it. You can also keep it elsewhere and use **Choose folder**.
@@ -24,7 +26,7 @@ The **Queue** button shows active and waiting albums, recent results, and **Clea
 
 No installer, accounts, API keys or background service. Online suggestions use the internet; uncheck **Online suggestions** to work offline. Windows 10 (1903 or newer) and Windows 11 use the .NET Framework 4.8 runtime already included with Windows. The EXE embeds its only third-party library, TagLibSharp. The ZIP includes the same EXE and license notices.
 
-Scanning first counts supported music files using directory listings, without reading audio tags. It then shows a filling progress bar, a percentage, and an exact counter such as **2751/3867 tracks scanned**. Files that fail to open still count as checked and appear in Details. The initial counting phase can also be stopped. Disabled options keep readable text on the dark background.
+Scanning first counts supported music files using directory listings, without reading audio tags. It then shows a filling progress bar, a percentage, and an exact counter such as **2751/3867 tracks scanned**. Files that fail to open still count as checked and appear in Details. The initial counting phase can also be stopped. Disabled options keep readable text on the light surfaces.
 
 [Scan progress preview](docs/scanning.png) · [Background queue preview](docs/queue.png)
 

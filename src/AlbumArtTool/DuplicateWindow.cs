@@ -47,7 +47,9 @@ namespace AlbumArtTool
             save.Text = "Save report…"; save.Enabled = false; save.Click += (s, e) => SaveReport();
             open.Text = "Open selected folder"; open.Enabled = false; open.Click += (s, e) => OpenSelected();
             buttons.Controls.Add(scan, 0, 0); buttons.Controls.Add(save, 1, 0); buttons.Controls.Add(open, 3, 0);
-            layout.Controls.Add(help, 0, 0); layout.Controls.Add(message, 0, 1); layout.Controls.Add(progress, 0, 2); layout.Controls.Add(matches, 0, 3); layout.Controls.Add(buttons, 0, 4);
+            var matchesCard = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(10), Margin = new Padding(0, 2, 0, 0) }; matchesCard.Controls.Add(matches);
+            ((ThemeButton)scan).Primary = true;
+            layout.Controls.Add(help, 0, 0); layout.Controls.Add(message, 0, 1); layout.Controls.Add(progress, 0, 2); layout.Controls.Add(matchesCard, 0, 3); layout.Controls.Add(buttons, 0, 4);
             Controls.Add(layout);
             AppTheme.Apply(this);
             FormClosed += (s, e) => source?.Cancel();

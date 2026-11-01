@@ -178,10 +178,11 @@ namespace AlbumArtTool
             clearWaiting = Button("Clear waiting jobs");
             clearWaiting.Dock = DockStyle.Right; clearWaiting.Width = 165;
             clearWaiting.Click += (s, e) => ClearWaitingJobs();
-            var footer = new Panel { Dock = DockStyle.Bottom, Height = 50, Padding = new Padding(8) };
-            footer.Controls.Add(clearWaiting);
-            queueWindow.Padding = new Padding(14);
-            queueWindow.Controls.Add(queueList); queueWindow.Controls.Add(footer);
+            var layout = new FrostCanvas { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(14) };
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+            var listCard = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(10), Margin = Padding.Empty }; listCard.Controls.Add(queueList);
+            var footer = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 8, 0, 0), Margin = Padding.Empty }; footer.Controls.Add(clearWaiting);
+            layout.Controls.Add(listCard, 0, 0); layout.Controls.Add(footer, 0, 1); queueWindow.Controls.Add(layout);
             queueWindow.FormClosed += (s, e) => { queueWindow = null; queueList = null; clearWaiting = null; };
             AppTheme.Apply(queueWindow);
             UpdateQueueDisplay(); queueWindow.Show(this);
