@@ -128,14 +128,14 @@ namespace AlbumArtTool
             using (var fill = new SolidBrush(selected ? AppTheme.Selection : hovered ? AppTheme.Input : AppTheme.Surface)) e.Graphics.FillPath(fill, path);
             if (selected)
                 using (var path = AppTheme.Rounded(tile, S(12)))
-                using (var border = new Pen(Color.FromArgb(211, 223, 251))) e.Graphics.DrawPath(border, path);
+                using (var border = new Pen(AppTheme.SelectedBorder)) e.Graphics.DrawPath(border, path);
             int coverSize = bounds.Height - S(22);
             var cover = new Rectangle(bounds.X + S(12), bounds.Y + S(11), coverSize, coverSize);
             using (var shadow = AppTheme.Rounded(new Rectangle(cover.X, cover.Y + S(2), cover.Width, cover.Height), S(9)))
             using (var fill = new SolidBrush(Color.FromArgb(20, 39, 57, 92))) e.Graphics.FillPath(fill, shadow);
             var image = GetThumbnail(album); var state = e.Graphics.Save();
             using (var shape = AppTheme.Rounded(cover, S(9))) e.Graphics.SetClip(shape);
-            using (var fill = new LinearGradientBrush(cover, Color.FromArgb(224, 235, 253), Color.FromArgb(231, 225, 247), 45)) e.Graphics.FillRectangle(fill, cover);
+            using (var fill = new LinearGradientBrush(cover, AppTheme.IsDark ? Color.FromArgb(47, 66, 99) : Color.FromArgb(224, 235, 253), AppTheme.IsDark ? Color.FromArgb(53, 46, 79) : Color.FromArgb(231, 225, 247), 45)) e.Graphics.FillRectangle(fill, cover);
             if (image != null)
             {
                 float scale = Math.Min((float)cover.Width / image.Width, (float)cover.Height / image.Height);
@@ -154,7 +154,7 @@ namespace AlbumArtTool
             Color tone = work != null ? AppTheme.Accent : album.MissingCount > 0 ? AppTheme.Warning : AppTheme.Positive;
             var badge = new Rectangle(left - S(1), bounds.Y + S(57), Math.Min(width, TextRenderer.MeasureText(label, detailFont).Width + S(13)), S(19));
             using (var path = AppTheme.Rounded(badge, S(6)))
-            using (var fill = new SolidBrush(AppTheme.Blend(tone, Color.White, .92f))) e.Graphics.FillPath(fill, path);
+            using (var fill = new SolidBrush(AppTheme.Blend(tone, AppTheme.Surface, AppTheme.IsDark ? .87f : .92f))) e.Graphics.FillPath(fill, path);
             var badgeText = badge; badgeText.X += S(6); badgeText.Width = Math.Max(1, badgeText.Width - S(10));
             TextRenderer.DrawText(e.Graphics, label, detailFont, badgeText, tone, flags);
             if (selected && Focused && ShowFocusCues)

@@ -11,9 +11,9 @@ namespace AlbumArtTool.Design
         protected override void OnPaintBackground(PaintEventArgs e)
         {
             if (Width < 1 || Height < 1) return;
-            using (var fill = new LinearGradientBrush(ClientRectangle, Color.FromArgb(235, 241, 252), Color.FromArgb(246, 244, 250), 35)) e.Graphics.FillRectangle(fill, ClientRectangle);
-            Glow(e.Graphics, new Rectangle(-Width / 4, -Height / 3, Width, Height), Color.FromArgb(30, 151, 187, 250));
-            Glow(e.Graphics, new Rectangle(Width / 2, 0, Width, Height), Color.FromArgb(22, 181, 166, 238));
+            using (var fill = new LinearGradientBrush(ClientRectangle, AppTheme.IsDark ? Color.FromArgb(23, 31, 45) : Color.FromArgb(235, 241, 252), AppTheme.IsDark ? Color.FromArgb(23, 24, 34) : Color.FromArgb(246, 244, 250), 35)) e.Graphics.FillRectangle(fill, ClientRectangle);
+            Glow(e.Graphics, new Rectangle(-Width / 4, -Height / 3, Width, Height), Color.FromArgb(AppTheme.IsDark ? 12 : 30, 151, 187, 250));
+            Glow(e.Graphics, new Rectangle(Width / 2, 0, Width, Height), Color.FromArgb(AppTheme.IsDark ? 9 : 22, 181, 166, 238));
         }
         private static void Glow(Graphics g, Rectangle bounds, Color color)
         {
@@ -29,6 +29,13 @@ namespace AlbumArtTool.Design
         internal int CornerRadius { get; set; } = 18;
         internal FrostPanel() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor | ControlStyles.ResizeRedraw, true); BackColor = Color.Transparent; Padding = new Padding(10); }
         protected override void OnPaintBackground(PaintEventArgs e) { base.OnPaintBackground(e); AppTheme.Frost(e.Graphics, ClientRectangle, AppTheme.Scale(this, CornerRadius)); }
+    }
+    internal sealed class DetailPanel : FrostPanel
+    {
+        protected override CreateParams CreateParams
+        {
+            get { var parameters = base.CreateParams; parameters.ExStyle |= 0x02000000; return parameters; } // WS_EX_COMPOSITED: buffer child windows together.
+        }
     }
     internal sealed class InputFrame : Panel
     {
@@ -54,17 +61,7 @@ namespace AlbumArtTool.Design
         {
             int size = AppTheme.Scale(this, 34), top = (Height - size) / 2;
             var icon = new Rectangle(0, top, size, size);
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (var path = AppTheme.Rounded(icon, size * .28f))
-            using (var fill = new LinearGradientBrush(icon, Color.FromArgb(100, 143, 255), Color.FromArgb(78, 82, 215), 55)) e.Graphics.FillPath(fill, path);
-            float unit = size / 34f;
-            using (var note = new Pen(Color.White, 2.6f * unit) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            {
-                e.Graphics.DrawLine(note, 14 * unit, top + 23 * unit, 14 * unit, top + 11 * unit);
-                e.Graphics.DrawLine(note, 14 * unit, top + 11 * unit, 25 * unit, top + 8 * unit);
-                e.Graphics.DrawLine(note, 25 * unit, top + 8 * unit, 25 * unit, top + 20 * unit);
-            }
-            using (var fill = new SolidBrush(Color.White)) { e.Graphics.FillEllipse(fill, 8 * unit, top + 20 * unit, 7 * unit, 5 * unit); e.Graphics.FillEllipse(fill, 19 * unit, top + 17 * unit, 7 * unit, 5 * unit); }
+            AppTheme.DrawBrandMark(e.Graphics, icon);
             var text = new Rectangle(icon.Right + AppTheme.Scale(this, 12), 0, Math.Max(1, Width - icon.Right - AppTheme.Scale(this, 12)), Height);
             TextRenderer.DrawText(e.Graphics, "Music Library Manager", title, text, AppTheme.Ink, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         }
@@ -82,13 +79,19 @@ namespace AlbumArtTool.Design
         protected override void OnVisibleChanged(EventArgs e) { base.OnVisibleChanged(e); if (!Visible) animation.Stop(); Invalidate(); }
         protected override void OnPaint(PaintEventArgs e)
         {
-            e.Graphics.Clear(Parent?.BackColor.A == 255 ? Parent.BackColor : AppTheme.Canvas);
+            if (Parent != null)
+            {
+                var saved = e.Graphics.Save(); e.Graphics.TranslateTransform(-Left, -Top);
+                using (var background = new PaintEventArgs(e.Graphics, new Rectangle(Left, Top, Width, Height))) InvokePaintBackground(Parent, background);
+                e.Graphics.Restore(saved);
+            }
+            else e.Graphics.Clear(AppTheme.Canvas);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             int height = Math.Min(AppTheme.Scale(this, 7), Height); var bounds = new RectangleF(0, (Height - height) / 2f, Width, height);
             if (Width < 1 || height < 1) return;
             using (var path = AppTheme.Rounded(bounds, height / 2f))
             {
-                using (var fill = new SolidBrush(Color.FromArgb(221, 228, 243))) e.Graphics.FillPath(fill, path);
+                using (var fill = new SolidBrush(AppTheme.IsDark ? AppTheme.Border : Color.FromArgb(221, 228, 243))) e.Graphics.FillPath(fill, path);
                 var saved = e.Graphics.Save(); e.Graphics.SetClip(path);
                 bool marquee = Style == ProgressBarStyle.Marquee;
                 if (marquee && Visible) animation.Start(); else animation.Stop();

@@ -33,7 +33,16 @@ internal static partial class Tests
         album = ScanAlbum(root);
         Assert(album.MainArtist == "BENEE" && album.Artist == "BENEE", "common lead artist is inferred when album artist tags are absent");
         var edit = Editor.ApplyArtist(album, "BENEE");
-        Assert(edit.TracksWritten == 6 && ScanAlbum(root).ArtistChangeCount == 0, "artist cleanup fills the album artist as well as collapsing track artists");
+        Assert(edit.TracksWritten == 4 && ScanAlbum(root).ArtistChangeCount == 0, "artist cleanup changes guest credits without rewriting already-correct tracks with missing album artist tags");
+        string clean = NewFolder("artist-already-correct"), cleanPath = CopyTrack(clean, "one.mp3", "10,000 gecs", "100 gecs");
+        SetArtists(cleanPath, new[] { "100 gecs" }, new string[0]);
+        string cleanHash = CoverEditor.Hash(cleanPath); var cleanAlbum = ScanAlbum(clean);
+        Assert(cleanAlbum.ArtistChangeCount == 0 && Editor.ApplyArtist(cleanAlbum, "100 gecs").TracksWritten == 0 && CoverEditor.Hash(cleanPath) == cleanHash,
+            "matching track artists with missing Album artist metadata are not offered or rewritten as cleanup");
+        Assert(!ArtistRules.NeedsChange(new Track { Performers = new[] { " 100  GECS " }, AlbumArtists = new[] { "A different album credit" } }, "100 gecs"),
+            "capitalization, whitespace and unrelated album credits alone do not create track-artist cleanup");
+        Assert(ArtistRules.NeedsChange(new Track { Performers = new[] { "100 gecs", "Guest" }, AlbumArtists = new[] { "100 gecs" } }, "100 gecs"),
+            "real additional track-artist credits still require cleanup");
         string bands = NewFolder("artist-band-name");
         SetArtists(CopyTrack(bands, "one.mp3"), new[] { "Earth, Wind & Fire" }, new string[0]);
         SetArtists(CopyTrack(bands, "two.mp3"), new[] { "Earth, Wind & Fire" }, new string[0]);
@@ -132,7 +141,7 @@ internal static partial class Tests
         SetArtists(one, new[] { "BENEE" }, new[] { "BENEE" }, "Happen to Me");
         SetArtists(two, new[] { "BENEE", "Featured Artist" }, new[] { "BENEE" }, "A collaboration");
         System.IO.File.Copy(one, Path.Combine(copy, "one.mp3")); System.IO.File.Copy(two, Path.Combine(copy, "two.mp3"));
-        CopyTrack(second, "one.flac", "A clean album", "Another Artist");
+        string cleanFile = CopyTrack(second, "one.flac", "A clean album", "Another Artist"); SetArtists(cleanFile, new[] { "Another Artist" }, new string[0]);
         var service = new GatedCoverSearch(); Exception failure = null;
         using (var form = new MainForm(root, false, service))
         {
@@ -152,6 +161,15 @@ internal static partial class Tests
                     filter.SelectedIndex = 1;
                     var name = Descendants(form).OfType<TextBox>().Single(t => t.AccessibleName == "Main artist for this album");
                     Assert(name.Visible && name.Text == "BENEE", "suggested main artist is editable and visible");
+                    var heading = Descendants(form).OfType<Label>().Single(c => c.AccessibleName == "Selected album for artist cleanup");
+                    bool blanked = false; heading.TextChanged += (a, b) => blanked |= heading.Text == "Select an album";
+                    for (int n = 0; n < 12; n++) { list.SelectedIndices.Clear(); list.SelectedIndices.Add(n % 2); }
+                    list.SelectedIndices.Clear(); list.SelectedIndices.Add(0);
+                    await Task.Delay(30);
+                    Assert(!blanked && name.Text == "BENEE", "switching artist albums does not expose an empty intermediate details pane");
+                    var preview = Descendants(form).OfType<ListView>().Single(l => l.AccessibleName == "Current track artists");
+                    Assert(preview.Items.Cast<ListViewItem>().Count(i => i.SubItems[2].Text == "Unchanged") == 1 && preview.Items.Cast<ListViewItem>().Count(i => i.SubItems[2].Text == "BENEE") == 1,
+                        "artist preview distinguishes unchanged tracks from the actual proposed credits");
                     Directory.CreateDirectory(output);
                     using (var bitmap = new Bitmap(form.Width, form.Height))
                     { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "track-artists.png"), ImageFormat.Png); }

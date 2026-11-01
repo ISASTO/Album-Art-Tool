@@ -37,7 +37,9 @@ namespace AlbumArtTool.Core
             return Separators.Any(s => rest.StartsWith(s, StringComparison.OrdinalIgnoreCase));
         }
         public static bool Single(string[] values, string artist) => values != null && values.Length == 1 && string.Equals(values[0], artist, StringComparison.Ordinal);
-        public static bool NeedsChange(Track track, string artist) => !Single(track.Performers, artist) || !Single(track.AlbumArtists, artist);
+        // Cleanup eligibility is about the track credit the user sees. Missing Album artist
+        // tags, capitalization and invisible whitespace alone do not require a rewrite.
+        public static bool NeedsChange(Track track, string artist) => track.Performers == null || track.Performers.Length != 1 || Normalize(track.Performers[0]) != Normalize(artist);
         public static string Normalize(string text) => Regex.Replace((text ?? "").Normalize().Trim(), @"\s+", " ").ToUpperInvariant();
     }
 }

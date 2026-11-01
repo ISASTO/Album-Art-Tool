@@ -15,10 +15,11 @@ namespace AlbumArtTool
 {
     internal sealed partial class MainForm : Form
     {
-        internal static readonly Color Surface = AppTheme.Surface;
-        internal static readonly Color Ink = AppTheme.Ink;
-        internal static readonly Color Muted = AppTheme.Muted;
-        internal static readonly Color Accent = AppTheme.Accent;
+        internal static Color Surface => AppTheme.Surface;
+        internal static Color Ink => AppTheme.Ink;
+        internal static Color Muted => AppTheme.Muted;
+        internal static Color Accent => AppTheme.Accent;
+        private readonly Button appearance = Button("Light mode");
         private readonly TextBox folder = new TextBox();
         private readonly TextBox search = new TextBox();
         private readonly Button browse = Button("Choose folder…");
@@ -31,6 +32,8 @@ namespace AlbumArtTool
         private readonly Button openFolder = Button("Open album folder");
         private readonly Button issuesButton = Button("Details");
         private readonly AlbumList albums = new AlbumList();
+        private DetailPanel detailsPane;
+        private int selectionEpoch;
         private readonly ICoverSearch coverSearch;
         private readonly CoverSearchPanel online;
         private readonly PictureBox cover = new PictureBox();
@@ -77,8 +80,13 @@ namespace AlbumArtTool
             search.AccessibleName = "Search albums, artists or folders";
             BuildLayout();
             ((ThemeButton)apply).Primary = true;
-            foreach (var button in new[] { undo, queueButton, getUpdates }) ((ThemeButton)button).Chrome = true;
-            AppTheme.Apply(this);
+            foreach (var button in new[] { appearance, undo, queueButton, getUpdates }) ((ThemeButton)button).Chrome = true;
+            appearance.AccessibleName = "Toggle light and dark mode";
+            AppTheme.Apply(this, () => { StyleTabs(); UpdateAppearance(); });
+            appearance.Click += (s, e) =>
+            {
+                if (!AppTheme.SetDark(!AppTheme.IsDark)) tips.SetToolTip(appearance, "Appearance changed, but the preference could not be saved on this PC.");
+            };
             albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? (currentJob.Artist == null ? "Applying cover…" : "Updating artists…") : "Queued") :
                 showingArtists ? (album.ArtistChangeCount > 0 ? album.ArtistChangeCount + (album.ArtistChangeCount == 1 ? " track with artist changes" : " tracks with artist changes") : "No artist changes suggested") : null;
             queueButton.Click += (s, e) => ShowQueue();
@@ -93,7 +101,18 @@ namespace AlbumArtTool
             existingTab.Click += (s, e) => SwitchTab(false);
             artistsTab.Click += (s, e) => SwitchArtists();
             search.TextChanged += (s, e) => { if (!busy) RefreshAlbums(); };
-            albums.SelectedIndexChanged += (s, e) => { if (!refreshing) ShowSelection(); };
+            albums.SelectedIndexChanged += (s, e) =>
+            {
+                int epoch = ++selectionEpoch;
+                if (refreshing) return;
+                if (albums.SelectedAlbum != null) ShowSelection();
+                else if (IsHandleCreated) BeginInvoke((Action)(() =>
+                {
+                    // A click reports the old row's deselection before the new row's
+                    // selection. Do not blank the details during that intermediate state.
+                    if (!IsDisposed && !refreshing && epoch == selectionEpoch) ShowSelection();
+                }));
+            };
             albums.CoverDropped += (album, path) => { if (!busy && !showingArtists) StageImage(path); };
             choose.Click += (s, e) =>
             {
@@ -140,16 +159,18 @@ namespace AlbumArtTool
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
             outer.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             outer.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
-            var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1 };
+            var header = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1 };
             header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170));
-            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
-            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 108));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 178));
+            header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 122));
             header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             header.Controls.Add(new BrandTitle { Dock = DockStyle.Fill }, 0, 0);
-            header.Controls.Add(undo, 1, 0);
-            header.Controls.Add(queueButton, 2, 0);
-            header.Controls.Add(getUpdates, 3, 0);
+            header.Controls.Add(appearance, 1, 0);
+            header.Controls.Add(undo, 2, 0);
+            header.Controls.Add(queueButton, 3, 0);
+            header.Controls.Add(getUpdates, 4, 0);
             var pathRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 5, RowCount = 1 };
             pathRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -211,7 +232,7 @@ namespace AlbumArtTool
             selectedPath.ForeColor = Muted; selectedPath.AutoEllipsis = true; selectedPath.TextAlign = ContentAlignment.MiddleLeft;
             path.Controls.Add(selectedPath, 0, 0); path.Controls.Add(openFolder, 1, 0);
             sidebar.Controls.Add(selectedTitle, 0, 0); sidebar.Controls.Add(selectedArtist, 0, 1); sidebar.Controls.Add(online, 0, 2); sidebar.Controls.Add(manual, 0, 3); sidebar.Controls.Add(path, 0, 4);
-            var panels = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(9, 9, 9, 11), Margin = Padding.Empty };
+            var panels = detailsPane = new DetailPanel { Dock = DockStyle.Fill, Padding = new Padding(9, 9, 9, 11), Margin = Padding.Empty };
             coverPanel = sidebar; artistPanel = BuildArtistPanel();
             panels.Controls.Add(sidebar); panels.Controls.Add(artistPanel); artistPanel.Visible = false;
             body.Controls.Add(listPanel, 0, 0); body.Controls.Add(panels, 1, 0);
@@ -234,6 +255,13 @@ namespace AlbumArtTool
             tips.SetToolTip(folderCover, "Updates recognized cover/folder/front/album/albumart images, or creates cover.jpg. Disabled when multiple albums share a folder.");
             tips.SetToolTip(getUpdates, "Check GitHub releases, download a newer version, and restart when your scan and artwork queue finish.");
             tips.SetToolTip(undo, "Restore files from your most recent edit in this session (Ctrl+Z). Backups are stored in the PC backup folder shown in Manage library.");
+        }
+
+        private void UpdateAppearance()
+        {
+            appearance.Text = AppTheme.IsDark ? "Light mode" : "Dark mode";
+            appearance.AccessibleDescription = (AppTheme.IsDark ? "Dark" : "Light") + " mode is active. Switch appearance without interrupting your work.";
+            tips.SetToolTip(appearance, "Switch to " + (AppTheme.IsDark ? "light" : "dark") + " mode. Your choice is remembered on this PC.");
         }
 
         private static Button Button(string text) => new ThemeButton { Text = text, Dock = DockStyle.Fill, FlatStyle = FlatStyle.Flat,
@@ -285,9 +313,19 @@ namespace AlbumArtTool
 
         private void ShowSelection()
         {
+            detailsPane.SuspendLayout();
+            try { ShowSelectionCore(); }
+            finally { detailsPane.ResumeLayout(false); }
+        }
+        private void ShowSelectionCore()
+        {
             int version = ++previewVersion;
             pending = null;
             var album = albums.SelectedAlbum;
+            if (showingArtists)
+            {
+                online.SetAlbum(null, false); ShowArtistSelection(); UpdateLibraryTools(); return;
+            }
             selectedTitle.Text = album?.Title ?? "Select an album";
             selectedArtist.Text = album?.Artist ?? "";
             selectedArtist.ForeColor = Muted;
@@ -305,7 +343,7 @@ namespace AlbumArtTool
             folderCover.Enabled &= album != null && !queuedAlbums.Contains(album.Key);
             UpdateApplyButton();
             online.SetAlbum(showingArtists ? null : album, !showingArtists && !busy && !maintenanceRunning && (album == null || !queuedAlbums.Contains(album.Key)));
-            ShowArtistSelection(); UpdateLibraryTools();
+            UpdateLibraryTools();
         }
 
         private async Task LoadPreviewAsync(Album album, int version)

@@ -15,13 +15,14 @@ namespace AlbumArtTool
         private readonly Button manageLibrary = Button("Manage library…");
         private LibraryManagerWindow managerWindow;
         private bool maintenanceRunning;
-        private readonly ComboBox albumFilter = new ComboBox(), albumSort = new ComboBox();
+        private readonly ComboBox albumFilter = new ThemeComboBox(), albumSort = new ThemeComboBox();
         private readonly TextBox mainArtist = new TextBox();
         private readonly Button applyArtist = Button("Set track artists");
         private readonly Label artistHeading = Label("Select an album", 13, true), artistSummary = Label("", 10);
         private readonly ListView artistPreview = new ListView();
         private Control artistPanel, coverPanel;
         private bool showingArtists;
+        private bool refreshingArtist;
         private DuplicateWindow duplicatesWindow;
 
         private Control BuildLibraryToolbar()
@@ -54,14 +55,21 @@ namespace AlbumArtTool
             foreach (int height in new[] { 32, 60, 30, 38, 40 }) panel.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
             panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
             panel.Controls.Add(artistHeading, 0, 0);
-            var help = Label("Set every track's Artist and Album artist to the main artist. Review the name below; titles, artwork and audio stay as they are.", 10); help.ForeColor = Muted;
+            artistHeading.AccessibleName = "Selected album for artist cleanup";
+            var help = Label("Collapse guest credits into the main artist. Already-correct track artists are left alone; review the proposed changes below.", 10); help.ForeColor = Muted;
             panel.Controls.Add(help, 0, 1); panel.Controls.Add(Label("Main artist", 10, true), 0, 2);
             StyleTextBox(mainArtist); mainArtist.AccessibleName = "Main artist for this album";
-            mainArtist.TextChanged += (s, e) => UpdateArtistPreview();
+            mainArtist.TextChanged += (s, e) => { if (!refreshingArtist) UpdateArtistPreview(); };
             panel.Controls.Add(mainArtist, 0, 3); artistSummary.ForeColor = Muted; panel.Controls.Add(artistSummary, 0, 4);
             artistPreview.Dock = DockStyle.Fill; artistPreview.View = View.Details; artistPreview.FullRowSelect = true; artistPreview.MultiSelect = false;
             artistPreview.BackColor = Surface; artistPreview.ForeColor = Ink; artistPreview.BorderStyle = BorderStyle.FixedSingle; artistPreview.HideSelection = false;
-            artistPreview.Columns.Add("Track", 200); artistPreview.Columns.Add("Current artist", 235); artistPreview.HeaderStyle = ColumnHeaderStyle.Nonclickable;
+            artistPreview.Columns.Add("Track", 180); artistPreview.Columns.Add("Current artist", 180); artistPreview.Columns.Add("After cleanup", 150); artistPreview.HeaderStyle = ColumnHeaderStyle.Nonclickable;
+            artistPreview.Resize += (s, e) =>
+            {
+                int width = Math.Max(120, artistPreview.ClientSize.Width - 2);
+                artistPreview.Columns[0].Width = width * 36 / 100; artistPreview.Columns[1].Width = width * 34 / 100;
+                artistPreview.Columns[2].Width = width - artistPreview.Columns[0].Width - artistPreview.Columns[1].Width;
+            };
             artistPreview.AccessibleName = "Current track artists"; artistPreview.ShowItemToolTips = true;
             panel.Controls.Add(artistPreview, 0, 5); panel.Controls.Add(applyArtist, 0, 6);
             applyArtist.Click += async (s, e) => await ApplyArtistAsync();
@@ -88,13 +96,16 @@ namespace AlbumArtTool
         private void ShowArtistSelection()
         {
             var album = albums.SelectedAlbum;
-            artistHeading.Text = album?.Title ?? "Select an album"; artistHeading.AutoEllipsis = true;
-            mainArtist.Text = album?.MainArtist ?? "";
-            artistPreview.BeginUpdate(); artistPreview.Items.Clear();
-            if (album != null)
-                foreach (var track in album.Tracks)
-                { var item = new ListViewItem(track.Title) { ToolTipText = track.Path + "\nAlbum artist: " + string.Join(", ", track.AlbumArtists) }; item.SubItems.Add(track.ArtistText); artistPreview.Items.Add(item); }
-            artistPreview.EndUpdate(); UpdateArtistPreview();
+            refreshingArtist = true; artistPreview.BeginUpdate();
+            try
+            {
+                artistHeading.Text = album?.Title ?? "Select an album"; artistHeading.AutoEllipsis = true;
+                mainArtist.Text = album?.MainArtist ?? ""; artistPreview.Items.Clear();
+                if (album != null)
+                    foreach (var track in album.Tracks)
+                    { var item = new ListViewItem(track.Title) { Tag = track }; item.SubItems.Add(track.ArtistText); item.SubItems.Add(""); artistPreview.Items.Add(item); }
+            }
+            finally { artistPreview.EndUpdate(); refreshingArtist = false; }
         }
         private void UpdateArtistPreview()
         {
@@ -106,8 +117,18 @@ namespace AlbumArtTool
             applyArtist.Enabled = !busy && !maintenanceRunning && !queued && count > 0;
             applyArtist.Text = queued ? "Album queued" : count > 0 ? "Set artists on " + count + (count == 1 ? " track" : " tracks") : "Set track artists";
             artistSummary.Text = album == null ? "Select an album to review its track artists." : !valid ? "No single main artist was found. Enter the name to use." :
-                count == 0 ? "Every track already uses this artist and album artist." : count + " of " + album.Tracks.Count + " tracks will change to " + name;
+                count == 0 ? "Every track already uses this artist. No cleanup needed." : count + " of " + album.Tracks.Count + " tracks will change to " + name;
             tips.SetToolTip(artistSummary, artistSummary.Text); artistSummary.AutoEllipsis = true;
+            artistPreview.BeginUpdate();
+            foreach (ListViewItem item in artistPreview.Items)
+            {
+                var track = (Track)item.Tag; bool changes = valid && ArtistRules.NeedsChange(track, name);
+                item.SubItems[2].Text = changes ? name : valid ? "Unchanged" : "Enter an artist";
+                item.ForeColor = changes ? Ink : Muted;
+                item.ToolTipText = track.Title + "\nCurrent artist: " + track.ArtistText + "\nAfter cleanup: " + (changes ? name : "Unchanged") +
+                    (changes ? "\nAlbum artist will also be set to " + name : "") + "\n" + track.Path;
+            }
+            artistPreview.EndUpdate();
         }
         internal Task ApplyArtistAsync()
         {
@@ -120,7 +141,7 @@ namespace AlbumArtTool
         {
             artistsTab.Enabled = albumFilter.Enabled = albumSort.Enabled = !busy;
             findDuplicates.Enabled = !busy && !maintenanceRunning && hasScanned && library.Albums.Count > 0;
-            UpdateArtistPreview();
+            if (showingArtists) UpdateArtistPreview();
         }
         private void ShowLibraryManager()
         {

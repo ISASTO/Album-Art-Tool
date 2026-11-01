@@ -45,10 +45,10 @@ namespace AlbumArtTool
             else e.Graphics.Clear(AppTheme.Canvas);
             if (Width < 4 || Height < 5) return;
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            Color fill = Primary ? AppTheme.Accent : Selected ? AppTheme.Surface : Chrome ? AppTheme.Input : AppTheme.Surface;
-            Color target = Primary ? Color.FromArgb(35, 85, 213) : AppTheme.Selection;
+            Color fill = Primary ? AppTheme.Primary : Selected ? AppTheme.Surface : Chrome ? AppTheme.Input : AppTheme.Surface;
+            Color target = Primary ? AppTheme.IsDark ? AppTheme.Blend(AppTheme.Primary, Color.White, .08f) : Color.FromArgb(35, 85, 213) : AppTheme.Selection;
             fill = AppTheme.Blend(fill, target, hover * .7f);
-            if (pressed && Enabled) fill = AppTheme.Blend(fill, Primary ? Color.FromArgb(27, 69, 184) : Color.FromArgb(216, 226, 246), .7f);
+            if (pressed && Enabled) fill = AppTheme.Blend(fill, Primary ? Color.FromArgb(27, 69, 184) : AppTheme.Selection, .7f);
             if (!Enabled) fill = AppTheme.Input;
             int radius = AppTheme.Scale(this, 9);
             var body = new RectangleF(.75f, .75f, Width - 1.5f, Height - 3f);
@@ -56,8 +56,8 @@ namespace AlbumArtTool
                 using (var shadow = AppTheme.Rounded(new RectangleF(body.X, body.Y + 1.5f, body.Width, body.Height), radius))
                 using (var brush = new SolidBrush(Primary ? Color.FromArgb(28, 51, 99, 212) : Color.FromArgb(12, 43, 59, 94))) e.Graphics.FillPath(brush, shadow);
             using (var path = AppTheme.Rounded(body, radius))
-            using (var brush = new LinearGradientBrush(body, AppTheme.Blend(fill, Color.White, Primary ? .05f : .25f), fill, 90))
-            using (var border = new Pen(Selected ? Color.FromArgb(214, 222, 240) : Primary ? fill : AppTheme.Border))
+            using (var brush = new LinearGradientBrush(body, AppTheme.Blend(fill, Color.White, Primary ? .05f : AppTheme.IsDark ? .025f : .25f), fill, 90))
+            using (var border = new Pen(Selected ? AppTheme.SelectedBorder : Primary ? fill : AppTheme.Border))
             { e.Graphics.FillPath(brush, path); if (!Chrome || Selected) e.Graphics.DrawPath(border, path); }
             Color text = !Enabled ? AppTheme.Muted : Primary ? Color.White : Selected ? AppTheme.Accent : AppTheme.Ink;
             var bounds = Rectangle.Inflate(ClientRectangle, -6, -2); if (pressed) bounds.Offset(0, 1);

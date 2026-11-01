@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.CompilerServices;
@@ -8,24 +9,67 @@ namespace AlbumArtTool.Design
 {
     internal static class AppTheme
     {
-        internal static readonly Color Canvas = Color.FromArgb(241, 244, 250);
-        internal static readonly Color Surface = Color.FromArgb(253, 254, 255);
-        internal static readonly Color Input = Color.FromArgb(246, 248, 252);
-        internal static readonly Color Ink = Color.FromArgb(30, 36, 51);
-        internal static readonly Color Muted = Color.FromArgb(101, 112, 133);
-        internal static readonly Color Accent = Color.FromArgb(50, 103, 235);
-        internal static readonly Color Selection = Color.FromArgb(231, 238, 255);
-        internal static readonly Color Border = Color.FromArgb(220, 226, 237);
-        internal static readonly Color Positive = Color.FromArgb(40, 126, 104);
-        internal static readonly Color Warning = Color.FromArgb(155, 102, 36);
+        private static ThemePalette palette = new ThemePalette(ThemeSettings.ReadDark());
+        internal static bool IsDark => palette.Dark;
+        internal static Color Canvas => palette.Canvas;
+        internal static Color Surface => palette.Surface;
+        internal static Color Input => palette.Input;
+        internal static Color Ink => palette.Ink;
+        internal static Color Muted => palette.Muted;
+        internal static Color Accent => palette.Accent;
+        internal static Color Selection => palette.Selection;
+        internal static Color Border => palette.Border;
+        internal static Color Positive => palette.Positive;
+        internal static Color Warning => palette.Warning;
+        internal static Color Primary => IsDark ? Color.FromArgb(50, 102, 214) : Accent;
+        internal static Color Alternate => IsDark ? Color.FromArgb(35, 42, 56) : Color.FromArgb(249, 251, 254);
+        internal static Color SelectedBorder => IsDark ? Color.FromArgb(67, 96, 148) : Color.FromArgb(211, 223, 251);
+        private sealed class WindowStyle { internal Action Updated; }
+        private static readonly ConditionalWeakTable<Form, WindowStyle> windows = new ConditionalWeakTable<Form, WindowStyle>();
+        private static readonly List<WeakReference<Form>> openWindows = new List<WeakReference<Form>>();
         private sealed class Applied { }
         private static readonly ConditionalWeakTable<Control, Applied> applied = new ConditionalWeakTable<Control, Applied>();
         private static readonly Bitmap grain = MakeGrain();
         private static readonly Icon appIcon = LoadIcon();
+        private static readonly Bitmap brandMark = appIcon.ToBitmap();
         private static Icon LoadIcon()
         {
             using (var stream = typeof(AppTheme).Assembly.GetManifestResourceStream("AlbumArtTool.AppIcon.ico"))
-            using (var icon = new Icon(stream)) return (Icon)icon.Clone();
+            using (var icon = new Icon(stream, 256, 256)) return (Icon)icon.Clone();
+        }
+        internal static void DrawBrandMark(Graphics graphics, Rectangle rectangle)
+        { graphics.InterpolationMode = InterpolationMode.HighQualityBicubic; graphics.DrawImage(brandMark, rectangle); }
+        internal static bool SetDark(bool dark, bool persist = true)
+        {
+            if (dark != IsDark)
+            {
+                var previous = palette; palette = new ThemePalette(dark);
+                var colors = new Dictionary<int, Color>(); var before = previous.Colors; var after = palette.Colors;
+                for (int i = 0; i < before.Length; i++) colors[before[i].ToArgb()] = after[i];
+                for (int i = openWindows.Count - 1; i >= 0; i--)
+                {
+                    if (!openWindows[i].TryGetTarget(out var form) || form.IsDisposed) { openWindows.RemoveAt(i); continue; }
+                    Recolor(form, colors); foreach (Control control in Snapshot(form)) Recolor(control, colors);
+                    if (form.IsHandleCreated) NativeEffects.Apply(form);
+                    windows.GetValue(form, _ => new WindowStyle()).Updated?.Invoke();
+                    form.Invalidate(true);
+                }
+            }
+            return !persist || ThemeSettings.SaveDark(dark);
+        }
+        private static void Recolor(Control control, Dictionary<int, Color> colors)
+        {
+            if (colors.TryGetValue(control.ForeColor.ToArgb(), out var ink)) control.ForeColor = ink;
+            if (colors.TryGetValue(control.BackColor.ToArgb(), out var fill)) control.BackColor = fill;
+            if (control is LinkLabel link) { link.LinkColor = Accent; link.ActiveLinkColor = Ink; link.VisitedLinkColor = Accent; }
+            if (control is TreeView tree) tree.LineColor = Border;
+            if (control is ListView list && !list.VirtualMode)
+            {
+                list.BeginUpdate();
+                foreach (ListViewItem item in list.Items)
+                    if (colors.TryGetValue(item.ForeColor.ToArgb(), out var color)) item.ForeColor = color;
+                list.EndUpdate();
+            }
         }
         internal static int Scale(Control c, int n) => Math.Max(1, (int)Math.Round(n * c.DeviceDpi / 96.0));
         internal static GraphicsPath Rounded(RectangleF r, float radius)
@@ -53,8 +97,8 @@ namespace AlbumArtTool.Design
                 using (var outline = Rounded(new RectangleF(body.X, body.Y + 2, body.Width, body.Height), radius))
                 using (var brush = new SolidBrush(Color.FromArgb(13, 37, 55, 93))) g.FillPath(brush, outline);
             using (var outline = Rounded(body, radius))
-            using (var fill = new LinearGradientBrush(body, Color.FromArgb(254, 255, 255), Color.FromArgb(247, 249, 253), 90))
-            using (var edge = new Pen(Color.FromArgb(225, 230, 240)))
+            using (var fill = new LinearGradientBrush(body, IsDark ? Color.FromArgb(38, 46, 61) : Color.FromArgb(254, 255, 255), IsDark ? Surface : Color.FromArgb(247, 249, 253), 90))
+            using (var edge = new Pen(Border))
             {
                 g.FillPath(fill, outline);
                 var saved = g.Save(); g.SetClip(outline);
@@ -68,12 +112,18 @@ namespace AlbumArtTool.Design
             for (int y = 0; y < 64; y++) for (int x = 0; x < 64; x++) bitmap.SetPixel(x, y, Color.FromArgb(random.Next(0, 5), 67, 84, 115));
             return bitmap;
         }
-        internal static void Apply(Form form)
+        internal static void Apply(Form form, Action updated = null)
         {
             form.BackColor = Canvas; form.ForeColor = Ink; form.Icon = appIcon;
-            form.HandleCreated += (s, e) => NativeEffects.Apply(form);
+            if (!windows.TryGetValue(form, out var style))
+            {
+                style = new WindowStyle(); windows.Add(form, style); openWindows.Add(new WeakReference<Form>(form));
+                form.HandleCreated += (s, e) => NativeEffects.Apply(form);
+            }
+            style.Updated = updated;
             if (form.IsHandleCreated) NativeEffects.Apply(form);
             ApplyTree(form);
+            updated?.Invoke();
         }
         internal static void ApplyTree(Control root)
         {
@@ -86,7 +136,8 @@ namespace AlbumArtTool.Design
                 else if (c is FlowLayoutPanel flow) { flow.BackColor = Input; flow.SizeChanged += (s, e) => ClipRound(flow, 12); ClipRound(flow, 12); }
                 else if (c is TreeView tree) { tree.BackColor = Surface; tree.ForeColor = Ink; tree.LineColor = Border; tree.BorderStyle = BorderStyle.None; tree.ItemHeight = Scale(tree, 27); }
                 else if (c is ListBox box) StyleQueue(box);
-                else if (c is LinkLabel link) { link.LinkColor = Accent; link.ActiveLinkColor = Ink; link.VisitedLinkColor = Accent; }
+                else if (c is LinkLabel link) { link.LinkColor = Accent; link.ActiveLinkColor = Ink; link.VisitedLinkColor = Accent; link.BackColor = Color.Transparent; }
+                else if (c is Label) c.BackColor = Color.Transparent;
                 else if (c is PictureBox picture)
                 {
                     picture.BackColor = Input; picture.SizeChanged += (s, e) => ClipRound(picture, 10); ClipRound(picture, 10);
@@ -118,7 +169,7 @@ namespace AlbumArtTool.Design
         private static void StyleCombo(ComboBox combo)
         {
             combo.BackColor = Surface; combo.ForeColor = Ink; combo.FlatStyle = FlatStyle.Flat; combo.DrawMode = DrawMode.OwnerDrawFixed;
-            combo.ItemHeight = Math.Max(18, combo.Font.Height + 4);
+            combo.ItemHeight = Math.Max(Scale(combo, 20), combo.Font.Height + 4);
             combo.DrawItem += (s, e) =>
             {
                 if (e.Index < 0) return;
@@ -128,7 +179,7 @@ namespace AlbumArtTool.Design
                 TextRenderer.DrawText(e.Graphics, combo.Items[e.Index].ToString(), combo.Font, text, combo.Enabled ? Ink : Muted,
                     TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             };
-            combo.SizeChanged += (s, e) => ClipRound(combo, 7); ClipRound(combo, 7);
+            combo.DpiChangedAfterParent += (s, e) => combo.ItemHeight = Math.Max(Scale(combo, 20), combo.Font.Height + 4);
         }
         private static void StyleList(ListView list)
         {
@@ -148,7 +199,7 @@ namespace AlbumArtTool.Design
             list.DrawItem += (s, e) => { if (list.View != View.Details) e.DrawDefault = true; };
             list.DrawSubItem += (s, e) =>
             {
-                using (var brush = new SolidBrush(e.Item.Selected ? Selection : e.ItemIndex % 2 == 0 ? Surface : Color.FromArgb(249, 251, 254))) e.Graphics.FillRectangle(brush, e.Bounds);
+                using (var brush = new SolidBrush(e.Item.Selected ? Selection : e.ItemIndex % 2 == 0 ? Surface : Alternate)) e.Graphics.FillRectangle(brush, e.Bounds);
                 var text = e.Bounds; text.X += 10; text.Width = Math.Max(1, text.Width - 16);
                 if (e.ColumnIndex == 0 && list.CheckBoxes)
                 { DrawCheck(e.Graphics, new Rectangle(e.Bounds.Left + Scale(list, 4), e.Bounds.Top + (e.Bounds.Height - Scale(list, 14)) / 2, Scale(list, 14), Scale(list, 14)), e.Item.Checked, list.Enabled); text.X += Scale(list, 18); text.Width = Math.Max(1, text.Width - Scale(list, 18)); }
@@ -171,8 +222,8 @@ namespace AlbumArtTool.Design
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
             using (var shape = Rounded(box, Math.Max(3, box.Width / 4)))
-            using (var fill = new SolidBrush(value ? enabled ? Accent : Blend(Accent, Surface, .55f) : Surface))
-            using (var border = new Pen(value ? Accent : Color.FromArgb(175, 187, 207))) { g.FillPath(fill, shape); g.DrawPath(border, shape); }
+            using (var fill = new SolidBrush(value ? enabled ? Primary : Blend(Primary, Surface, .55f) : Input))
+            using (var border = new Pen(value ? Primary : IsDark ? Border : Color.FromArgb(175, 187, 207))) { g.FillPath(fill, shape); g.DrawPath(border, shape); }
             if (value)
                 using (var pen = new Pen(Color.White, Math.Max(1.5f, box.Width / 7f)) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
                     g.DrawLines(pen, new[] { new PointF(box.Left + box.Width * .22f, box.Top + box.Height * .51f), new PointF(box.Left + box.Width * .43f, box.Top + box.Height * .72f), new PointF(box.Left + box.Width * .8f, box.Top + box.Height * .28f) });

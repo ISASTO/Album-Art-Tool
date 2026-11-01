@@ -30,6 +30,7 @@ internal static partial class Tests
             if (args.Length > 0 && args[0] == "--live-search") return LiveSearch(args.Length > 1 ? args[1] : workspace).GetAwaiter().GetResult();
             if (args.Length > 0 && args[0] == "--live-update") return LiveUpdateTest().GetAwaiter().GetResult();
             if (args.Length > 0 && args[0] == "--live-encoder") return LiveEncoderSetup().GetAwaiter().GetResult();
+            ThemePreferenceTests();
             OnlineTests().GetAwaiter().GetResult();
             UpdateTests().GetAwaiter().GetResult();
             foreach (var path in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) RoundTrip(path);
@@ -38,6 +39,7 @@ internal static partial class Tests
             foreach (var path in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) ArtistRoundTrip(path);
             PartialAlbums(); MixedAlbums(); Guards(); FolderArt(); CancelScan(); CountedScanProgress(); InvalidArt(); UntaggedMp3();
             GuiSmoke(args.Length > 0 ? args[0] : workspace);
+            ThemeGuiSmoke(args.Length > 0 ? args[0] : workspace);
             QueueGuiSmoke(args.Length > 0 ? args[0] : workspace);
             LibraryToolsGuiSmoke(args.Length > 0 ? args[0] : workspace);
             ManagementGuiSmoke(args.Length > 0 ? args[0] : workspace);
