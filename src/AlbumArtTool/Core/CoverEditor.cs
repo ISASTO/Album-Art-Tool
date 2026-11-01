@@ -121,8 +121,7 @@ namespace AlbumArtTool.Core
         private static void BackupOriginal(string source, string backup, FileStamp stamp)
         {
             if (!stamp.Matches(source)) throw new IOException("The source changed before backup. Original kept.");
-            string hash = Hash(source);
-            System.IO.File.Copy(source, backup, false);
+            string hash = FileTransfer.CopyAndHash(source, backup, CancellationToken.None);
             if (Hash(backup) != hash || !stamp.Matches(source) || Hash(source) != hash)
                 throw new IOException("The original backup could not be verified. Original kept.");
         }

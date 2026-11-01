@@ -53,6 +53,7 @@ internal static partial class Tests
             PartialAlbums(); MixedAlbums(); Guards(); FolderArt(); CancelScan(); CountedScanProgress(); InvalidArt(); UntaggedMp3();
             GuiSmoke(args.Length > 0 ? args[0] : workspace);
             ThemeGuiSmoke(args.Length > 0 ? args[0] : workspace);
+            ThemeWipeGuiSmoke(args.Length > 0 ? args[0] : workspace);
             ScrollbarGuiSmoke(args.Length > 0 ? args[0] : workspace);
             QueueGuiSmoke(args.Length > 0 ? args[0] : workspace);
             LibraryToolsGuiSmoke(args.Length > 0 ? args[0] : workspace);

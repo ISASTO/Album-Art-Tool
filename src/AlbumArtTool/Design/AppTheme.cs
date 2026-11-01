@@ -47,7 +47,7 @@ namespace AlbumArtTool.Design
             if (dark != IsDark)
             {
                 var transitions = new List<ThemeTransition>();
-                if (animate && ThemeTransition.MotionAllowed)
+                if (animate)
                     foreach (var reference in openWindows.ToArray())
                         if (reference.TryGetTarget(out var visible) && !visible.IsDisposed)
                             try { var layer = ThemeTransition.Prepare(visible); if (layer != null) transitions.Add(layer); }
@@ -64,7 +64,7 @@ namespace AlbumArtTool.Design
                     form.Invalidate(true);
                 }
                 foreach (var transition in transitions)
-                    try { transition.Start(); }
+                    try { if (ThemeTransition.MotionAllowed) transition.Start(); else transition.Finish(); }
                     catch (Exception e) when (e is ArgumentException || e is ExternalException || e is InvalidOperationException || e is OutOfMemoryException) { transition.Finish(); }
             }
             return !persist || ThemeSettings.SaveDark(dark);

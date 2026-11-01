@@ -32,7 +32,7 @@ namespace AlbumArtTool.Design
         {
             if (!form.Visible || form.WindowState == FormWindowState.Minimized || form.ClientSize.Width < 1 || form.ClientSize.Height < 1) return null;
             ThemeTransition previous = form.Controls.OfType<ThemeTransition>().FirstOrDefault();
-            Bitmap image = previous == null ? Capture(form) : previous.CurrentImage();
+            Bitmap image = previous == null ? CaptureRoots(form) : previous.CurrentImage();
             previous?.Finish();
             var layer = new ThemeTransition(form, image);
             form.Controls.Add(layer); layer.BringToFront(); layer.Refresh();
@@ -49,7 +49,7 @@ namespace AlbumArtTool.Design
         internal void Start()
         {
             if (IsDisposed) return;
-            try { form.PerformLayout(); after = Capture(form); clock.Start(); timer.Start(); Invalidate(); }
+            try { form.PerformLayout(); after = CaptureRoots(form); clock.Start(); timer.Start(); Invalidate(); }
             catch { Finish(); throw; }
         }
         private void Resizing(object sender, EventArgs e) => Finish();
@@ -61,9 +61,9 @@ namespace AlbumArtTool.Design
             Dispose();
             if (!form.IsDisposed && !form.Disposing) { form.Invalidate(true); form.Update(); }
         }
-        private static Bitmap Capture(Form form)
+        private static Bitmap CaptureRoots(Form form)
         {
-            var image = new Bitmap(form.ClientSize.Width, form.ClientSize.Height, PixelFormat.Format32bppPArgb);
+            var image = new Bitmap(form.ClientSize.Width, form.ClientSize.Height, PixelFormat.Format24bppRgb);
             try
             {
                 using (var graphics = Graphics.FromImage(image)) graphics.Clear(AppTheme.Canvas);
@@ -78,7 +78,7 @@ namespace AlbumArtTool.Design
         }
         private Bitmap CurrentImage()
         {
-            var image = new Bitmap(before.Width, before.Height, PixelFormat.Format32bppPArgb);
+            var image = new Bitmap(before.Width, before.Height, PixelFormat.Format24bppRgb);
             using (var graphics = Graphics.FromImage(image)) PaintFrame(graphics, Position);
             return image;
         }

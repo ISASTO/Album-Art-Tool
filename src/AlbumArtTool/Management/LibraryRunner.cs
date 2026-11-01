@@ -217,30 +217,8 @@ namespace AlbumArtTool.Management
                 if (pictures.Length != expected.Length || pictures.Where((p, i) => !p.Data.Data.SequenceEqual(expected[i])).Any()) throw new IOException("The format did not retain all cropped pictures. Original kept.");
             }
         }
-        internal static void Copy(string source, string target, CancellationToken token) => CopyCore(source, target, token, false);
-        internal static string CopyAndHash(string source, string target, CancellationToken token) => CopyCore(source, target, token, true);
-        private static string CopyCore(string source, string target, CancellationToken token, bool fingerprint)
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(target));
-            bool created = false; string digest = null;
-            try
-            {
-                using (var hash = fingerprint ? System.Security.Cryptography.SHA256.Create() : null)
-                using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.SequentialScan))
-                using (var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                {
-                    created = true;
-                    var buffer = new byte[65536]; int count;
-                    while ((count = input.Read(buffer, 0, buffer.Length)) > 0)
-                    { token.ThrowIfCancellationRequested(); hash?.TransformBlock(buffer, 0, count, buffer, 0); output.Write(buffer, 0, count); }
-                    if (hash != null) { hash.TransformFinalBlock(new byte[0], 0, 0); digest = Convert.ToBase64String(hash.Hash); }
-                    output.Flush(true);
-                }
-                File.SetLastWriteTimeUtc(target, File.GetLastWriteTimeUtc(source));
-                return digest;
-            }
-            catch { if (created) try { File.Delete(target); } catch { } throw; }
-        }
+        internal static void Copy(string source, string target, CancellationToken token) => FileTransfer.Copy(source, target, token);
+        internal static string CopyAndHash(string source, string target, CancellationToken token) => FileTransfer.CopyAndHash(source, target, token);
         internal static int Undo(LibraryJournal journal, CancellationToken token, IProgress<ProgressInfo> progress = null, ISet<JournalEntry> selected = null)
         {
             var entries = journal.Entries.Where(e => (selected == null || selected.Contains(e)) && new[] { "Committed", "Prepared", "TargetCreated" }.Contains(e.State)).Reverse().ToArray(); int restored = 0, done = 0;

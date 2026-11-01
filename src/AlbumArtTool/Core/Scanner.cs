@@ -38,7 +38,13 @@ namespace AlbumArtTool.Core
                 string folder = entry.Path;
                 if (useCache && ScanCache.TryRead(folder, entry.Stamps, out var cached))
                 {
-                    checkedFiles += entry.Tracks.Length; Report(folder);
+                    foreach (var ignored in entry.Tracks)
+                    {
+                        if (cancellation.IsCancellationRequested) break;
+                        checkedFiles++;
+                        if (checkedFiles == 1 || checkedFiles == total || clock.ElapsedMilliseconds >= 120)
+                        { Report(folder); clock.Restart(); }
+                    }
                     if (cancellation.IsCancellationRequested) { result.Cancelled = true; break; }
                     result.Albums.AddRange(cached); result.FilesRead += entry.Tracks.Length; result.CachedFiles += entry.Tracks.Length;
                     continue;
