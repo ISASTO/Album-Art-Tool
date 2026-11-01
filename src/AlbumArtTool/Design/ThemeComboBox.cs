@@ -53,8 +53,13 @@ namespace AlbumArtTool.Design
                 using (var border = new Pen(focus ? AppTheme.Accent : AppTheme.Border, focus ? 1.4f : 1f))
                 { graphics.FillPath(fill, shape); graphics.DrawPath(border, shape); }
                 var bounds = new Rectangle(AppTheme.Scale(this, 10), 0, Math.Max(1, Width - AppTheme.Scale(this, 36)), Height);
-                TextRenderer.DrawText(graphics, Text, Font, bounds, Enabled ? AppTheme.Ink : AppTheme.Muted,
-                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                // GDI TextRenderer does not preserve alpha on the offscreen bitmap.
+                // Use GDI+ here so switching themes cannot leave opaque/stippled glyphs.
+                graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+                using (var ink = new SolidBrush(Enabled ? AppTheme.Ink : AppTheme.Muted))
+                using (var format = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center,
+                    Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                    graphics.DrawString(Text, Font, ink, bounds, format);
                 float x = Width - AppTheme.Scale(this, 15), y = Height / 2f, span = AppTheme.Scale(this, 3);
                 using (var pen = new Pen(Enabled ? AppTheme.Muted : AppTheme.Border, AppTheme.Scale(this, 1) + .4f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
                     graphics.DrawLines(pen, new[] { new PointF(x - span, y - span / 2), new PointF(x, y + span / 2), new PointF(x + span, y - span / 2) });
