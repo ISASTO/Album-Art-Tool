@@ -553,7 +553,7 @@ namespace AlbumArtTool
         {
             try
             {
-                StartExplorer(selectFile ? new ProcessStartInfo("explorer.exe", "/select," + Updates.UpdateInstaller.Quote(path)) { UseShellExecute = true } :
+                StartExplorer(selectFile ? new ProcessStartInfo("explorer.exe", "/select," + Updates.UpdateInstaller.QuoteArgument(path)) { UseShellExecute = true } :
                     new ProcessStartInfo(path) { UseShellExecute = true });
             }
             catch (Exception e) { MessageBox.Show(this, e.Message, "Could not open folder"); }
