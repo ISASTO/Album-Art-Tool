@@ -126,7 +126,7 @@ namespace AlbumArtTool
                 item.SubItems[2].Text = changes ? name : valid ? "Unchanged" : "Enter an artist";
                 item.ForeColor = changes ? Ink : Muted;
                 item.ToolTipText = track.Title + "\nCurrent artist: " + track.ArtistText + "\nAfter cleanup: " + (changes ? name : "Unchanged") +
-                    (changes ? "\nAlbum artist will also be set to " + name : "") + "\n" + track.Path;
+                    (changes && track.AlbumArtists.Length > 0 ? "\nAlbum artist will also be set to " + name : "") + "\n" + track.Path;
             }
             artistPreview.EndUpdate();
         }

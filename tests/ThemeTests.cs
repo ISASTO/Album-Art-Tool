@@ -37,6 +37,7 @@ internal static partial class Tests
             {
                 try
                 {
+                    form.Size = form.MinimumSize;
                     await form.ScanAsync(); var list = Descendants(form).OfType<AlbumList>().Single();
                     var panel = Descendants(form).OfType<CoverSearchPanel>().Single(); await panel.CurrentSearch; await Task.Delay(40);
                     var toggle = Descendants(form).OfType<Button>().Single(b => b.AccessibleName == "Toggle light and dark mode");
