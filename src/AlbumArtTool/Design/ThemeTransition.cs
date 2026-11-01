@@ -32,11 +32,12 @@ namespace AlbumArtTool.Design
         {
             if (!form.Visible || form.WindowState == FormWindowState.Minimized || form.ClientSize.Width < 1 || form.ClientSize.Height < 1) return null;
             ThemeTransition previous = form.Controls.OfType<ThemeTransition>().FirstOrDefault();
+            AppTheme.PrepareSurface(form);
             Bitmap image = previous == null ? CaptureRoots(form) : previous.CurrentImage();
             previous?.Finish();
             var layer = new ThemeTransition(form, image);
-            form.Controls.Add(layer); layer.BringToFront(); layer.Refresh();
-            return layer;
+            try { form.Controls.Add(layer); layer.BringToFront(); layer.Refresh(); return layer; }
+            catch { layer.Finish(); throw; }
         }
         private ThemeTransition(Form form, Bitmap image)
         {
@@ -49,7 +50,7 @@ namespace AlbumArtTool.Design
         internal void Start()
         {
             if (IsDisposed) return;
-            try { form.PerformLayout(); after = CaptureRoots(form); clock.Start(); timer.Start(); Invalidate(); }
+            try { AppTheme.PrepareSurface(form); after = CaptureRoots(form); clock.Start(); timer.Start(); Invalidate(); }
             catch { Finish(); throw; }
         }
         private void Resizing(object sender, EventArgs e) => Finish();
@@ -95,7 +96,7 @@ namespace AlbumArtTool.Design
             if (solid > 0) graphics.DrawImage(after, new Rectangle(0, 0, solid, before.Height), new Rectangle(0, 0, solid, before.Height), GraphicsUnit.Pixel);
             using (var attributes = new ImageAttributes())
             {
-                const int strips = 48;
+                int strips = band;
                 for (int n = 0; n < strips; n++)
                 {
                     int left = Math.Max(0, (int)Math.Floor(edge + band * n / (double)strips));

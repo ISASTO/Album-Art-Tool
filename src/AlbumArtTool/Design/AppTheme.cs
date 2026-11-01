@@ -131,11 +131,21 @@ namespace AlbumArtTool.Design
             {
                 style = new WindowStyle(); windows.Add(form, style); openWindows.Add(new WeakReference<Form>(form));
                 form.HandleCreated += (s, e) => NativeEffects.Apply(form);
+                form.Shown += (s, e) => PrepareSurface(form);
             }
             style.Updated = updated;
             if (form.IsHandleCreated) NativeEffects.Apply(form);
             ApplyTree(form);
             updated?.Invoke();
+        }
+        internal static void PrepareSurface(Form form)
+        {
+            if (!form.IsHandleCreated || form.IsDisposed || form.Disposing) return;
+            form.PerformLayout();
+            // Settle native client extents before the first paint or a task-state
+            // change. Waiting for a posted sync can expose default-sized windows.
+            foreach (var host in Snapshot(form).OfType<ThemeScrollbars>()) host.Sync();
+            form.Refresh();
         }
         internal static void ApplyTree(Control root)
         {

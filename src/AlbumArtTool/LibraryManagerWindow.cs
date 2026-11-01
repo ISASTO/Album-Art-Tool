@@ -105,6 +105,7 @@ namespace AlbumArtTool
             IsWorking = value;
             foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, rename, backup, preview, undo, download, chooseEncoder, chooseBackup }) control.Enabled = !value;
             stop.Enabled = value; progress.Visible = value; UpdateApply();
+            AppTheme.PrepareSurface(this);
         }
         private void UpdateApply()
         {

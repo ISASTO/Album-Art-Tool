@@ -86,6 +86,7 @@ namespace AlbumArtTool
             AppTheme.Apply(this, () => { StyleTabs(); UpdateAppearance(); });
             appearance.Click += (s, e) =>
             {
+                tips.Hide(appearance);
                 if (!AppTheme.SetDark(!AppTheme.IsDark, animate: true)) tips.SetToolTip(appearance, "Appearance changed, but the preference could not be saved on this PC.");
             };
             albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? (currentJob.Artist == null ? "Applying cover…" : "Updating artists…") : "Queued") :

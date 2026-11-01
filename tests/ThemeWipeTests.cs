@@ -20,7 +20,8 @@ internal static partial class Tests
             var input = new TextBox { Text = "Keep this staged input", Dock = DockStyle.Fill };
             var button = new ThemeButton { Text = "A native-control theme transition", Dock = DockStyle.Fill };
             var list = new ListView { View = View.Details, Dock = DockStyle.Fill, FullRowSelect = true };
-            list.Columns.Add("Track", 500); for (int n = 0; n < 40; n++) list.Items.Add("A song " + (n + 1));
+            list.Columns.Add("Track", 500); list.Columns.Add("Artist", 500);
+            for (int n = 0; n < 40; n++) { var item = new ListViewItem("A song " + (n + 1)); item.SubItems.Add("Example artist"); list.Items.Add(item); }
             root.Controls.Add(input, 0, 0); root.Controls.Add(button, 0, 1); root.Controls.Add(list, 0, 2); form.Controls.Add(root); AppTheme.Apply(form);
             form.Shown += async (s, e) =>
             {
