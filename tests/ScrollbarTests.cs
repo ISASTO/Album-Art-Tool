@@ -83,8 +83,10 @@ internal static partial class Tests
                     foreach (var control in new Control[] { queue, tree, text, flow })
                     {
                         var host = ThemeScrollbars.For(control);
+                        Console.WriteLine("SCROLL CONTROL " + control.GetType().Name + " client=" + control.ClientSize + " viewport=" + host.VisibleContent.Size + " bar=" + host.VerticalBar.Visible);
                         Assert(host.VerticalBar.Visible && control.ClientSize == host.VisibleContent.Size, control.GetType().Name + " keeps its native scrollbar outside the visible viewport");
                         var info = new TestScrollInfo { Size = Marshal.SizeOf(typeof(TestScrollInfo)), Mask = 7 }; GetScrollInfo(control.Handle, 1, ref info);
+                        Console.WriteLine("SCROLL RANGE " + control.GetType().Name + " " + info.Min + ".." + info.Max + " page=" + info.Page + " at=" + info.Position);
                         host.VerticalBar.AccessibilityObject.Value = ((info.Max - info.Page + 1) / 2).ToString(); await Task.Delay(30);
                         Assert(ScrollPosition(control, true) > 0, control.GetType().Name + " follows its rounded scrollbar position");
                     }
@@ -99,7 +101,12 @@ internal static partial class Tests
                 }
                 finally { form.Close(); }
             };
-            Application.Run(form);
+            using (var guard = new System.Threading.Timer(_ =>
+            {
+                Console.Error.WriteLine("FAIL: additional scrolling controls did not finish within 60 seconds");
+                using (var screen = ScreenImage(Screen.PrimaryScreen.Bounds)) screen.Save(Path.Combine(output, "scrolling-watchdog.png"), ImageFormat.Png);
+                Environment.Exit(1);
+            }, null, 60000, System.Threading.Timeout.Infinite)) Application.Run(form);
         }
         if (failure != null) throw failure;
     }

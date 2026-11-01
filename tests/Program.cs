@@ -22,6 +22,9 @@ internal static partial class Tests
     [STAThread]
     private static int Main(string[] args)
     {
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         fixtures = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fixtures");
         workspace = Path.Combine(Path.GetTempPath(), "AlbumArtTool-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
