@@ -206,6 +206,13 @@ internal static partial class Tests
                     var reporter = (IProgress<ProgressInfo>)typeof(LibraryManagerWindow).GetMethod("Reporter", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(form, null);
                     var optionsPanel = Descendants(form).Single(c => c.AccessibleName == "Library management options");
                     Cursor.Position = optionsPanel.PointToScreen(new Point(70, 20)); await Task.Delay(60);
+                    using (var reference = new Bitmap(optionsPanel.Width, optionsPanel.Height))
+                    {
+                        optionsPanel.DrawToBitmap(reference, new Rectangle(Point.Empty, reference.Size));
+                        using (var visible = ScreenImage(optionsPanel.RectangleToScreen(optionsPanel.ClientRectangle)))
+                            Assert(DifferentPixels(reference, visible) < reference.Width * reference.Height / 5,
+                                "the options panel's on-screen paint agrees with its fully rendered controls");
+                    }
                     using (var initial = ScreenImage(optionsPanel.RectangleToScreen(optionsPanel.ClientRectangle)))
                     {
                         for (int n = 1; n <= 16; n++)
@@ -248,7 +255,11 @@ internal static partial class Tests
                     await form.ApplyAsync();
                     Assert(File.Exists(Path.Combine(root, "BENEE", "Hey u x", "Happen to Me.mp3")), "manager UI applies conversion, canonical organization and the metadata filename");
                 }
-                catch (Exception ex) { failure = ex; }
+                catch (Exception ex)
+                {
+                    using (var screen = ScreenImage(new Rectangle(form.Location, form.Size))) screen.Save(Path.Combine(output, "manager-render-failure.png"), ImageFormat.Png);
+                    failure = ex;
+                }
                 finally { form.Close(); }
             };
             Application.Run(form);
