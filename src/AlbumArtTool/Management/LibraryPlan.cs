@@ -1,0 +1,243 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading;
+using AlbumArtTool.Core;
+
+namespace AlbumArtTool.Management
+{
+    internal sealed class LibraryOptions
+    {
+        public string Root { get; set; }
+        public string BackupRoot { get; set; }
+        public string EncoderPath { get; set; }
+        public bool Convert { get; set; }
+        public bool ConvertOtherLossy { get; set; }
+        public bool Square { get; set; }
+        public bool Organize { get; set; }
+        public bool Duplicates { get; set; }
+        public bool ArchiveOldBackups { get; set; }
+    }
+    internal sealed class LibraryAction
+    {
+        internal Track Track;
+        public string Source { get; set; }
+        public string Target { get; set; }
+        public string Keeper { get; set; }
+        public string KeeperHash { get; set; }
+        public string ExpectedHash { get; set; }
+        public string Reason { get; set; }
+        public bool Convert { get; set; }
+        public bool Square { get; set; }
+        public bool Archive { get; set; }
+        public bool Selected { get; set; } = true;
+        internal FileStamp Stamp;
+        internal bool Move => !string.IsNullOrEmpty(Target) && !Source.Equals(Target, StringComparison.OrdinalIgnoreCase);
+        internal bool HasWork => Archive || Convert || Square || Move;
+        internal string Description => Archive ? Keeper != null ? "Remove duplicate (backed up)" : "Archive old backup" :
+            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, Move ? "Move" : null }.Where(s => s != null));
+    }
+    internal sealed class LibraryPlan
+    {
+        internal LibraryOptions Options;
+        internal List<LibraryAction> Actions = new List<LibraryAction>();
+        internal List<string> Issues = new List<string>();
+    }
+    internal static class LibraryPaths
+    {
+        internal static string Component(string name)
+        {
+            string value = Regex.Replace(name ?? "", @"\s+", " ").Trim();
+            foreach (char c in "<>:\"/\\|?*") value = value.Replace(c, c == ':' ? '-' : '_');
+            value = new string(value.Where(c => !char.IsControl(c)).ToArray()).TrimEnd(' ', '.');
+            if (Regex.IsMatch(value, @"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)", RegexOptions.IgnoreCase)) value = "_" + value;
+            return value.Length <= 120 ? value : value.Substring(0, 120).TrimEnd(' ', '.');
+        }
+        internal static void Safe(string path, string root)
+        {
+            if (!BackupSettings.Within(path, root)) throw new IOException("A planned path escapes the selected folder.");
+            string folder = Directory.Exists(path) ? path : Path.GetDirectoryName(path);
+            while (folder != null && BackupSettings.Within(folder, root))
+            {
+                if (Directory.Exists(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0) throw new IOException("Linked folders are not changed.");
+                folder = Path.GetDirectoryName(folder);
+            }
+            if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new IOException("Linked files are not changed.");
+        }
+        internal static string Available(string desired, string source, HashSet<string> reserved)
+        {
+            string path = desired; int n = 2;
+            while (reserved.Contains(path) || (File.Exists(path) || Directory.Exists(path)) && !path.Equals(source, StringComparison.OrdinalIgnoreCase))
+                path = Path.Combine(Path.GetDirectoryName(desired), Path.GetFileNameWithoutExtension(desired) + " (" + n++ + ")" + Path.GetExtension(desired));
+            reserved.Add(path); return path;
+        }
+        internal static bool ShouldConvert(Track track, LibraryOptions options)
+        {
+            if (!options.Convert) return false;
+            bool mp3 = Path.GetExtension(track.Path).Equals(".mp3", StringComparison.OrdinalIgnoreCase);
+            return mp3 ? track.Bitrate > 320 : track.Lossless || track.Bitrate > 320 || options.ConvertOtherLossy;
+        }
+    }
+    internal static class LibraryPlanner
+    {
+        internal static LibraryPlan Build(LibraryOptions options, CancellationToken token, IProgress<ProgressInfo> progress = null)
+        {
+            options.Root = Path.GetFullPath(options.Root); options.BackupRoot = Path.GetFullPath(options.BackupRoot);
+            if (BackupSettings.Within(options.BackupRoot, options.Root)) throw new IOException("The backup folder must be outside the music folder so your player cannot index the backups.");
+            LibraryPaths.Safe(options.Root, options.Root); LibraryPaths.Safe(options.BackupRoot, Path.GetPathRoot(options.BackupRoot));
+            var scan = new Scanner().Scan(options.Root, token, progress);
+            if (scan.Cancelled) throw new OperationCanceledException(token);
+            var plan = new LibraryPlan { Options = options }; plan.Issues.AddRange(scan.Issues);
+            var tracks = scan.Albums.SelectMany(a => a.Tracks).ToArray();
+            if (tracks.Any(t => LibraryPaths.ShouldConvert(t, options)))
+            {
+                if (string.IsNullOrEmpty(options.EncoderPath)) throw new IOException("Set up FFmpeg before previewing conversion, or uncheck conversion.");
+                Encoder.Validate(options.EncoderPath, token);
+            }
+            var actions = new Dictionary<string, LibraryAction>(StringComparer.OrdinalIgnoreCase);
+            var albumFor = scan.Albums.SelectMany(a => a.Tracks.Select(t => new { t.Path, Album = a })).ToDictionary(x => x.Path, x => x.Album, StringComparer.OrdinalIgnoreCase);
+            int done = 0;
+            foreach (var track in tracks)
+            {
+                token.ThrowIfCancellationRequested();
+                var row = new LibraryAction { Source = track.Path, Target = track.Path, Track = track, Stamp = track.Stamp, Convert = LibraryPaths.ShouldConvert(track, options) };
+                try
+                {
+                    if (!track.Stamp.Matches(track.Path)) throw new IOException("The file changed during preview. Preview again.");
+                    if (options.Square)
+                        using (var file = TagLib.File.Create(track.Path, TagLib.ReadStyle.None))
+                            row.Square = file.Tag.Pictures.Any(p => { using (var image = Artwork.Decode(p.Data.Data)) return image.Width != image.Height; });
+                    if (options.Organize)
+                    {
+                        var album = albumFor[track.Path];
+                        string artist = ArtistRules.Specific(album.TaggedArtist) ? album.TaggedArtist : !string.IsNullOrEmpty(album.MainArtist) ? album.MainArtist : track.Performer;
+                        if (!ArtistRules.Specific(artist) && album.Artist.Equals("Various artists", StringComparison.OrdinalIgnoreCase)) artist = "Various Artists";
+                        string folder = LibraryPaths.Component(artist), title = LibraryPaths.Component(track.AlbumTitle);
+                        if (folder.Length == 0 || title.Length == 0) row.Reason = "Organization skipped: missing usable Artist/Album tags.";
+                        else
+                        {
+                            string dest = Path.Combine(options.Root, folder, title);
+                            string parent = Path.GetFileName(Path.GetDirectoryName(track.Path));
+                            if (track.DiscCount > 1 || Regex.IsMatch(parent, @"^(CD|DISC|DISK)\s*[-_. ]*\d+$", RegexOptions.IgnoreCase))
+                                dest = Path.Combine(dest, "Disc " + (track.Disc > 0 ? track.Disc.ToString() : Regex.Match(parent, @"\d+").Value));
+                            row.Target = Path.Combine(dest, Path.GetFileName(track.Path));
+                        }
+                    }
+                    if (row.Convert) row.Target = Path.ChangeExtension(row.Target, ".mp3");
+                    LibraryPaths.Safe(row.Target, options.Root);
+                    if (row.Target.Length > 250) throw new IOException("The organized path is longer than 250 characters. Shorten the artist/album/file names first.");
+                    if (!row.Convert && options.Convert) row.Reason = (row.Reason ?? "") + (track.Lossless ? "" : " Existing MP3/lower-bitrate lossy audio is not re-encoded.");
+                    actions.Add(track.Path, row);
+                }
+                catch (Exception e) when (Scanner.IsFileError(e) || Artwork.IsImageError(e)) { plan.Issues.Add(track.Path + ": " + e.Message); }
+                progress?.Report(new ProgressInfo { Completed = ++done, Total = tracks.Length, Message = "Planning library changes · " + done + "/" + tracks.Length + " tracks" });
+            }
+            if (options.Duplicates)
+            {
+                var matches = new DuplicateScanner().Scan(scan.Albums, token, progress); plan.Issues.AddRange(matches.Issues);
+                var confirmed = matches.Songs.Where(g => g.Confirmed).Select(g => g.Tracks.ToArray()).ToList();
+                // Other containers can be confirmed by FFmpeg's demuxed packet hash when the encoder is available.
+                if (!string.IsNullOrEmpty(options.EncoderPath))
+                    foreach (var group in tracks.Where(t => !new[] { ".mp3", ".flac" }.Contains(Path.GetExtension(t.Path).ToLowerInvariant())).GroupBy(t => SongKey(t, albumFor[t.Path])).Where(g => g.Count() > 1))
+                    {
+                        token.ThrowIfCancellationRequested();
+                        var hashes = new List<Tuple<Track, string>>();
+                        foreach (var track in group)
+                            try { if (!track.Stamp.Matches(track.Path)) continue; string hash = Encoder.AudioHash(options.EncoderPath, track, token); if (track.Stamp.Matches(track.Path)) hashes.Add(Tuple.Create(track, hash)); }
+                            catch (Exception e) when (Scanner.IsFileError(e)) { plan.Issues.Add(track.Path + ": " + e.Message); }
+                        confirmed.AddRange(hashes.GroupBy(x => x.Item2).Where(g => g.Count() > 1).Select(g => g.Select(x => x.Item1).ToArray()));
+                    }
+                foreach (var match in confirmed)
+                    foreach (var logical in match.Where(t => actions.ContainsKey(t.Path)).GroupBy(t => SongKey(t, albumFor[t.Path])).Where(g => g.Count() > 1))
+                    {
+                        var keep = logical.OrderByDescending(t => t.HasCover).ThenBy(t => Regex.IsMatch(Path.GetFileNameWithoutExtension(t.Path), @"(?i)(\(\d+\)|copy|duplicate)$") ? 1 : 0)
+                            .ThenBy(t => t.Path.Length).ThenBy(t => t.Path, StringComparer.OrdinalIgnoreCase).First();
+                        string keepHash = CoverEditor.Hash(keep.Path);
+                        foreach (var copy in logical.Where(t => t != keep))
+                        {
+                            var row = actions[copy.Path];
+                            if (row.Archive) continue;
+                            row.Archive = true; row.Convert = row.Square = false; row.Target = null; row.Keeper = keep.Path; row.KeeperHash = keepHash;
+                            row.ExpectedHash = CoverEditor.Hash(copy.Path); row.Reason = "Confirmed file/audio copy of " + keep.Path;
+                        }
+                    }
+            }
+            foreach (var row in actions.Values.Where(a => a.Keeper != null))
+            {
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                while (actions.TryGetValue(row.Keeper, out var next) && next.Archive && next.Keeper != null && seen.Add(row.Keeper)) row.Keeper = next.Keeper;
+                row.KeeperHash = CoverEditor.Hash(row.Keeper);
+            }
+            var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in actions.Values.Where(a => !a.Archive).OrderBy(a => a.Move ? 1 : 0))
+                row.Target = LibraryPaths.Available(row.Target, row.Source, reserved);
+            plan.Actions.AddRange(actions.Values.Where(a => !a.Archive));
+            if (options.Organize) AddAssets(plan, scan, actions, reserved, token);
+            plan.Actions.AddRange(actions.Values.Where(a => a.Archive));
+            if (options.ArchiveOldBackups) AddOldBackups(plan, token);
+            return plan;
+        }
+        private static string SongKey(Track track, Album album)
+        {
+            string artist = album.MainArtist;
+            if (string.IsNullOrEmpty(artist)) artist = string.IsNullOrWhiteSpace(album.TaggedArtist) ? track.Performer : album.TaggedArtist;
+            string title = track.HasTitleTag ? track.Title : Regex.Replace(Path.GetFileNameWithoutExtension(track.Path), @"(?i)\s*(\(\d+\)|[-_ ]+(copy|duplicate))\s*$", "");
+            // Repeated audio in different albums or different titled/numbered tracks is kept.
+            return ArtistRules.Normalize(artist) + "\u001f" + ArtistRules.Normalize(track.AlbumTitle) + "\u001f" + track.Disc + "\u001f" + track.Number + "\u001f" + ArtistRules.Normalize(title);
+        }
+        private static void AddAssets(LibraryPlan plan, ScanResult scan, Dictionary<string, LibraryAction> actions, HashSet<string> reserved, CancellationToken token)
+        {
+            var assetExtensions = new HashSet<string>(new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".pdf", ".txt", ".nfo", ".cue", ".log", ".m3u", ".m3u8", ".pls", ".lrc", ".srt" }, StringComparer.OrdinalIgnoreCase);
+            var all = scan.Albums.SelectMany(a => a.Tracks).ToArray(); var handled = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var album in scan.Albums)
+            {
+                string source = album.Folder;
+                while (source != null && !source.Equals(plan.Options.Root, StringComparison.OrdinalIgnoreCase) && BackupSettings.Within(source, plan.Options.Root))
+                {
+                    string name = Path.GetFileName(source); if (name.StartsWith("Album - ", StringComparison.OrdinalIgnoreCase)) name = name.Substring(8);
+                    if (album.Tracks.All(t => ArtistRules.Normalize(LibraryPaths.Component(t.AlbumTitle)) == ArtistRules.Normalize(name))) break;
+                    source = Path.GetDirectoryName(source);
+                }
+                if (source == null || source.Equals(plan.Options.Root, StringComparison.OrdinalIgnoreCase) || !handled.Add(source)) continue;
+                var contained = all.Where(t => BackupSettings.Within(t.Path, source)).ToArray();
+                if (contained.Any(t => !actions.ContainsKey(t.Path) || ArtistRules.Normalize(t.AlbumTitle) != ArtistRules.Normalize(album.Tracks[0].AlbumTitle))) continue;
+                var live = contained.Select(t => actions[t.Path]).Where(a => !a.Archive).ToArray();
+                string destination = live.Length > 0 ? Path.GetDirectoryName(live[0].Target) : null;
+                if (destination != null && Regex.IsMatch(Path.GetFileName(destination), @"^Disc \d+$")) destination = Path.GetDirectoryName(destination);
+                if (destination == null && contained.Length > 0)
+                { string keeper = actions[contained[0].Path].Keeper; if (keeper != null && actions.ContainsKey(keeper)) destination = Path.GetDirectoryName(actions[keeper].Target); }
+                if (destination == null) continue;
+                foreach (string path in WalkFiles(source, token))
+                {
+                    if (!assetExtensions.Contains(Path.GetExtension(path)) || actions.ContainsKey(path)) continue;
+                    string relative = path.Substring(source.TrimEnd(Path.DirectorySeparatorChar).Length + 1);
+                    string target = Path.Combine(destination, relative);
+                    if (path.Equals(target, StringComparison.OrdinalIgnoreCase)) continue;
+                    var row = new LibraryAction { Source = path, Target = LibraryPaths.Available(target, path, reserved), Stamp = FileStamp.Read(path), Reason = "Album artwork/booklet/sidecar kept with its album." };
+                    plan.Actions.Add(row);
+                }
+            }
+        }
+        internal static IEnumerable<string> WalkFiles(string root, CancellationToken token, bool includeBackups = false)
+        {
+            var pending = new Stack<string>(); pending.Push(root);
+            while (pending.Count > 0)
+            {
+                token.ThrowIfCancellationRequested(); string folder = pending.Pop();
+                foreach (string file in Directory.GetFiles(folder)) { token.ThrowIfCancellationRequested(); if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) == 0) yield return file; }
+                foreach (string child in Directory.GetDirectories(folder))
+                    if ((File.GetAttributes(child) & (FileAttributes.ReparsePoint | FileAttributes.System)) == 0 &&
+                        (includeBackups || Path.GetFileName(child) != ".album-art-backups") && !BackupSettings.Within(child, BackupSettings.Root)) pending.Push(child);
+            }
+        }
+        private static void AddOldBackups(LibraryPlan plan, CancellationToken token)
+        {
+            foreach (string path in WalkFiles(plan.Options.Root, token, true))
+                if (path.Split(Path.DirectorySeparatorChar).Any(s => s.Equals(".album-art-backups", StringComparison.OrdinalIgnoreCase)) ||
+                    Path.GetFileName(path).Contains(".before-square-crop") || Path.GetFileName(path).StartsWith(".covercrop-tmp-", StringComparison.OrdinalIgnoreCase))
+                    plan.Actions.Add(new LibraryAction { Source = path, Archive = true, Stamp = FileStamp.Read(path), Reason = "Old tool backup moved off the active music tree." });
+        }
+    }
+}

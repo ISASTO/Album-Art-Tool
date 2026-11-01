@@ -15,7 +15,7 @@ namespace AlbumArtTool
         private Form updateWindow;
         private bool checkingUpdate, installingUpdate, restartForUpdate;
         internal Func<UpdateService> CreateUpdateService = () => new UpdateService();
-        internal bool CanInstallUpdate => !busy && !writing && !queueRunning && pending == null && (duplicatesWindow == null || !duplicatesWindow.IsScanning);
+        internal bool CanInstallUpdate => !busy && !writing && !queueRunning && !maintenanceRunning && (managerWindow == null || !managerWindow.IsWorking) && pending == null && (duplicatesWindow == null || !duplicatesWindow.IsScanning);
 
         internal async Task GetUpdatesAsync()
         {
@@ -73,7 +73,7 @@ namespace AlbumArtTool
                     {
                         message.Text = pending != null
                             ? "Update downloaded. Apply or discard your staged cover to restart and install it. You can cancel this update."
-                            : "Update downloaded. Waiting for scans and the work queue to finish before restarting. You can cancel this update.";
+                            : "Update downloaded. Waiting for background tasks to finish before restarting. You can cancel this update.";
                         await Task.Delay(200, token);
                     }
                     // This check and disabling input occur together on the UI thread: no new job can slip into the handoff.

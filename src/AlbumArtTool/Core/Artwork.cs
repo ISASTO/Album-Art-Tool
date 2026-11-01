@@ -90,6 +90,30 @@ namespace AlbumArtTool.Core
             }
         }
 
+        // Center crop at native resolution; already-square pictures retain their original bytes.
+        public static byte[] Square(byte[] bytes)
+        {
+            using (var source = Decode(bytes))
+            {
+                if (source.Width == source.Height) return bytes;
+                int side = Math.Min(source.Width, source.Height);
+                var rect = new Rectangle((source.Width - side) / 2, (source.Height - side) / 2, side, side);
+                bool jpeg = bytes.Length > 2 && bytes[0] == 0xff && bytes[1] == 0xd8;
+                using (var square = source.Clone(rect, jpeg ? PixelFormat.Format24bppRgb : PixelFormat.Format32bppArgb))
+                using (var output = new MemoryStream())
+                {
+                    if (jpeg)
+                    {
+                        var encoder = ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == ImageFormat.Jpeg.Guid);
+                        using (var parameters = new EncoderParameters(1))
+                        { parameters.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 92L); square.Save(output, encoder, parameters); }
+                    }
+                    else square.Save(output, ImageFormat.Png);
+                    return output.ToArray();
+                }
+            }
+        }
+
         public static byte[] Thumbnail(byte[] bytes) => Normalize(bytes, 128, ImageFormat.Png);
 
         public static ImageFormat FormatForPath(string path)

@@ -13,7 +13,7 @@ namespace AlbumArtTool.Core
                 throw new ArgumentException("Enter the main artist's name before applying the change.");
             var result = new EditResult();
             var targets = album.Tracks.Where(t => ArtistRules.NeedsChange(t, artist)).ToList();
-            string backups = Path.Combine(album.Folder, ".album-art-backups", DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            string backups = BackupSettings.NewFolder(album.Folder);
             int done = 0;
             foreach (var track in targets)
             {

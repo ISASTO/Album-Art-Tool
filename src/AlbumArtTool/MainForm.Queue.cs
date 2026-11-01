@@ -36,7 +36,7 @@ namespace AlbumArtTool
 
         private Task EnqueueCover(Album album, string source, Func<Task<byte[]>> loadImage)
         {
-            if (busy || queuedAlbums.Contains(album.Key)) return Task.CompletedTask;
+            if (busy || maintenanceRunning || queuedAlbums.Contains(album.Key)) return Task.CompletedTask;
             // Freeze this album, image source and options before the user moves to another row.
             var job = new CoverJob { Album = album, Source = source, LoadImage = loadImage,
                 OnlyMissing = onlyMissing.Checked, FolderCover = folderCover.Enabled && folderCover.Checked };
@@ -46,7 +46,7 @@ namespace AlbumArtTool
         private Task EnqueueJob(CoverJob job)
         {
             var album = job.Album;
-            if (busy || queuedAlbums.Contains(album.Key)) return Task.CompletedTask;
+            if (busy || maintenanceRunning || queuedAlbums.Contains(album.Key)) return Task.CompletedTask;
             if (!queueRunning) { jobsFinished = jobsWithIssues = 0; issues.Clear(); }
             waitingJobs.Enqueue(job); queuedAlbums.Add(album.Key);
             status.Text = "Queued " + album.Title + ". You can continue with another album.";
@@ -124,12 +124,12 @@ namespace AlbumArtTool
         private void UpdateQueueControls()
         {
             if (IsDisposed) return;
-            browse.Enabled = !busy && !queueRunning;
-            scan.Enabled = !writing && (!queueRunning || busy);
-            undo.Enabled = !busy && !queueRunning && lastEdit != null && lastEdit.Entries.Count > 0;
+            browse.Enabled = !busy && !queueRunning && !maintenanceRunning;
+            scan.Enabled = !maintenanceRunning && !writing && (!queueRunning || busy);
+            undo.Enabled = !busy && !queueRunning && !maintenanceRunning && lastEdit != null && lastEdit.Entries.Count > 0;
             issuesButton.Enabled = issues.Count > 0;
             var selected = albums.SelectedAlbum;
-            bool canEdit = !busy && selected != null && !queuedAlbums.Contains(selected.Key);
+            bool canEdit = !busy && !maintenanceRunning && selected != null && !queuedAlbums.Contains(selected.Key);
             choose.Enabled = onlyMissing.Enabled = canEdit;
             bool shared = selected != null && library.Albums.Count(a => string.Equals(a.Folder, selected.Folder, StringComparison.OrdinalIgnoreCase)) > 1;
             folderCover.Enabled = canEdit && !shared;

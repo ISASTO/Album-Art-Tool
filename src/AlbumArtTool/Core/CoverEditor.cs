@@ -14,7 +14,7 @@ namespace AlbumArtTool.Core
             using (var validation = Artwork.Decode(jpeg)) { }
             var result = new EditResult();
             var targets = album.Tracks.Where(t => !onlyMissing || !t.HasCover).ToList();
-            string backupDirectory = Path.Combine(album.Folder, ".album-art-backups", DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+            string backupDirectory = BackupSettings.NewFolder(album.Folder);
             int done = 0;
             foreach (var track in targets)
             {

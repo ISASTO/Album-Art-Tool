@@ -29,6 +29,13 @@ namespace AlbumArtTool.Core
         public string Performer { get; set; }
         public string[] Performers { get; set; } = new string[0];
         public string[] AlbumArtists { get; set; } = new string[0];
+        public string AlbumTitle { get; set; }
+        public uint Disc { get; set; }
+        public uint DiscCount { get; set; }
+        public uint Number { get; set; }
+        public int Bitrate { get; set; }
+        public string Codec { get; set; }
+        public bool Lossless { get; set; }
         public TimeSpan Duration { get; set; }
         public bool HasTitleTag { get; set; }
         public long AudioStart { get; set; } = -1;
@@ -73,6 +80,7 @@ namespace AlbumArtTool.Core
         public string Message { get; set; }
         public int Completed { get; set; }
         public int Total { get; set; }
+        public double Fraction { get; set; }
     }
 
     public sealed class BackupEntry

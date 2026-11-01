@@ -111,6 +111,7 @@ namespace AlbumArtTool
             FormClosing += (s, e) =>
             {
                 if (installingUpdate && !restartForUpdate) { e.Cancel = true; return; }
+                if (maintenanceRunning || managerWindow != null && managerWindow.IsWorking) { e.Cancel = true; status.Text = "A library task is running. Stop it in Manage library before closing."; return; }
                 if (writing || queueRunning) { e.Cancel = true; status.Text = "Work is still running. Open Queue to clear waiting jobs; the current update will finish safely."; }
                 else cancellation?.Cancel();
             };
@@ -223,7 +224,7 @@ namespace AlbumArtTool
             tips.SetToolTip(onlyMissing, "Keeps existing embedded front covers. Uncheck to replace the cover on every track in this album.");
             tips.SetToolTip(folderCover, "Updates recognized cover/folder/front/album/albumart images, or creates cover.jpg. Disabled when multiple albums share a folder.");
             tips.SetToolTip(getUpdates, "Check GitHub releases, download a newer version, and restart when your scan and artwork queue finish.");
-            tips.SetToolTip(undo, "Restore files from your most recent edit in this session (Ctrl+Z). Backups remain in .album-art-backups after closing.");
+            tips.SetToolTip(undo, "Restore files from your most recent edit in this session (Ctrl+Z). Backups are stored in the PC backup folder shown in Manage library.");
         }
 
         private static Button Button(string text) => new ThemeButton { Text = text, Dock = DockStyle.Fill, FlatStyle = FlatStyle.Flat,
@@ -288,13 +289,13 @@ namespace AlbumArtTool
             SetPreview(album?.Thumbnail);
             if (!showingArtists && album?.Thumbnail != null) _ = LoadPreviewAsync(album, version);
             bool shared = album != null && library.Albums.Count(a => string.Equals(a.Folder, album.Folder, StringComparison.OrdinalIgnoreCase)) > 1;
-            folderCover.Enabled = !busy && album != null && !shared;
+            folderCover.Enabled = !busy && !maintenanceRunning && album != null && !shared;
             folderCover.Text = shared ? "Folder shared by multiple albums" : "Update folder cover images too";
-            choose.Enabled = onlyMissing.Enabled = album != null && !busy && !queuedAlbums.Contains(album.Key);
+            choose.Enabled = onlyMissing.Enabled = album != null && !busy && !maintenanceRunning && !queuedAlbums.Contains(album.Key);
             openFolder.Enabled = album != null && !busy;
             folderCover.Enabled &= album != null && !queuedAlbums.Contains(album.Key);
             UpdateApplyButton();
-            online.SetAlbum(showingArtists ? null : album, !showingArtists && !busy && (album == null || !queuedAlbums.Contains(album.Key)));
+            online.SetAlbum(showingArtists ? null : album, !showingArtists && !busy && !maintenanceRunning && (album == null || !queuedAlbums.Contains(album.Key)));
             ShowArtistSelection(); UpdateLibraryTools();
         }
 
@@ -327,7 +328,7 @@ namespace AlbumArtTool
 
         internal void StageImage(string path)
         {
-            if (busy || albums.SelectedAlbum == null || queuedAlbums.Contains(albums.SelectedAlbum.Key)) return;
+            if (busy || maintenanceRunning || albums.SelectedAlbum == null || queuedAlbums.Contains(albums.SelectedAlbum.Key)) return;
             try
             {
                 SetPendingImage(Artwork.Normalize(Artwork.LoadFile(path)));
@@ -361,7 +362,7 @@ namespace AlbumArtTool
             bool queued = album != null && queuedAlbums.Contains(album.Key);
             apply.Text = queued ? "Cover queued" : count > 0 ? "Apply cover to " + count + (count == 1 ? " track" : " tracks") : "Apply cover";
             bool hasImage = pending != null || album?.PreviewTrack != null || album?.FolderCovers.Count > 0;
-            apply.Enabled = !busy && !queued && hasImage && album != null && (count > 0 || (folderCover.Enabled && folderCover.Checked));
+            apply.Enabled = !busy && !maintenanceRunning && !queued && hasImage && album != null && (count > 0 || (folderCover.Enabled && folderCover.Checked));
             tips.SetToolTip(apply, queued ? "This album is already in the queue. You can work on another album." :
                 pending != null ? "Add the chosen cover to the work queue." : "Apply the displayed cover using the full-size image already in your album.");
             apply.BackColor = apply.Enabled ? Accent : Color.FromArgb(39, 44, 44);
@@ -412,7 +413,7 @@ namespace AlbumArtTool
 
         internal async Task ScanAsync()
         {
-            if (busy || queueRunning) return;
+            if (busy || queueRunning || maintenanceRunning) return;
             string root = folder.Text;
             cancellation?.Dispose(); cancellation = new CancellationTokenSource();
             var token = cancellation.Token;
@@ -434,7 +435,7 @@ namespace AlbumArtTool
         internal Task ApplyAsync()
         {
             var album = albums.SelectedAlbum;
-            if (busy || album == null || queuedAlbums.Contains(album.Key)) return Task.CompletedTask;
+            if (busy || maintenanceRunning || album == null || queuedAlbums.Contains(album.Key)) return Task.CompletedTask;
             try
             {
                 if (pending != null)
@@ -471,7 +472,7 @@ namespace AlbumArtTool
 
         private async Task UndoAsync()
         {
-            if (busy || queueRunning || lastEdit == null) return;
+            if (busy || queueRunning || maintenanceRunning || lastEdit == null) return;
             SetBusy(true, true); issues.Clear();
             var reporter = Reporter();
             try

@@ -10,7 +10,7 @@ namespace AlbumArtTool.Core
     public sealed class Scanner
     {
         public static readonly HashSet<string> Extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        { ".mp3", ".flac", ".m4a", ".m4b", ".ogg", ".oga", ".opus", ".wma", ".wav", ".aif", ".aiff", ".ape", ".wv" };
+        { ".mp3", ".flac", ".m4a", ".m4b", ".ogg", ".oga", ".opus", ".wma", ".wav", ".aif", ".aiff", ".ape", ".wv", ".aac", ".mp4", ".asf", ".aifc", ".dsf", ".tta", ".mpc" };
         private static readonly HashSet<string> CoverNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         { "cover", "folder", "front", "album", "albumart" };
         private static readonly HashSet<string> ImageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -59,6 +59,10 @@ namespace AlbumArtTool.Core
                             byte[] cover = Artwork.GetCover(file.Tag);
                             album.Tracks.Add(new Track { Path = path, Title = file.Tag.Title ?? Path.GetFileNameWithoutExtension(path),
                                 Performer = file.Tag.FirstPerformer ?? "", Performers = file.Tag.Performers.ToArray(), AlbumArtists = file.Tag.AlbumArtists.ToArray(),
+                                AlbumTitle = file.Tag.Album ?? "", Disc = file.Tag.Disc, DiscCount = file.Tag.DiscCount, Number = file.Tag.Track,
+                                Bitrate = file.Properties.AudioBitrate,
+                                Codec = string.Join("; ", file.Properties.Codecs.Select(c => c.Description)),
+                                Lossless = Lossless(path, string.Join(" ", file.Properties.Codecs.Select(c => c.Description))),
                                 Duration = file.Properties.Duration, HasTitleTag = !string.IsNullOrWhiteSpace(file.Tag.Title),
                                 AudioStart = file.InvariantStartPosition, AudioEnd = file.InvariantEndPosition,
                                 SampleRate = file.Properties.AudioSampleRate, Channels = file.Properties.AudioChannels,
@@ -140,7 +144,7 @@ namespace AlbumArtTool.Core
                         if (token.IsCancellationRequested) { result.Cancelled = true; break; }
                         string path = info.FullName;
                         string extension = Path.GetExtension(path);
-                        bool music = Extensions.Contains(extension) && !Path.GetFileName(path).StartsWith(".aat-", StringComparison.OrdinalIgnoreCase);
+                        bool music = Extensions.Contains(extension) && !TemporaryOrBackup(Path.GetFileName(path));
                         bool cover = ImageExtensions.Contains(extension) && CoverNames.Contains(Path.GetFileNameWithoutExtension(path));
                         if (!music && !cover) continue;
                         try
@@ -171,7 +175,8 @@ namespace AlbumArtTool.Core
                     foreach (string child in Directory.GetDirectories(folder).OrderByDescending(p => p, StringComparer.OrdinalIgnoreCase))
                     {
                         if (token.IsCancellationRequested) { result.Cancelled = true; break; }
-                        if (Path.GetFileName(child).Equals(".album-art-backups", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (Path.GetFileName(child).Equals(".album-art-backups", StringComparison.OrdinalIgnoreCase) ||
+                            Path.GetFileName(child).Equals(".music-manager-backups", StringComparison.OrdinalIgnoreCase) || BackupSettings.Within(child, BackupSettings.Root)) continue;
                         try
                         {
                             if ((System.IO.File.GetAttributes(child) & (FileAttributes.ReparsePoint | FileAttributes.System)) == 0) pending.Push(child);
@@ -183,6 +188,15 @@ namespace AlbumArtTool.Core
             }
             if (token.IsCancellationRequested) result.Cancelled = true;
             return found;
+        }
+
+        internal static bool TemporaryOrBackup(string name) => name.StartsWith(".aat-", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith(".__mp3convert_", StringComparison.OrdinalIgnoreCase) || name.Contains(".before-square-crop") || name.StartsWith(".covercrop-tmp-", StringComparison.OrdinalIgnoreCase);
+        private static bool Lossless(string path, string codec)
+        {
+            string ext = Path.GetExtension(path).ToLowerInvariant(); codec = codec.ToLowerInvariant();
+            return new[] { ".flac", ".ape", ".tta", ".dsf" }.Contains(ext) ||
+                codec.Contains("lossless") || codec.Contains("pcm") || ext == ".wv" && !codec.Contains("hybrid");
         }
 
         public static bool IsFileError(Exception e) => e is IOException || e is UnauthorizedAccessException || e is System.Security.SecurityException || e is NotSupportedException;

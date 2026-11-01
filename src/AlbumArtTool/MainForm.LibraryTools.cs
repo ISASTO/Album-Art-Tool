@@ -11,6 +11,9 @@ namespace AlbumArtTool
     {
         private readonly Button artistsTab = Button("Track artists");
         private readonly Button findDuplicates = Button("Find duplicates…");
+        private readonly Button manageLibrary = Button("Manage library…");
+        private LibraryManagerWindow managerWindow;
+        private bool maintenanceRunning;
         private readonly ComboBox albumFilter = new ComboBox(), albumSort = new ComboBox();
         private readonly TextBox mainArtist = new TextBox();
         private readonly Button applyArtist = Button("Set track artists");
@@ -22,8 +25,8 @@ namespace AlbumArtTool
 
         private Control BuildLibraryToolbar()
         {
-            var bar = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 6, RowCount = 1, Margin = Padding.Empty };
-            foreach (int width in new[] { 175, 45, 245, 43, 210 }) bar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, width));
+            var bar = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 7, RowCount = 1, Margin = Padding.Empty };
+            foreach (int width in new[] { 175, 170, 45, 245, 43, 210 }) bar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, width));
             bar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); bar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             foreach (var combo in new[] { albumFilter, albumSort })
             { combo.DropDownStyle = ComboBoxStyle.DropDownList; combo.Dock = DockStyle.Fill; combo.BackColor = Surface; combo.ForeColor = Ink; combo.FlatStyle = FlatStyle.Flat; combo.Font = new Font("Segoe UI", 9); combo.Margin = new Padding(3, 8, 8, 3); }
@@ -34,8 +37,9 @@ namespace AlbumArtTool
             albumFilter.SelectedIndexChanged += (s, e) => { if (!busy) RefreshAlbums(); };
             albumSort.SelectedIndexChanged += (s, e) => { if (!busy) RefreshAlbums(); };
             findDuplicates.Click += async (s, e) => await FindDuplicatesAsync();
-            bar.Controls.Add(findDuplicates, 0, 0); bar.Controls.Add(Label("Show", 9), 1, 0); bar.Controls.Add(albumFilter, 2, 0);
-            bar.Controls.Add(Label("Sort", 9), 3, 0); bar.Controls.Add(albumSort, 4, 0);
+            manageLibrary.Click += (s, e) => ShowLibraryManager();
+            bar.Controls.Add(findDuplicates, 0, 0); bar.Controls.Add(manageLibrary, 1, 0); bar.Controls.Add(Label("Show", 9), 2, 0); bar.Controls.Add(albumFilter, 3, 0);
+            bar.Controls.Add(Label("Sort", 9), 4, 0); bar.Controls.Add(albumSort, 5, 0);
             return bar;
         }
 
@@ -93,8 +97,8 @@ namespace AlbumArtTool
             bool valid = ArtistRules.Specific(name) && name.Length <= 300 && !name.Any(char.IsControl);
             int count = valid && album != null ? album.Tracks.Count(t => ArtistRules.NeedsChange(t, name)) : 0;
             bool queued = album != null && queuedAlbums.Contains(album.Key);
-            mainArtist.ReadOnly = busy || queued || album == null;
-            applyArtist.Enabled = !busy && !queued && count > 0;
+            mainArtist.ReadOnly = busy || maintenanceRunning || queued || album == null;
+            applyArtist.Enabled = !busy && !maintenanceRunning && !queued && count > 0;
             applyArtist.Text = queued ? "Album queued" : count > 0 ? "Set artists on " + count + (count == 1 ? " track" : " tracks") : "Set track artists";
             artistSummary.Text = album == null ? "Select an album to review its track artists." : !valid ? "No single main artist was found. Enter the name to use." :
                 count == 0 ? "Every track already uses this artist and album artist." : count + " of " + album.Tracks.Count + " tracks will change to " + name;
@@ -103,20 +107,30 @@ namespace AlbumArtTool
         internal Task ApplyArtistAsync()
         {
             var album = albums.SelectedAlbum; string name = mainArtist.Text.Trim();
-            if (busy || album == null || queuedAlbums.Contains(album.Key) || !ArtistRules.Specific(name) || name.Length > 300 || name.Any(char.IsControl)) return Task.CompletedTask;
+            if (busy || maintenanceRunning || album == null || queuedAlbums.Contains(album.Key) || !ArtistRules.Specific(name) || name.Length > 300 || name.Any(char.IsControl)) return Task.CompletedTask;
             if (!album.Tracks.Any(t => ArtistRules.NeedsChange(t, name))) return Task.CompletedTask;
             return EnqueueJob(new CoverJob { Album = album, Artist = name, Source = "Track artists" });
         }
         private void UpdateLibraryTools()
         {
             artistsTab.Enabled = albumFilter.Enabled = albumSort.Enabled = !busy;
-            findDuplicates.Enabled = !busy && hasScanned && library.Albums.Count > 0;
+            findDuplicates.Enabled = !busy && !maintenanceRunning && hasScanned && library.Albums.Count > 0;
             UpdateArtistPreview();
+        }
+        private void ShowLibraryManager()
+        {
+            if (managerWindow != null && !managerWindow.IsDisposed) { managerWindow.Activate(); return; }
+            managerWindow = new LibraryManagerWindow(folder.Text,
+                () => !busy && !queueRunning && !maintenanceRunning && pending == null && (duplicatesWindow == null || !duplicatesWindow.IsScanning),
+                value => { maintenanceRunning = value; UpdateQueueControls(); },
+                async root => { lastEdit = null; folder.Text = root; await ScanAsync(); });
+            managerWindow.FormClosed += (s, e) => managerWindow = null;
+            managerWindow.Show(this);
         }
         internal async Task FindDuplicatesAsync()
         {
             if (duplicatesWindow != null && !duplicatesWindow.IsDisposed) { duplicatesWindow.Activate(); return; }
-            if (busy || library.Albums.Count == 0) return;
+            if (busy || maintenanceRunning || library.Albums.Count == 0) return;
             var window = new DuplicateWindow(library.Albums.ToArray(), () => library.Albums.ToArray());
             duplicatesWindow = window;
             window.FormClosed += (s, e) => { if (duplicatesWindow == window) duplicatesWindow = null; };
