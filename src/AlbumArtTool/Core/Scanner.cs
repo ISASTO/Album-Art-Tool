@@ -16,7 +16,7 @@ namespace AlbumArtTool.Core
         private static readonly HashSet<string> ImageExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         { ".jpg", ".jpeg", ".png", ".bmp", ".gif" };
 
-        public ScanResult Scan(string root, CancellationToken cancellation, IProgress<ProgressInfo> progress = null, bool recursive = true)
+        public ScanResult Scan(string root, CancellationToken cancellation, IProgress<ProgressInfo> progress = null, bool recursive = true, bool useCache = true)
         {
             root = Path.GetFullPath(root);
             if (!Directory.Exists(root)) throw new DirectoryNotFoundException("That music folder no longer exists.");
@@ -30,11 +30,20 @@ namespace AlbumArtTool.Core
             void Report(string folder) => progress?.Report(new ProgressInfo {
                 Message = checkedFiles + "/" + total + " tracks scanned · " + folder,
                 Completed = checkedFiles, Total = total });
+            var artwork = new ArtworkValidationCache();
             Report(root);
             foreach (var entry in folders)
             {
                 if (cancellation.IsCancellationRequested) { result.Cancelled = true; break; }
                 string folder = entry.Path;
+                if (useCache && ScanCache.TryRead(folder, entry.Stamps, out var cached))
+                {
+                    checkedFiles += entry.Tracks.Length; Report(folder);
+                    if (cancellation.IsCancellationRequested) { result.Cancelled = true; break; }
+                    result.Albums.AddRange(cached); result.FilesRead += entry.Tracks.Length; result.CachedFiles += entry.Tracks.Length;
+                    continue;
+                }
+                int issuesBefore = result.Issues.Count;
                 var albums = new Dictionary<string, Album>(StringComparer.OrdinalIgnoreCase);
                 foreach (string path in entry.Tracks)
                 {
@@ -43,6 +52,7 @@ namespace AlbumArtTool.Core
                     {
                         if ((System.IO.File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) continue;
                         var stamp = FileStamp.Read(path);
+                        result.FilesOpened++;
                         using (var file = TagLib.File.Create(path, TagLib.ReadStyle.Average))
                         {
                             if (file.Properties == null || (file.Properties.MediaTypes & TagLib.MediaTypes.Audio) == 0)
@@ -56,7 +66,7 @@ namespace AlbumArtTool.Core
                                 album = new Album { Key = folder + "\u001f" + key, Folder = folder, Title = title, Artist = albumArtist, TaggedArtist = albumArtist };
                                 albums.Add(key, album);
                             }
-                            byte[] cover = Artwork.GetCover(file.Tag);
+                            byte[] cover = Artwork.GetCover(file.Tag, artwork);
                             album.Tracks.Add(new Track { Path = path, Title = file.Tag.Title ?? Path.GetFileNameWithoutExtension(path),
                                 Performer = file.Tag.FirstPerformer ?? "", Performers = file.Tag.Performers.ToArray(), AlbumArtists = file.Tag.AlbumArtists.ToArray(),
                                 AlbumTitle = file.Tag.Album ?? "", Disc = file.Tag.Disc, DiscCount = file.Tag.DiscCount, Number = file.Tag.Track,
@@ -114,7 +124,9 @@ namespace AlbumArtTool.Core
                     if (string.IsNullOrEmpty(album.TaggedArtist) && album.MainArtist.Length > 0) album.Artist = album.MainArtist;
                     result.Albums.Add(album);
                 }
+                if (result.Issues.Count == issuesBefore) ScanCache.Store(folder, entry.Stamps, albums.Values);
             }
+            result.ArtworkImagesDecoded = artwork.Decoded;
             result.Albums.Sort((a, b) => StringComparer.CurrentCultureIgnoreCase.Compare(a.Artist + "\u001f" + a.Title + a.Folder, b.Artist + "\u001f" + b.Title + b.Folder));
             return result;
         }
@@ -123,6 +135,7 @@ namespace AlbumArtTool.Core
         {
             public string Path;
             public string[] Tracks, Covers;
+            public Dictionary<string, FileStamp> Stamps;
         }
 
         private static List<ScanFolder> Discover(string root, bool recursive, CancellationToken token, ScanResult result, IProgress<ProgressInfo> progress)
@@ -137,6 +150,7 @@ namespace AlbumArtTool.Core
                 if (token.IsCancellationRequested) { result.Cancelled = true; break; }
                 string folder = pending.Pop();
                 var tracks = new List<string>(); var covers = new List<string>();
+                var stamps = new Dictionary<string, FileStamp>(StringComparer.OrdinalIgnoreCase);
                 try
                 {
                     foreach (var info in new DirectoryInfo(folder).EnumerateFiles())
@@ -150,7 +164,9 @@ namespace AlbumArtTool.Core
                         try
                         {
                             if ((info.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                            var stamp = FileStamp.FromInfo(info);
                             if (music) tracks.Add(path); else covers.Add(path);
+                            stamps[path] = stamp;
                         }
                         catch (Exception e) when (IsFileError(e)) { result.Issues.Add(path + ": " + e.Message); }
                     }
@@ -162,7 +178,7 @@ namespace AlbumArtTool.Core
                 }
                 if (result.Cancelled) break;
                 tracks.Sort(StringComparer.OrdinalIgnoreCase); covers.Sort(StringComparer.OrdinalIgnoreCase);
-                if (tracks.Count > 0) found.Add(new ScanFolder { Path = folder, Tracks = tracks.ToArray(), Covers = covers.ToArray() });
+                if (tracks.Count > 0) found.Add(new ScanFolder { Path = folder, Tracks = tracks.ToArray(), Covers = covers.ToArray(), Stamps = stamps });
                 total += tracks.Count; visited++;
                 if (clock.ElapsedMilliseconds >= 120)
                 {

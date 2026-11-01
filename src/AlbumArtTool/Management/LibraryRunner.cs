@@ -120,14 +120,16 @@ namespace AlbumArtTool.Management
                     if (entry.Target != null) LibraryPaths.Safe(entry.Target, options.Root);
                     if ((File.GetAttributes(row.Source) & FileAttributes.ReadOnly) != 0) throw new IOException("Read-only file skipped.");
                     if (!row.Stamp.Matches(row.Source)) throw new IOException("File changed after preview. Preview again before changing it.");
-                    entry.OriginalHash = CoverEditor.Hash(row.Source);
+                    entry.OriginalHash = row.ExpectedHash != null || entry.MoveOnly ? CoverEditor.Hash(row.Source) : null;
                     if (row.ExpectedHash != null && entry.OriginalHash != row.ExpectedHash) throw new IOException("The duplicate changed after preview. It was kept.");
                     if (row.Keeper != null) VerifyKeeper(row, completed);
                     if (!entry.MoveOnly)
                     {
                         entry.Backup = Path.Combine(journal.Directory, "originals", (journal.Entries.Count - 1).ToString("D6") + "-" + LibraryPaths.Component(Path.GetFileName(row.Source)));
-                        Copy(row.Source, entry.Backup, token);
-                        if (CoverEditor.Hash(entry.Backup) != entry.OriginalHash) throw new IOException("Backup verification failed. Original kept.");
+                        string copiedHash = CopyAndHash(row.Source, entry.Backup, token);
+                        if (entry.OriginalHash != null && copiedHash != entry.OriginalHash) throw new IOException("The original changed during backup. Original kept.");
+                        entry.OriginalHash = copiedHash;
+                        if (!row.Stamp.Matches(row.Source) || CoverEditor.Hash(entry.Backup) != entry.OriginalHash) throw new IOException("Backup verification failed. Original kept.");
                     }
                     if (row.Archive)
                     {
@@ -215,21 +217,27 @@ namespace AlbumArtTool.Management
                 if (pictures.Length != expected.Length || pictures.Where((p, i) => !p.Data.Data.SequenceEqual(expected[i])).Any()) throw new IOException("The format did not retain all cropped pictures. Original kept.");
             }
         }
-        internal static void Copy(string source, string target, CancellationToken token)
+        internal static void Copy(string source, string target, CancellationToken token) => CopyCore(source, target, token, false);
+        internal static string CopyAndHash(string source, string target, CancellationToken token) => CopyCore(source, target, token, true);
+        private static string CopyCore(string source, string target, CancellationToken token, bool fingerprint)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(target));
-            bool created = false;
+            bool created = false; string digest = null;
             try
             {
-                using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var hash = fingerprint ? System.Security.Cryptography.SHA256.Create() : null)
+                using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.SequentialScan))
                 using (var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 {
                     created = true;
                     var buffer = new byte[65536]; int count;
-                    while ((count = input.Read(buffer, 0, buffer.Length)) > 0) { token.ThrowIfCancellationRequested(); output.Write(buffer, 0, count); }
+                    while ((count = input.Read(buffer, 0, buffer.Length)) > 0)
+                    { token.ThrowIfCancellationRequested(); hash?.TransformBlock(buffer, 0, count, buffer, 0); output.Write(buffer, 0, count); }
+                    if (hash != null) { hash.TransformFinalBlock(new byte[0], 0, 0); digest = Convert.ToBase64String(hash.Hash); }
                     output.Flush(true);
                 }
                 File.SetLastWriteTimeUtc(target, File.GetLastWriteTimeUtc(source));
+                return digest;
             }
             catch { if (created) try { File.Delete(target); } catch { } throw; }
         }

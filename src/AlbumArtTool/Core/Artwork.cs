@@ -15,12 +15,14 @@ namespace AlbumArtTool.Core
 
         public static bool IsCover(IPicture picture) => picture.Type == PictureType.FrontCover || picture.Type == PictureType.Other;
 
-        public static byte[] GetCover(TagLib.Tag tag)
+        public static byte[] GetCover(TagLib.Tag tag) => GetCover(tag, null);
+        internal static byte[] GetCover(TagLib.Tag tag, ArtworkValidationCache cache)
         {
             foreach (var picture in tag.Pictures.Where(IsCover).OrderBy(p => p.Type == PictureType.FrontCover ? 0 : 1))
             {
                 byte[] bytes = picture.Data.Data;
                 if (bytes.Length == 0 || bytes.Length > MaxImageBytes) continue;
+                if (cache != null) { if (cache.Valid(bytes)) return bytes; continue; }
                 try { using (var image = Decode(bytes)) return bytes; }
                 catch (Exception e) when (IsImageError(e)) { }
             }

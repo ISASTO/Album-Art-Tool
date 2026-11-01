@@ -86,7 +86,7 @@ namespace AlbumArtTool
             AppTheme.Apply(this, () => { StyleTabs(); UpdateAppearance(); });
             appearance.Click += (s, e) =>
             {
-                if (!AppTheme.SetDark(!AppTheme.IsDark)) tips.SetToolTip(appearance, "Appearance changed, but the preference could not be saved on this PC.");
+                if (!AppTheme.SetDark(!AppTheme.IsDark, animate: true)) tips.SetToolTip(appearance, "Appearance changed, but the preference could not be saved on this PC.");
             };
             albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? (currentJob.Artist == null ? "Applying cover…" : "Updating artists…") : "Queued") :
                 showingArtists ? (album.ArtistChangeCount > 0 ? album.ArtistChangeCount + (album.ArtistChangeCount == 1 ? " track with artist changes" : " tracks with artist changes") : "No artist changes suggested") : null;
@@ -97,7 +97,8 @@ namespace AlbumArtTool
                 using (var dialog = new FolderBrowserDialog { Description = "Choose the top folder containing your music", SelectedPath = folder.Text, ShowNewFolderButton = false })
                     if (dialog.ShowDialog(this) == DialogResult.OK) { folder.Text = dialog.SelectedPath; await ScanAsync(); }
             };
-            scan.Click += async (s, e) => { if (busy) cancellation?.Cancel(); else await ScanAsync(); };
+            tips.SetToolTip(scan, "Rescan the library. Hold Shift to read every file again.");
+            scan.Click += async (s, e) => { if (busy) cancellation?.Cancel(); else await ScanAsync((ModifierKeys & Keys.Shift) != 0); };
             missingTab.Click += (s, e) => SwitchTab(true);
             existingTab.Click += (s, e) => SwitchTab(false);
             artistsTab.Click += (s, e) => SwitchArtists();
@@ -460,7 +461,7 @@ namespace AlbumArtTool
             });
         }
 
-        internal async Task ScanAsync()
+        internal async Task ScanAsync(bool force = false)
         {
             if (busy || queueRunning || maintenanceRunning) return;
             string root = folder.Text;
@@ -470,7 +471,7 @@ namespace AlbumArtTool
             var reporter = Reporter();
             try
             {
-                var result = await Task.Run(() => scanner.Scan(root, token, reporter));
+                var result = await Task.Run(() => scanner.Scan(root, token, reporter, useCache: !force));
                 if (IsDisposed) return;
                 library = result; hasScanned = true; issues.AddRange(result.Issues);
                 status.Text = (result.Cancelled ? "Scan stopped · " : "") + result.Albums.Count + " albums · " + result.FilesRead + " tracks" +
@@ -537,7 +538,7 @@ namespace AlbumArtTool
 
         private async Task RefreshFolderAsync(string path, string key, bool preserveStaged = false)
         {
-            var updated = await Task.Run(() => scanner.Scan(path, CancellationToken.None, recursive: false));
+            var updated = await Task.Run(() => scanner.Scan(path, CancellationToken.None, recursive: false, useCache: false));
             library.Albums.RemoveAll(a => string.Equals(a.Folder, path, StringComparison.OrdinalIgnoreCase));
             library.Albums.AddRange(updated.Albums); issues.AddRange(updated.Issues);
             library.Albums.Sort((a, b) => StringComparer.CurrentCultureIgnoreCase.Compare(a.Artist + a.Title + a.Folder, b.Artist + b.Title + b.Folder));

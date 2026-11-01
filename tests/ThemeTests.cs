@@ -24,6 +24,25 @@ internal static partial class Tests
         AppTheme.SetDark(true, false);
     }
     [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr parameter, IntPtr data);
+    private static async Task WaitForThemeWipe(Form form, string output, string name)
+    {
+        var layer = form.Controls.OfType<ThemeTransition>().FirstOrDefault();
+        if (ThemeTransition.MotionAllowed)
+        {
+            Assert(layer != null && layer.Visible && layer.Bounds == form.ClientRectangle, "one transition surface covers every child control during a theme change");
+            using (var mid = new Bitmap(layer.Width, layer.Height))
+            {
+                using (var graphics = Graphics.FromImage(mid)) layer.PaintFrame(graphics, .5);
+                mid.Save(Path.Combine(output, "theme-wipe-" + name + "-middle.png"), ImageFormat.Png);
+                // Both sides of a material-only horizontal line must be different
+                // during the wipe, rather than changing whole controls individually.
+                var left = mid.GetPixel(12, Math.Min(60, mid.Height - 1)); var right = mid.GetPixel(mid.Width - 12, Math.Min(60, mid.Height - 1));
+                Assert(Math.Abs(left.R - right.R) > 40, "the theme wipe simultaneously displays the new left side and the old right side");
+            }
+        }
+        for (int n = 0; n < 100 && form.Controls.OfType<ThemeTransition>().Any(); n++) await Task.Delay(20);
+        Assert(!form.Controls.OfType<ThemeTransition>().Any(), "the theme wipe finishes and releases its snapshot surface");
+    }
     private static void ThemeGuiSmoke(string output)
     {
         string root = NewFolder("appearance-gui"), album = Path.Combine(root, "Morning Miles"); Directory.CreateDirectory(album);
@@ -62,13 +81,13 @@ internal static partial class Tests
                     Descendants(form).OfType<Button>().Single(b => b.Text == "Manage library…").PerformClick();
                     var manager = form.OwnedForms.OfType<LibraryManagerWindow>().Single();
                     var rename = Descendants(manager).OfType<CheckBox>().Single(c => c.AccessibleName == "Rename song files from Title tags"); rename.Checked = true;
-                    toggle.PerformClick(); await Task.Delay(40);
+                    toggle.PerformClick(); await WaitForThemeWipe(form, output, "to-light");
                     Assert(!AppTheme.IsDark && !ThemeSettings.ReadDark() && toggle.Text == "Dark mode", "the toggle switches and saves light mode immediately");
                     Assert(manager.BackColor == AppTheme.Canvas && rename.Checked && query.Text == "An edited artwork search" && list.SelectedAlbum.Key == selected && !form.CanInstallUpdate,
                         "theme changes update existing tool windows while preserving their options, selection, query and staged cover");
                     using (var bitmap = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "light-mode.png"), ImageFormat.Png); }
                     manager.Close();
-                    toggle.PerformClick(); await Task.Delay(40);
+                    toggle.PerformClick(); await WaitForThemeWipe(form, output, "to-dark");
                     Assert(AppTheme.IsDark && ThemeSettings.ReadDark() && toggle.Text == "Light mode", "the toggle switches back to dark mode and saves it");
                     using (var bitmap = new Bitmap(form.Width, form.Height)) { form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "dark-mode.png"), ImageFormat.Png); }
                 }

@@ -46,6 +46,7 @@ internal static partial class Tests
             OnlineTests().GetAwaiter().GetResult();
             UpdateTests().GetAwaiter().GetResult();
             foreach (var path in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) RoundTrip(path);
+            PerformanceTests();
             ManagementTests();
             ArtistRulesTests(); DuplicateTests();
             foreach (var path in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) ArtistRoundTrip(path);

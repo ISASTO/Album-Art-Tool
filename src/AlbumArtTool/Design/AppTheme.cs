@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace AlbumArtTool.Design
@@ -40,10 +42,16 @@ namespace AlbumArtTool.Design
         }
         internal static void DrawBrandMark(Graphics graphics, Rectangle rectangle)
         { graphics.InterpolationMode = InterpolationMode.HighQualityBicubic; graphics.DrawImage(brandMark, rectangle); }
-        internal static bool SetDark(bool dark, bool persist = true)
+        internal static bool SetDark(bool dark, bool persist = true, bool animate = false)
         {
             if (dark != IsDark)
             {
+                var transitions = new List<ThemeTransition>();
+                if (animate && ThemeTransition.MotionAllowed)
+                    foreach (var reference in openWindows.ToArray())
+                        if (reference.TryGetTarget(out var visible) && !visible.IsDisposed)
+                            try { var layer = ThemeTransition.Prepare(visible); if (layer != null) transitions.Add(layer); }
+                            catch (Exception e) when (e is ArgumentException || e is ExternalException || e is InvalidOperationException || e is OutOfMemoryException) { }
                 var previous = palette; palette = new ThemePalette(dark);
                 var colors = new Dictionary<int, Color>(); var before = previous.Colors; var after = palette.Colors;
                 for (int i = 0; i < before.Length; i++) colors[before[i].ToArgb()] = after[i];
@@ -55,6 +63,9 @@ namespace AlbumArtTool.Design
                     windows.GetValue(form, _ => new WindowStyle()).Updated?.Invoke();
                     form.Invalidate(true);
                 }
+                foreach (var transition in transitions)
+                    try { transition.Start(); }
+                    catch (Exception e) when (e is ArgumentException || e is ExternalException || e is InvalidOperationException || e is OutOfMemoryException) { transition.Finish(); }
             }
             return !persist || ThemeSettings.SaveDark(dark);
         }

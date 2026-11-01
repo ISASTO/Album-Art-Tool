@@ -15,6 +15,8 @@ namespace AlbumArtTool.Core
             if (!info.Exists) throw new FileNotFoundException("The file no longer exists.", path);
             return new FileStamp { Length = info.Length, ModifiedUtc = info.LastWriteTimeUtc };
         }
+        internal static FileStamp FromInfo(FileInfo info) => new FileStamp { Length = info.Length, ModifiedUtc = info.LastWriteTimeUtc };
+        internal bool Same(FileStamp other) => other != null && Length == other.Length && ModifiedUtc == other.ModifiedUtc;
         public bool Matches(string path)
         {
             var info = new FileInfo(path);
@@ -74,6 +76,9 @@ namespace AlbumArtTool.Core
         public List<string> Issues { get; } = new List<string>();
         public int FilesRead { get; set; }
         public bool Cancelled { get; set; }
+        internal int CachedFiles { get; set; }
+        internal int FilesOpened { get; set; }
+        internal int ArtworkImagesDecoded { get; set; }
     }
 
     public sealed class ProgressInfo
