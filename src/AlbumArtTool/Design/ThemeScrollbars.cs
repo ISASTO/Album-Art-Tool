@@ -76,7 +76,9 @@ namespace AlbumArtTool.Design
             if (!GetScrollBarInfo(Handle, vertical ? -5 : -6, ref info) || (info.States[0] & 0x18000) != 0) return Rectangle.Empty;
             var bounds = Rectangle.FromLTRB(info.Bounds.Left - window.Left, info.Bounds.Top - window.Top, info.Bounds.Right - window.Left, info.Bounds.Bottom - window.Top);
             if (bounds.Width < 1 || bounds.Height < 1) return Rectangle.Empty;
-            using (var background = new SolidBrush(Surface)) graphics.FillRectangle(background, bounds);
+            // Include the one-pixel system edge so the channel does not retain a box.
+            var channel = Rectangle.Intersect(Rectangle.Inflate(bounds, 1, 1), new Rectangle(0, 0, window.Right - window.Left, window.Bottom - window.Top));
+            using (var background = new SolidBrush(Surface)) graphics.FillRectangle(background, channel);
             var pointer = Cursor.Position; pointer.Offset(-window.Left, -window.Top);
             bool active = owner.Enabled && (bounds.Contains(pointer) || (info.States[3] & 8) != 0);
             int thickness = Math.Min(vertical ? bounds.Width - 4 : bounds.Height - 4, AppTheme.Scale(owner, active ? 8 : 6));
