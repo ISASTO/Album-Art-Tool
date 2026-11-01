@@ -188,6 +188,7 @@ internal static partial class Tests
     }
     private static void ManagementGuiSmoke(string output)
     {
+        guiStage = "management rendering"; Console.WriteLine(guiStage);
         string root = NewFolder("manager-gui"), backups = NewFolder("manager-gui-backups"), folder = Path.Combine(root, "BENEE", "BENEE", "2020", "Hey u x"); Directory.CreateDirectory(folder);
         string file = CopyTrack(folder, "01 - Happen to Me.flac", "Hey u x", "BENEE"); AddRectangleArt(file); SetFilenameTitle(file, "Happen to Me");
         File.Copy(file, Path.Combine(folder, "01 - Happen to Me (1).flac"));
@@ -258,9 +259,13 @@ internal static partial class Tests
                 catch (Exception ex)
                 {
                     using (var screen = ScreenImage(new Rectangle(form.Location, form.Size))) screen.Save(Path.Combine(output, "manager-render-failure.png"), ImageFormat.Png);
-                    failure = ex;
+                    Console.Error.WriteLine(ex); failure = ex;
                 }
-                finally { form.Close(); }
+                finally
+                {
+                    if (form.IsWorking) typeof(LibraryManagerWindow).GetMethod("SetWorking", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(form, new object[] { false });
+                    form.Close();
+                }
             };
             Application.Run(form);
         }
