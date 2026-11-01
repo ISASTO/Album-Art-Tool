@@ -14,6 +14,7 @@ using AlbumArtTool.Core;
 internal static partial class Tests
 {
     private static int assertions;
+    private static string guiStage = "initial checks";
     private static readonly Scanner Scanner = new Scanner();
     private static readonly CoverEditor Editor = new CoverEditor();
     private static readonly byte[] Cover = MakeCover(Color.Teal);
@@ -28,11 +29,19 @@ internal static partial class Tests
         fixtures = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fixtures");
         workspace = Path.Combine(Path.GetTempPath(), "AlbumArtTool-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
+        System.Threading.Timer watchdog = null;
         try
         {
             if (args.Length > 0 && args[0] == "--live-search") return LiveSearch(args.Length > 1 ? args[1] : workspace).GetAwaiter().GetResult();
             if (args.Length > 0 && args[0] == "--live-update") return LiveUpdateTest().GetAwaiter().GetResult();
             if (args.Length > 0 && args[0] == "--live-encoder") return LiveEncoderSetup().GetAwaiter().GetResult();
+            watchdog = new System.Threading.Timer(_ =>
+            {
+                Console.Error.WriteLine("FAIL: UI watchdog at " + guiStage);
+                string output = args.Length > 0 ? args[0] : workspace; Directory.CreateDirectory(output);
+                using (var screen = ScreenImage(Screen.PrimaryScreen.Bounds)) screen.Save(Path.Combine(output, "ui-watchdog.png"), ImageFormat.Png);
+                Environment.Exit(1);
+            }, null, 120000, System.Threading.Timeout.Infinite);
             ThemePreferenceTests();
             OnlineTests().GetAwaiter().GetResult();
             UpdateTests().GetAwaiter().GetResult();
@@ -51,7 +60,7 @@ internal static partial class Tests
             return 0;
         }
         catch (Exception e) { Console.Error.WriteLine(e); return 1; }
-        finally { try { Directory.Delete(workspace, true); } catch { } }
+        finally { watchdog?.Dispose(); try { Directory.Delete(workspace, true); } catch { } }
     }
 
     private static void Assert(bool condition, string message)

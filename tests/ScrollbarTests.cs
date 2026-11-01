@@ -58,6 +58,7 @@ internal static partial class Tests
     }
     private static void OtherScrollControlsGuiSmoke(string output)
     {
+        guiStage = "construct other scrolling controls"; Console.WriteLine(guiStage);
         Exception failure = null;
         using (var form = new Form { Text = "Other scrolling controls", StartPosition = FormStartPosition.CenterScreen, ClientSize = new Size(900, 660), Font = new Font("Segoe UI", 10) })
         {
@@ -74,7 +75,7 @@ internal static partial class Tests
             }
             text.Lines = Enumerable.Range(1, 200).Select(n => "Details line " + n + ": " + new string('x', 120)).ToArray();
             layout.Controls.Add(queue, 0, 0); layout.Controls.Add(tree, 1, 0); layout.Controls.Add(text, 0, 1); layout.Controls.Add(flow, 1, 1);
-            form.Controls.Add(layout); AppTheme.Apply(form);
+            form.Controls.Add(layout); guiStage = "apply other scrolling themes"; Console.WriteLine(guiStage); AppTheme.Apply(form); guiStage = "show other scrolling controls"; Console.WriteLine(guiStage);
             form.Shown += async (s, e) =>
             {
                 try
@@ -82,6 +83,7 @@ internal static partial class Tests
                     await Task.Delay(80);
                     foreach (var control in new Control[] { queue, tree, text, flow })
                     {
+                        guiStage = "scroll " + control.GetType().Name; Console.WriteLine(guiStage);
                         var host = ThemeScrollbars.For(control);
                         Console.WriteLine("SCROLL CONTROL " + control.GetType().Name + " client=" + control.ClientSize + " viewport=" + host.VisibleContent.Size + " bar=" + host.VerticalBar.Visible);
                         Assert(host.VerticalBar.Visible && control.ClientSize == host.VisibleContent.Size, control.GetType().Name + " keeps its native scrollbar outside the visible viewport");
