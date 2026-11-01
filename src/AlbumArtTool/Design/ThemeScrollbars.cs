@@ -95,16 +95,20 @@ namespace AlbumArtTool.Design
                 // with the content's CLIENT size equal to the clipped viewport size.
                 for (int pass = 0; pass < 6; pass++)
                 {
-                    viewport.Bounds = new Rectangle(0, 0, Math.Max(1, ClientSize.Width - (showVertical ? gutter : 0)), Math.Max(1, ClientSize.Height - (showHorizontal ? gutter : 0)));
+                    var viewBounds = new Rectangle(0, 0, Math.Max(1, ClientSize.Width - (showVertical ? gutter : 0)), Math.Max(1, ClientSize.Height - (showHorizontal ? gutter : 0)));
+                    if (viewport.Bounds != viewBounds) viewport.Bounds = viewBounds;
                     int extraWidth = Math.Max(0, content.Width - content.ClientSize.Width), extraHeight = Math.Max(0, content.Height - content.ClientSize.Height);
-                    content.Bounds = new Rectangle(0, 0, viewport.Width + extraWidth, viewport.Height + extraHeight);
+                    var contentBounds = new Rectangle(0, 0, viewport.Width + extraWidth, viewport.Height + extraHeight);
+                    if (content.Bounds != contentBounds) content.Bounds = contentBounds;
                     var v = Read(true); var h = Read(false);
                     bool nextV = v.Scrollable && NativeBarVisible(true), nextH = h.Scrollable && NativeBarVisible(false);
                     if (nextV == showVertical && nextH == showHorizontal && content.ClientSize == viewport.Size) break;
                     showVertical = nextV; showHorizontal = nextH;
                 }
-                vertical.Bounds = new Rectangle(viewport.Right, 0, gutter, viewport.Height);
-                horizontal.Bounds = new Rectangle(0, viewport.Bottom, viewport.Width, gutter);
+                var verticalBounds = new Rectangle(viewport.Right, 0, gutter, viewport.Height);
+                var horizontalBounds = new Rectangle(0, viewport.Bottom, viewport.Width, gutter);
+                if (vertical.Bounds != verticalBounds) vertical.Bounds = verticalBounds;
+                if (horizontal.Bounds != horizontalBounds) horizontal.Bounds = horizontalBounds;
                 vertical.Visible = showVertical; horizontal.Visible = showHorizontal;
                 vertical.Enabled = horizontal.Enabled = content.Enabled;
                 vertical.SetMetrics(Read(true)); horizontal.SetMetrics(Read(false));
@@ -160,7 +164,9 @@ namespace AlbumArtTool.Design
             else if (isVertical && content is TextBox)
                 SendMessage(content.Handle, 0x00B6, IntPtr.Zero, (IntPtr)delta); // EM_LINESCROLL, lines
             else ScrollNative(isVertical, target);
-            Sync(); content.Invalidate(); content.Update();
+            Sync();
+            if (content is ScrollableControl) content.Invalidate(true); // Let transparent flow children repaint through the message loop.
+            else { content.Invalidate(); content.Update(); }
         }
         private void ScrollNative(bool isVertical, int target)
         {
