@@ -36,6 +36,7 @@ namespace AlbumArtTool.Core
         public int Bitrate { get; set; }
         public string Codec { get; set; }
         public bool Lossless { get; set; }
+        public bool HasVideo { get; set; }
         public TimeSpan Duration { get; set; }
         public bool HasTitleTag { get; set; }
         public long AudioStart { get; set; } = -1;

@@ -75,7 +75,7 @@ namespace AlbumArtTool.Management
         }
         internal static bool ShouldConvert(Track track, LibraryOptions options)
         {
-            if (!options.Convert) return false;
+            if (!options.Convert || track.HasVideo) return false;
             bool mp3 = Path.GetExtension(track.Path).Equals(".mp3", StringComparison.OrdinalIgnoreCase);
             return mp3 ? track.Bitrate > 320 : track.Lossless || track.Bitrate > 320 || options.ConvertOtherLossy;
         }
@@ -129,7 +129,8 @@ namespace AlbumArtTool.Management
                     if (row.Convert) row.Target = Path.ChangeExtension(row.Target, ".mp3");
                     LibraryPaths.Safe(row.Target, options.Root);
                     if (row.Target.Length > 250) throw new IOException("The organized path is longer than 250 characters. Shorten the artist/album/file names first.");
-                    if (!row.Convert && options.Convert) row.Reason = (row.Reason ?? "") + (track.Lossless ? "" : " Existing MP3/lower-bitrate lossy audio is not re-encoded.");
+                    if (track.HasVideo && options.Convert) row.Reason = "This file has video; automatic audio conversion is skipped.";
+                    if (!track.HasVideo && !row.Convert && options.Convert) row.Reason = (row.Reason ?? "") + (track.Lossless ? "" : " Existing MP3/lower-bitrate lossy audio is not re-encoded.");
                     actions.Add(track.Path, row);
                 }
                 catch (Exception e) when (Scanner.IsFileError(e) || Artwork.IsImageError(e)) { plan.Issues.Add(track.Path + ": " + e.Message); }
@@ -141,7 +142,7 @@ namespace AlbumArtTool.Management
                 var confirmed = matches.Songs.Where(g => g.Confirmed).Select(g => g.Tracks.ToArray()).ToList();
                 // Other containers can be confirmed by FFmpeg's demuxed packet hash when the encoder is available.
                 if (!string.IsNullOrEmpty(options.EncoderPath))
-                    foreach (var group in tracks.Where(t => !new[] { ".mp3", ".flac" }.Contains(Path.GetExtension(t.Path).ToLowerInvariant())).GroupBy(t => SongKey(t, albumFor[t.Path])).Where(g => g.Count() > 1))
+                    foreach (var group in tracks.Where(t => !t.HasVideo && !new[] { ".mp3", ".flac" }.Contains(Path.GetExtension(t.Path).ToLowerInvariant())).GroupBy(t => SongKey(t, albumFor[t.Path])).Where(g => g.Count() > 1))
                     {
                         token.ThrowIfCancellationRequested();
                         var hashes = new List<Tuple<Track, string>>();

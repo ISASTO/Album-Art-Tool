@@ -46,6 +46,7 @@ internal static partial class Tests
         Assert(Artwork.Square(cropped).SequenceEqual(cropped), "already-square artwork remains byte identical");
         foreach (string extension in new[] { ".mp3", ".m4a" })
             Assert(!LibraryPaths.ShouldConvert(new Track { Path = "x" + extension, Bitrate = 256 }, new LibraryOptions { Convert = true }), "default conversion does not upscale lower-bitrate lossy " + extension);
+        Assert(!LibraryPaths.ShouldConvert(new Track { Path = "video.mp4", HasVideo = true, Bitrate = 500 }, new LibraryOptions { Convert = true, ConvertOtherLossy = true }), "video containers are not silently replaced with audio-only files");
         Assert(!LibraryPaths.ShouldConvert(new Track { Path = "x.mp3", Bitrate = 320 }, new LibraryOptions { Convert = true }), "existing MP3 320 is not re-encoded");
         Assert(LibraryPaths.ShouldConvert(new Track { Path = "x.flac", Bitrate = 100, Lossless = true }, new LibraryOptions { Convert = true }), "lossless source is convertible even at a low compressed bitrate");
         Assert(LibraryPaths.ShouldConvert(new Track { Path = "x.m4a", Bitrate = 400 }, new LibraryOptions { Convert = true }), "over-320 lossy source is convertible");

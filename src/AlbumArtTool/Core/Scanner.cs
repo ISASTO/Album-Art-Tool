@@ -60,7 +60,7 @@ namespace AlbumArtTool.Core
                             album.Tracks.Add(new Track { Path = path, Title = file.Tag.Title ?? Path.GetFileNameWithoutExtension(path),
                                 Performer = file.Tag.FirstPerformer ?? "", Performers = file.Tag.Performers.ToArray(), AlbumArtists = file.Tag.AlbumArtists.ToArray(),
                                 AlbumTitle = file.Tag.Album ?? "", Disc = file.Tag.Disc, DiscCount = file.Tag.DiscCount, Number = file.Tag.Track,
-                                Bitrate = file.Properties.AudioBitrate,
+                                Bitrate = file.Properties.AudioBitrate, HasVideo = (file.Properties.MediaTypes & TagLib.MediaTypes.Video) != 0,
                                 Codec = string.Join("; ", file.Properties.Codecs.Where(c => c != null).Select(c => c.Description)),
                                 Lossless = Lossless(path, string.Join(" ", file.Properties.Codecs.Where(c => c != null).Select(c => c.Description)), file.InvariantStartPosition),
                                 Duration = file.Properties.Duration, HasTitleTag = !string.IsNullOrWhiteSpace(file.Tag.Title),
