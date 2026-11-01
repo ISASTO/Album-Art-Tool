@@ -44,6 +44,12 @@ jobs:
         run: |
           & tests/bin/Release/net48/AlbumArtTool.Tests.exe --live-update
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify in-app FFmpeg download, checksum, licenses and launch
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          & tests/bin/Release/net48/AlbumArtTool.Tests.exe --live-encoder
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Package portable executable
         shell: pwsh
         run: |

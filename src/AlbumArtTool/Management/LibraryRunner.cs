@@ -166,18 +166,20 @@ namespace AlbumArtTool.Management
         internal static void Copy(string source, string target, CancellationToken token)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(target));
+            bool created = false;
             try
             {
                 using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 {
+                    created = true;
                     var buffer = new byte[65536]; int count;
                     while ((count = input.Read(buffer, 0, buffer.Length)) > 0) { token.ThrowIfCancellationRequested(); output.Write(buffer, 0, count); }
                     output.Flush(true);
                 }
                 File.SetLastWriteTimeUtc(target, File.GetLastWriteTimeUtc(source));
             }
-            catch { try { File.Delete(target); } catch { } throw; }
+            catch { if (created) try { File.Delete(target); } catch { } throw; }
         }
         internal static int Undo(LibraryJournal journal, CancellationToken token, IProgress<ProgressInfo> progress = null, ISet<JournalEntry> selected = null)
         {

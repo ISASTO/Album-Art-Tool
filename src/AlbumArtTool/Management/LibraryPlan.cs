@@ -112,7 +112,8 @@ namespace AlbumArtTool.Management
                     if (options.Organize)
                     {
                         var album = albumFor[track.Path];
-                        string artist = ArtistRules.Specific(album.TaggedArtist) ? album.TaggedArtist : !string.IsNullOrEmpty(album.MainArtist) ? album.MainArtist : track.Performer;
+                        string artist = !string.IsNullOrWhiteSpace(album.TaggedArtist) && !album.TaggedArtist.Equals("Unknown artist", StringComparison.OrdinalIgnoreCase) ? album.TaggedArtist :
+                            !string.IsNullOrEmpty(album.MainArtist) ? album.MainArtist : album.Artist.Equals("Various artists", StringComparison.OrdinalIgnoreCase) ? "Various Artists" : track.Performer;
                         if (!ArtistRules.Specific(artist) && album.Artist.Equals("Various artists", StringComparison.OrdinalIgnoreCase)) artist = "Various Artists";
                         string folder = LibraryPaths.Component(artist), title = LibraryPaths.Component(track.AlbumTitle);
                         if (folder.Length == 0 || title.Length == 0) row.Reason = "Organization skipped: missing usable Artist/Album tags.";
@@ -208,8 +209,9 @@ namespace AlbumArtTool.Management
                 if (destination != null && Regex.IsMatch(Path.GetFileName(destination), @"^Disc \d+$")) destination = Path.GetDirectoryName(destination);
                 if (destination == null && contained.Length > 0)
                 { string keeper = actions[contained[0].Path].Keeper; if (keeper != null && actions.ContainsKey(keeper)) destination = Path.GetDirectoryName(actions[keeper].Target); }
-                if (destination == null) continue;
-                foreach (string path in WalkFiles(source, token))
+                if (destination != null && Regex.IsMatch(Path.GetFileName(destination), @"^Disc \d+$")) destination = Path.GetDirectoryName(destination);
+                if (destination == null || live.Any(a => !BackupSettings.Within(a.Target, destination))) continue;
+                foreach (string path in WalkFiles(source, token, issues: plan.Issues))
                 {
                     if (!assetExtensions.Contains(Path.GetExtension(path)) || actions.ContainsKey(path)) continue;
                     string relative = path.Substring(source.TrimEnd(Path.DirectorySeparatorChar).Length + 1);
@@ -220,21 +222,24 @@ namespace AlbumArtTool.Management
                 }
             }
         }
-        internal static IEnumerable<string> WalkFiles(string root, CancellationToken token, bool includeBackups = false)
+        internal static IEnumerable<string> WalkFiles(string root, CancellationToken token, bool includeBackups = false, List<string> issues = null)
         {
             var pending = new Stack<string>(); pending.Push(root);
             while (pending.Count > 0)
             {
                 token.ThrowIfCancellationRequested(); string folder = pending.Pop();
-                foreach (string file in Directory.GetFiles(folder)) { token.ThrowIfCancellationRequested(); if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) == 0) yield return file; }
-                foreach (string child in Directory.GetDirectories(folder))
+                string[] children, found;
+                try { found = Directory.GetFiles(folder); children = Directory.GetDirectories(folder); }
+                catch (Exception e) when (Scanner.IsFileError(e)) { issues?.Add(folder + ": " + e.Message); continue; }
+                foreach (string file in found) { token.ThrowIfCancellationRequested(); if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) == 0) yield return file; }
+                foreach (string child in children)
                     if ((File.GetAttributes(child) & (FileAttributes.ReparsePoint | FileAttributes.System)) == 0 &&
                         (includeBackups || Path.GetFileName(child) != ".album-art-backups") && !BackupSettings.Within(child, BackupSettings.Root)) pending.Push(child);
             }
         }
         private static void AddOldBackups(LibraryPlan plan, CancellationToken token)
         {
-            foreach (string path in WalkFiles(plan.Options.Root, token, true))
+            foreach (string path in WalkFiles(plan.Options.Root, token, true, plan.Issues))
                 if (path.Split(Path.DirectorySeparatorChar).Any(s => s.Equals(".album-art-backups", StringComparison.OrdinalIgnoreCase)) ||
                     Path.GetFileName(path).Contains(".before-square-crop") || Path.GetFileName(path).StartsWith(".covercrop-tmp-", StringComparison.OrdinalIgnoreCase))
                     plan.Actions.Add(new LibraryAction { Source = path, Archive = true, Stamp = FileStamp.Read(path), Reason = "Old tool backup moved off the active music tree." });

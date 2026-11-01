@@ -61,8 +61,8 @@ namespace AlbumArtTool.Core
                                 Performer = file.Tag.FirstPerformer ?? "", Performers = file.Tag.Performers.ToArray(), AlbumArtists = file.Tag.AlbumArtists.ToArray(),
                                 AlbumTitle = file.Tag.Album ?? "", Disc = file.Tag.Disc, DiscCount = file.Tag.DiscCount, Number = file.Tag.Track,
                                 Bitrate = file.Properties.AudioBitrate,
-                                Codec = string.Join("; ", file.Properties.Codecs.Select(c => c.Description)),
-                                Lossless = Lossless(path, string.Join(" ", file.Properties.Codecs.Select(c => c.Description))),
+                                Codec = string.Join("; ", file.Properties.Codecs.Where(c => c != null).Select(c => c.Description)),
+                                Lossless = Lossless(path, string.Join(" ", file.Properties.Codecs.Where(c => c != null).Select(c => c.Description)), file.InvariantStartPosition),
                                 Duration = file.Properties.Duration, HasTitleTag = !string.IsNullOrWhiteSpace(file.Tag.Title),
                                 AudioStart = file.InvariantStartPosition, AudioEnd = file.InvariantEndPosition,
                                 SampleRate = file.Properties.AudioSampleRate, Channels = file.Properties.AudioChannels,
@@ -192,11 +192,21 @@ namespace AlbumArtTool.Core
 
         internal static bool TemporaryOrBackup(string name) => name.StartsWith(".aat-", StringComparison.OrdinalIgnoreCase) ||
             name.StartsWith(".__mp3convert_", StringComparison.OrdinalIgnoreCase) || name.Contains(".before-square-crop") || name.StartsWith(".covercrop-tmp-", StringComparison.OrdinalIgnoreCase);
-        private static bool Lossless(string path, string codec)
+        private static bool Lossless(string path, string codec, long start)
         {
             string ext = Path.GetExtension(path).ToLowerInvariant(); codec = codec.ToLowerInvariant();
+            if (ext == ".wv")
+            {
+                using (var stream = System.IO.File.OpenRead(path))
+                {
+                    stream.Position = Math.Max(0, start); var header = new byte[32];
+                    if (stream.Read(header, 0, header.Length) == header.Length && System.Text.Encoding.ASCII.GetString(header, 0, 4) == "wvpk")
+                        return (BitConverter.ToUInt32(header, 24) & 8) == 0; // WavPack HYBRID_FLAG
+                }
+                return false;
+            }
             return new[] { ".flac", ".ape", ".tta", ".dsf" }.Contains(ext) ||
-                codec.Contains("lossless") || codec.Contains("pcm") || ext == ".wv" && !codec.Contains("hybrid");
+                codec.Contains("lossless") || codec.Contains("pcm");
         }
 
         public static bool IsFileError(Exception e) => e is IOException || e is UnauthorizedAccessException || e is System.Security.SecurityException || e is NotSupportedException;

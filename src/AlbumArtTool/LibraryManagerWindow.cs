@@ -95,7 +95,7 @@ namespace AlbumArtTool
         }
         private void UpdateApply()
         {
-            apply.Enabled = !IsWorking && files.CheckedItems.Cast<ListViewItem>().Any(i => i.Tag is LibraryAction a && a.HasWork || i.Tag is JournalEntry);
+            apply.Enabled = !IsWorking && (plan != null || undoJournal != null) && files.CheckedItems.Cast<ListViewItem>().Any(i => i.Tag is LibraryAction a && a.HasWork || i.Tag is JournalEntry);
             apply.Text = undoJournal != null ? "Undo selected changes" : "Apply selected changes";
         }
         private IProgress<ProgressInfo> Reporter()
