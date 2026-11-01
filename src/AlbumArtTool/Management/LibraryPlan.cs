@@ -153,6 +153,8 @@ namespace AlbumArtTool.Management
                 foreach (var match in confirmed)
                     foreach (var logical in match.Where(t => actions.ContainsKey(t.Path)).GroupBy(t => SongKey(t, albumFor[t.Path])).Where(g => g.Count() > 1))
                     {
+                        if (logical.Where(t => t.Disc > 0).Select(t => t.Disc).Distinct().Take(2).Count() > 1 ||
+                            logical.Where(t => t.Number > 0).Select(t => t.Number).Distinct().Take(2).Count() > 1) continue;
                         var keep = logical.OrderByDescending(t => t.HasCover).ThenBy(t => Regex.IsMatch(Path.GetFileNameWithoutExtension(t.Path), @"(?i)(\(\d+\)|copy|duplicate)$") ? 1 : 0)
                             .ThenBy(t => t.Path.Length).ThenBy(t => t.Path, StringComparer.OrdinalIgnoreCase).First();
                         string keepHash = CoverEditor.Hash(keep.Path);
@@ -186,7 +188,7 @@ namespace AlbumArtTool.Management
             if (string.IsNullOrEmpty(artist)) artist = string.IsNullOrWhiteSpace(album.TaggedArtist) ? track.Performer : album.TaggedArtist;
             string title = track.HasTitleTag ? track.Title : Regex.Replace(Path.GetFileNameWithoutExtension(track.Path), @"(?i)\s*(\(\d+\)|[-_ ]+(copy|duplicate))\s*$", "");
             // Repeated audio in different albums or different titled/numbered tracks is kept.
-            return ArtistRules.Normalize(artist) + "\u001f" + ArtistRules.Normalize(track.AlbumTitle) + "\u001f" + track.Disc + "\u001f" + track.Number + "\u001f" + ArtistRules.Normalize(title);
+            return ArtistRules.Normalize(artist) + "\u001f" + ArtistRules.Normalize(track.AlbumTitle) + "\u001f" + ArtistRules.Normalize(title);
         }
         private static void AddAssets(LibraryPlan plan, ScanResult scan, Dictionary<string, LibraryAction> actions, HashSet<string> reserved, CancellationToken token)
         {

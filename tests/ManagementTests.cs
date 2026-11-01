@@ -10,6 +10,7 @@ using System.Windows.Forms;
 using AlbumArtTool;
 using AlbumArtTool.Core;
 using AlbumArtTool.Management;
+using Encoder = AlbumArtTool.Management.Encoder;
 
 internal static partial class Tests
 {
@@ -51,7 +52,7 @@ internal static partial class Tests
         Assert(LibraryPaths.ShouldConvert(new Track { Path = "x.m4a", Bitrate = 128 }, new LibraryOptions { Convert = true, ConvertOtherLossy = true }), "explicit compatibility mode converts other non-MP3 audio");
         Assert(LibraryPaths.Component("AC/DC: Live?") == "AC_DC- Live_" && LibraryPaths.Component("CON") == "_CON", "Windows folder names are sanitized without creating extra directory levels");
         foreach (string fixture in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p)))) SquareRoundTrip(fixture);
-        ManagementCombined(); ManagementConflicts(); ManagementStaleAndCancel();
+        ManagementCombined(); ManagementConflicts(); ManagementStaleAndCancel(); ManagementRecovery();
     }
     private static void SquareRoundTrip(string fixture)
     {
@@ -138,6 +139,22 @@ internal static partial class Tests
         }
         options.BackupRoot = Path.Combine(root, "bad-backups");
         Assert(Throws(() => LibraryPlanner.Build(options, CancellationToken.None)), "backups inside the active music/player tree are rejected");
+    }
+    private static void ManagementRecovery()
+    {
+        string root = NewFolder("manager-recovery"), backups = NewFolder("manager-recovery-backup");
+        string first = CopyTrack(root, "one.mp3"), target = Path.Combine(root, "Nested", "one.mp3");
+        var journal = new LibraryJournal { Root = root, Directory = Path.Combine(backups, "run") }; journal.Save();
+        Directory.CreateDirectory(BackupSettings.AppData); File.WriteAllText(LibraryJournal.LastFile, journal.FilePath);
+        var entry = new JournalEntry { Index = 0, Source = first, Target = target, OriginalHash = CoverEditor.Hash(first), WrittenHash = CoverEditor.Hash(first), MoveOnly = true, State = "Prepared" };
+        journal.Entries.Add(entry); journal.Save(entry);
+        Directory.CreateDirectory(Path.GetDirectoryName(target)); File.Move(first, target);
+        File.AppendAllText(Path.Combine(journal.Directory, "events.jsonl"), "{unfinished");
+        var recovered = LibraryJournal.Last();
+        Assert(recovered.Entries.Count == 1 && recovered.Entries[0].State == "Prepared", "recovery replays write-ahead records and ignores a partially written tail");
+        Assert(LibraryRunner.Undo(recovered, CancellationToken.None) == 1 && File.Exists(first) && !File.Exists(target), "Undo recovers a move interrupted before its final completion record");
+        string other = Path.Combine(root, "must-keep.txt"); File.WriteAllText(other, "keep");
+        Assert(Throws(() => LibraryRunner.Copy(first, other, CancellationToken.None)) && File.ReadAllText(other) == "keep", "failed CreateNew copy never deletes an existing destination");
     }
     private static async Task<int> LiveEncoderSetup()
     {

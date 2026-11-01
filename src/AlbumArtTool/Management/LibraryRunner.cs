@@ -12,6 +12,7 @@ namespace AlbumArtTool.Management
     internal sealed class JournalEntry
     {
         public JournalEntry() { }
+        public int Index { get; set; }
         public string Source { get; set; }
         public string Target { get; set; }
         public string Backup { get; set; }
@@ -32,12 +33,29 @@ namespace AlbumArtTool.Management
         public bool Stopped { get; set; }
         internal string FilePath => Path.Combine(Directory, "journal.json");
         internal static string LastFile => Path.Combine(BackupSettings.AppData, "last-library-run.txt");
-        internal void Save()
+        internal void Save(JournalEntry changed = null)
         {
             System.IO.Directory.CreateDirectory(Directory);
+            var serializer = new JavaScriptSerializer { MaxJsonLength = 64 * 1024 * 1024 };
+            if (changed != null)
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(serializer.Serialize(changed) + "\n");
+                using (var stream = new FileStream(Path.Combine(Directory, "events.jsonl"), FileMode.Append, FileAccess.Write, FileShare.Read))
+                { stream.Write(bytes, 0, bytes.Length); stream.Flush(true); }
+                return;
+            }
             string temporary = FilePath + ".tmp";
-            File.WriteAllText(temporary, new JavaScriptSerializer { MaxJsonLength = 64 * 1024 * 1024 }.Serialize(this), new UTF8Encoding(false));
+            File.WriteAllText(temporary, serializer.Serialize(this), new UTF8Encoding(false));
             if (File.Exists(FilePath)) File.Replace(temporary, FilePath, null); else File.Move(temporary, FilePath);
+            try { File.Delete(Path.Combine(Directory, "events.jsonl")); } catch { }
+            try
+            {
+                string Csv(string text) => "\"" + (text ?? "").Replace("\"", "\"\"") + "\"";
+                var lines = new List<string> { "Status,Source,Destination,Original backup,Error" };
+                lines.AddRange(Entries.Select(e => string.Join(",", new[] { e.State, e.Source, e.Target, e.Backup, e.Error }.Select(Csv))));
+                File.WriteAllLines(Path.Combine(Directory, "report.csv"), lines, new UTF8Encoding(true));
+            }
+            catch (IOException) { } // An open report must not prevent durable journal updates.
         }
         internal static LibraryJournal Last()
         {
@@ -45,6 +63,28 @@ namespace AlbumArtTool.Management
             string path = File.ReadAllText(LastFile); if (!File.Exists(path) || new FileInfo(path).Length > 64 * 1024 * 1024) return null;
             var journal = new JavaScriptSerializer { MaxJsonLength = 64 * 1024 * 1024 }.Deserialize<LibraryJournal>(File.ReadAllText(path));
             if (!Path.GetFullPath(path).Equals(journal.FilePath, StringComparison.OrdinalIgnoreCase)) throw new IOException("The backup journal path does not match its contents.");
+            string events = Path.Combine(journal.Directory, "events.jsonl");
+            if (File.Exists(events))
+            {
+                var lines = File.ReadAllLines(events);
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    if (string.IsNullOrWhiteSpace(lines[i])) continue;
+                    JournalEntry entry;
+                    try { entry = new JavaScriptSerializer().Deserialize<JournalEntry>(lines[i]); }
+                    catch
+                    {
+                        if (i == lines.Length - 1)
+                        {
+                            string repaired = events + ".repair";
+                            File.WriteAllLines(repaired, lines.Take(i), new UTF8Encoding(false)); File.Replace(repaired, events, null); break;
+                        }
+                        throw new IOException("The saved operation log is damaged. Review original backups before restoring manually.");
+                    }
+                    if (entry.Index < 0 || entry.Index > journal.Entries.Count) throw new IOException("The saved operation log has an invalid entry number.");
+                    if (entry.Index == journal.Entries.Count) journal.Entries.Add(entry); else journal.Entries[entry.Index] = entry;
+                }
+            }
             return journal;
         }
     }
@@ -62,7 +102,7 @@ namespace AlbumArtTool.Management
             foreach (var row in selected)
             {
                 if (token.IsCancellationRequested) { journal.Stopped = true; break; }
-                var entry = new JournalEntry { Source = row.Source, Target = row.Archive ? null : row.Target, Archive = row.Archive,
+                var entry = new JournalEntry { Index = journal.Entries.Count, Source = row.Source, Target = row.Archive ? null : row.Target, Archive = row.Archive,
                     MoveOnly = !row.Archive && !row.Convert && !row.Square, State = "Preparing" };
                 journal.Entries.Add(entry);
                 string temp = null; bool changed = false;
@@ -83,13 +123,13 @@ namespace AlbumArtTool.Management
                     }
                     if (row.Archive)
                     {
-                        entry.WrittenHash = null; entry.State = "Prepared"; journal.Save();
+                        entry.WrittenHash = null; entry.State = "Prepared"; journal.Save(entry);
                         CheckOriginal(entry); if (row.Keeper != null) VerifyKeeper(row, completed);
                         File.Delete(row.Source); changed = true;
                     }
                     else if (entry.MoveOnly)
                     {
-                        entry.WrittenHash = entry.OriginalHash; entry.State = "Prepared"; journal.Save();
+                        entry.WrittenHash = entry.OriginalHash; entry.State = "Prepared"; journal.Save(entry);
                         Directory.CreateDirectory(Path.GetDirectoryName(row.Target)); LibraryPaths.Safe(row.Target, options.Root);
                         CheckOriginal(entry); File.Move(row.Source, row.Target); changed = true;
                     }
@@ -102,12 +142,12 @@ namespace AlbumArtTool.Management
                                 Message = "MP3 320 · " + (done + 1) + "/" + selected.Length + " · " + Path.GetFileName(row.Source) }));
                         else Copy(row.Source, temp, token);
                         if (row.Square) SquarePictures(temp);
-                        entry.WrittenHash = CoverEditor.Hash(temp); entry.State = "Prepared"; journal.Save();
+                        entry.WrittenHash = CoverEditor.Hash(temp); entry.State = "Prepared"; journal.Save(entry);
                         token.ThrowIfCancellationRequested(); CheckOriginal(entry);
                         if (row.Source.Equals(row.Target, StringComparison.OrdinalIgnoreCase)) { File.Replace(temp, row.Source, null); changed = true; }
                         else
                         {
-                            File.Move(temp, row.Target); changed = true; entry.State = "TargetCreated"; journal.Save();
+                            File.Move(temp, row.Target); changed = true; entry.State = "TargetCreated"; journal.Save(entry);
                             try { CheckOriginal(entry); File.Delete(row.Source); }
                             catch
                             {
@@ -117,16 +157,16 @@ namespace AlbumArtTool.Management
                             }
                         }
                     }
-                    entry.State = "Committed"; journal.Save(); completed[row.Source] = entry;
+                    entry.State = "Committed"; journal.Save(entry); completed[row.Source] = entry;
                 }
                 catch (OperationCanceledException)
                 {
-                    entry.State = changed ? "TargetCreated" : "Cancelled"; journal.Stopped = true; journal.Save(); break;
+                    entry.State = changed ? "TargetCreated" : "Cancelled"; journal.Stopped = true; journal.Save(entry); break;
                 }
                 catch (Exception e)
                 {
                     entry.Error = e.Message; entry.State = changed ? "TargetCreated" : "Failed";
-                    journal.Issues.Add(row.Source + ": " + e.Message); journal.Save();
+                    journal.Issues.Add(row.Source + ": " + e.Message); journal.Save(entry);
                 }
                 finally { if (temp != null) try { File.Delete(temp); } catch { } }
                 progress?.Report(new ProgressInfo { Completed = ++done, Total = selected.Length, Message = done + "/" + selected.Length + " changes processed" });
@@ -216,20 +256,31 @@ namespace AlbumArtTool.Management
                         }
                         else { if (!originalExists) RestoreBackup(entry, false, token); if (targetExists) File.Delete(entry.Target); }
                     }
-                    entry.State = "Restored"; entry.Error = null; journal.Save(); restored++;
+                    entry.State = "Restored"; entry.Error = null; journal.Save(entry); restored++;
                 }
-                catch (Exception e) when (Scanner.IsFileError(e)) { entry.Error = e.Message; journal.Issues.Add("Undo " + entry.Source + ": " + e.Message); journal.Save(); }
+                catch (Exception e) when (Scanner.IsFileError(e)) { entry.Error = e.Message; journal.Issues.Add("Undo " + entry.Source + ": " + e.Message); journal.Save(entry); }
                 progress?.Report(new ProgressInfo { Completed = ++done, Total = entries.Length, Message = done + "/" + entries.Length + " changes checked for Undo" });
             }
             RemoveEmptySourceFolders(journal.Root, entries.Where(e => e.State == "Restored" && e.Target != null).Select(e => e.Target));
-            return restored;
+            journal.Save(); return restored;
         }
         private static void RestoreBackup(JournalEntry entry, bool replace, CancellationToken token)
         {
             if (entry.Backup == null || CoverEditor.Hash(entry.Backup) != entry.OriginalHash) throw new IOException("The verified original backup is missing or changed.");
             Directory.CreateDirectory(Path.GetDirectoryName(entry.Source));
             string temp = Path.Combine(Path.GetDirectoryName(entry.Source), ".aat-restore-" + Guid.NewGuid().ToString("N") + Path.GetExtension(entry.Source));
-            try { Copy(entry.Backup, temp, token); if (replace) File.Replace(temp, entry.Source, null); else File.Move(temp, entry.Source); }
+            try
+            {
+                Copy(entry.Backup, temp, token);
+                if (replace)
+                {
+                    string hash = CoverEditor.Hash(entry.Source);
+                    if (hash == entry.OriginalHash) return;
+                    if (hash != entry.WrittenHash) throw new IOException("The file changed while Undo was preparing its restore. It was kept.");
+                    File.Replace(temp, entry.Source, null);
+                }
+                else File.Move(temp, entry.Source);
+            }
             finally { try { File.Delete(temp); } catch { } }
         }
         private static void RemoveEmptySourceFolders(string root, IEnumerable<string> files)
