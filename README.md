@@ -1,6 +1,6 @@
 # Album Art Tool
 
-A small, portable Windows app for finding and fixing album covers, with built-in online artwork search.
+A small, portable Windows app for album covers, duplicate scanning, and track artist cleanup, with built-in online artwork search.
 
 **[Download the Windows app](https://github.com/ISASTO/Album-Art-Tool/releases/latest)** · Single portable EXE.
 
@@ -27,6 +27,28 @@ No installer, accounts, API keys or background service. Online suggestions use t
 Scanning first counts supported music files using directory listings, without reading audio tags. It then shows a filling progress bar, a percentage, and an exact counter such as **2751/3867 tracks scanned**. Files that fail to open still count as checked and appear in Details. The initial counting phase can also be stopped. Disabled options keep readable text on the dark background.
 
 [Scan progress preview](docs/scanning.png) · [Background queue preview](docs/queue.png)
+
+## Track artist cleanup
+
+Open **Track artists** to find albums whose track credits can be collapsed to the main artist. This tab includes albums with and without cover art. **Show → Artist cleanup available** lists albums with suggested changes; **Show → All albums in this tab** lets you review any album and enter an artist manually. **Sort → Artist changes first** puts albums with the most changes at the top. Artist/album and album-title sorting are also available.
+
+Select an album, review its current track artists, and edit **Main artist** if necessary. Click **Set artists on X tracks** to queue the change, then continue with another album. For your BENEE example, tracks credited to BENEE and guests become a single **BENEE** credit. The change sets both **Artist** and **Album artist** to the entered name; existing artist sort fields are updated too. Track titles, artwork, audio and other tags stay as they are.
+
+The suggestion uses a specific tagged album artist first, or a consistent lead artist across the tracks when album artist is missing or says Various Artists. A consistent band name such as **Earth, Wind & Fire** stays intact. Mixed-artist compilations without a consistent lead get no automatic suggestion; you can review them with the all-albums filter. Review inferred names before queueing.
+
+Artist jobs share the artwork queue, freeze the selected album/name at enqueue time, and use the same full-file backups, stale-file protection and **Undo last change**. Already-correct tracks are skipped. Failed writes are listed in Details. Artist cleanup does not rename or move files/folders. The cleanup filter removes an album once its artist fields match.
+
+## Find duplicate songs and albums
+
+After scanning a music folder, click **Find duplicates**. A separate window scans the successfully read tracks in that folder tree, with a progress bar, percentage, checked/total counter and Stop button. Album browsing remains available. **Open selected folder** takes you to a result's location, and **Save report** exports a CSV with paths and the evidence for each match. Start a new scan from the main window after rescanning the library to include newly added music.
+
+- **Confirmed song copies** have identical SHA-256 hashes of the entire file, or identical encoded MP3/FLAC audio data. MP3 tag blocks and FLAC metadata/artwork blocks are excluded from the audio comparison. Hover over a match to see which test confirmed it.
+- **Confirmed album copies** have the same complete set of verified song contents in different folders. A folder containing only part of an album is not labeled a complete copy. Repeated tracks count separately when comparing album contents.
+- **Possible song copies** match a tagged title, track artist and duration within two seconds. This can find different encodings and bitrates, but it can also include different recordings. **Possible album copies** match album/artist, track count, song titles, artists and durations. These require review.
+
+The scanner only reads music. It does **not** delete, move or select copies for removal. Repeated music on a compilation can be an intentional duplicate. Other codecs get whole-file verification and metadata comparisons; they do not get a claim of identical audio across retagging or re-encoding. MP3 and FLAC audio checks compare encoded data, not perceptual fingerprints, so a re-encode can appear only as a possible match. Missing, linked or changed files are skipped with an explanation. Backups and temporary editor files remain excluded.
+
+The first pass uses small audio samples and file sizes to find candidates; full hashes are then calculated for candidate files, rather than reading every complete song by default. The window uses a snapshot of the main library scan. If you change tags or covers while it is working, changed files are skipped; rescan the library and reopen the duplicate scanner to get current results. App installation waits for an active duplicate scan before restarting.
 
 ## App updates
 
@@ -106,7 +128,7 @@ $env:ALBUMART_FFMPEG = 'C:\path\to\ffmpeg.exe'
 tests/bin/Release/net48/AlbumArtTool.Tests.exe TestResults
 ```
 
-Tests also exercise provider parsing and ranking, unavailable sources, search caching, cancellation, bounded image-header checks, redirect validation, source resolutions, counted scan progress, direct folder-cover application, and the responsive work queue. Queue checks cover captured targets/options, preserved staged images, duplicate clicks, failures and clearing waiting work. Updater checks additionally verify release versions and checksums, rejected download redirects, cancellation, rollback, a real separate-process EXE replacement/restart, the reopened music-folder path, and scan/queue/staged-cover interlocks. A separate live GitHub check downloads the latest published EXE and verifies it without installing it. A separate live-service check reports source availability and downloads a real high-resolution cover; public-site outages do not fail the deterministic integration suite.
+Tests also exercise provider parsing and ranking, unavailable sources, search caching, cancellation, bounded image-header checks, redirect validation, source resolutions, counted scan progress, direct folder-cover application, and the responsive work queue. Queue checks cover captured targets/options, preserved staged images, duplicate clicks, failures and clearing waiting work. Library-tool tests cover artist inference, mixed compilations and band names, nine audio-format artist edits with decoded-audio and artwork preservation, exact Undo, shared queue behavior, eligible-album filters, confirmed file/audio/album copies, partial albums, possible matches, cancellation and read-only duplicate scans. Updater checks additionally verify release versions and checksums, rejected download redirects, cancellation, rollback, a real separate-process EXE replacement/restart, the reopened music-folder path, and scan/queue/staged-cover interlocks. A separate live GitHub check downloads the latest published EXE and verifies it without installing it. A separate live-service check reports source availability and downloads a real high-resolution cover; public-site outages do not fail the deterministic integration suite.
 
 Tests verify audio decoding hashes before/after edits, existing metadata, exact backup restoration, partial albums, corrupt files, stale scans, read-only files, folder images, preserved back covers, cancellation, GUI tab behavior and cover previews. CI additionally opens the isolated EXE with no adjacent DLLs to check the portable dependency loader. Test audio fixtures are short synthesized tones, generated by `tests/generate_fixtures.py`; they contain no copyrighted music. FFmpeg and Python are test tools only and are not included in the app.
 

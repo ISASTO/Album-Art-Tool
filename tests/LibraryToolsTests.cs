@@ -177,7 +177,7 @@ internal static partial class Tests
                     { dialog.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(output, "duplicates.png"), ImageFormat.Png); }
                     dialog.Close();
                 }
-                catch (Exception e) { failure = e; }
+                catch (Exception ex) { failure = ex; }
                 finally { service.Release.TrySetResult(true); form.ClearWaitingJobs(); await form.QueueCompletion; form.Close(); }
             };
             Application.Run(form);
