@@ -28,7 +28,7 @@ internal static partial class Tests
         foreach (var example in examples) Assert(TitleCleanup.Clean(example.Key) == example.Value, "featured-title rule: " + example.Key);
         foreach (string extension in Directory.GetFiles(fixtures).Where(p => Scanner.Extensions.Contains(Path.GetExtension(p))).Select(Path.GetExtension))
             AlbumCleanupRoundTrip(extension);
-        ManyDiscs(); DiscTitleVariants(); CleanupWithoutTitleTags(); PartialMergeSelection();
+        ManyDiscs(); DiscTitleVariants(); CleanupWithoutTitleTags(); PartialMergeSelection(); CombinedAlbumCleanup();
     }
     private static string DiscTrack(string folder, string filename, uint disc, uint number, string title, string album = "A multi-disc album")
     {
@@ -109,6 +109,33 @@ internal static partial class Tests
         var options = Options(root, NewFolder("merge-selection-backups")); options.CombineDiscs = true;
         var plan = LibraryPlanner.Build(options, CancellationToken.None); var before = TreeHashes(root); plan.Actions.First(a => a.MergeDiscs).Selected = false;
         Assert(Throws(() => LibraryRunner.Run(plan, CancellationToken.None)) && before.All(p => CoverEditor.Hash(root + p.Key) == p.Value), "incomplete album selection is rejected before any merge changes a file");
+    }
+    private static void CombinedAlbumCleanup()
+    {
+        string root = NewFolder("combined-album-cleanup"), album = Path.Combine(root, "Nested", "A multi-disc album");
+        string first = DiscTrack(Path.Combine(album, "Disc 1"), "one.flac", 1, 1, "One (feat. Guest)");
+        string second = DiscTrack(Path.Combine(album, "Disc 2"), "two.flac", 2, 1, "Two (FT Guest)");
+        AddRectangleArt(first); AddRectangleArt(second);
+        File.Copy(second, Path.Combine(Path.GetDirectoryName(second), "two (1).flac"));
+        File.WriteAllText(Path.Combine(album, "booklet.pdf"), "A booklet"); var original = TreeHashes(root);
+        var options = Options(root, NewFolder("combined-album-cleanup-backups"));
+        options.Convert = options.Square = options.Duplicates = options.Organize = options.RenameFromTitle = options.CombineDiscs = options.RemoveFeaturedTitles = true;
+        var plan = LibraryPlanner.Build(options, CancellationToken.None);
+        Assert(plan.Actions.Count(a => a.MergeDiscs) == 2 && plan.Actions.Count(a => a.Archive) == 1 && plan.Actions.Where(a => a.MergeDiscs).All(a => a.Convert && a.Square && a.NewTitle != null),
+            "disc merging, title cleanup, cropping, conversion, organization and duplicate removal preview together");
+        var journal = LibraryRunner.Run(plan, CancellationToken.None);
+        Assert(journal.Issues.Count == 0, "all album operations run together without failed writes: " + string.Join(";", journal.Issues));
+        string target = Path.Combine(root, "Example artist", "A multi-disc album");
+        foreach (string path in Directory.GetFiles(target, "*.mp3"))
+            using (var file = TagLib.File.Create(path))
+            {
+                Assert(file.Tag.DiscCount == 1 && file.Tag.TrackCount == 2 && !file.Tag.Title.Contains("feat") && !file.Tag.Title.Contains("FT") && file.Properties.AudioBitrate >= 318,
+                    "combined output has one numbered album, clean titles and MP3 320 audio");
+                foreach (var picture in file.Tag.Pictures) using (var image = Artwork.Decode(picture.Data.Data)) Assert(image.Width == image.Height, "combined output retains all cropped embedded pictures");
+            }
+        Assert(Directory.GetFiles(target, "*.mp3").Length == 2 && File.Exists(Path.Combine(target, "booklet.pdf")), "the combined album contains only the retained songs and its booklet");
+        Assert(LibraryRunner.Undo(LibraryJournal.Last(), CancellationToken.None) == journal.Entries.Count && original.Count == TreeHashes(root).Count && original.All(p => CoverEditor.Hash(root + p.Key) == p.Value),
+            "one persistent Undo restores the exact pre-conversion, pre-merge and pre-cleanup library");
     }
     private static void AlbumCleanupGuiSmoke(string output)
     {
