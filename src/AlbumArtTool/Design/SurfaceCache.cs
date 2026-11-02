@@ -21,6 +21,7 @@ namespace AlbumArtTool.Design
                 var replacement = new Bitmap(control.ClientSize.Width, control.ClientSize.Height, PixelFormat.Format24bppRgb);
                 try
                 {
+                    using (PaintTrace.Measure("Generate " + control.GetType().Name))
                     using (var graphics = Graphics.FromImage(replacement))
                     using (var paint = new PaintEventArgs(graphics, control.ClientRectangle)) render(paint);
                 }
@@ -29,7 +30,7 @@ namespace AlbumArtTool.Design
             }
             var clip = Rectangle.Intersect(control.ClientRectangle, Rectangle.Ceiling(e.Graphics.VisibleClipBounds));
             clip.Intersect(e.ClipRectangle);
-            if (clip.Width > 0 && clip.Height > 0) e.Graphics.DrawImage(image, clip, clip, GraphicsUnit.Pixel);
+            if (clip.Width > 0 && clip.Height > 0) using (PaintTrace.Measure("Copy backdrop")) e.Graphics.DrawImage(image, clip, clip, GraphicsUnit.Pixel);
         }
         private static ulong Key(Control control, int variant)
         {

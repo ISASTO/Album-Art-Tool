@@ -36,6 +36,8 @@ namespace AlbumArtTool
         protected override void OnPaintBackground(PaintEventArgs pevent) { /* Parent material is painted below, with rounded transparent edges. */ }
         protected override void OnPaint(PaintEventArgs e)
         {
+            using (PaintTrace.Measure("Button paint"))
+            {
             if (Parent != null)
             {
                 var saved = e.Graphics.Save(); e.Graphics.TranslateTransform(-Left, -Top);
@@ -66,6 +68,7 @@ namespace AlbumArtTool
             if (Focused && ShowFocusCues)
                 using (var path = AppTheme.Rounded(new RectangleF(2, 2, Width - 4, Height - 6), Math.Max(1, radius - 1)))
                 using (var pen = new Pen(Primary ? Color.White : AppTheme.Accent, 1.5f)) e.Graphics.DrawPath(pen, path);
+                    }
         }
         protected override void Dispose(bool disposing) { if (disposing) animation.Dispose(); base.Dispose(disposing); }
     }

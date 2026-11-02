@@ -22,7 +22,7 @@ namespace AlbumArtTool.Design
                 clip.Width * image.Width / bounds.Width, clip.Height * image.Height / bounds.Height);
             var saved = graphics.Save();
             graphics.InterpolationMode = InterpolationMode.Bilinear; graphics.PixelOffsetMode = PixelOffsetMode.Half;
-            graphics.DrawImage(image, clip, source, GraphicsUnit.Pixel); graphics.Restore(saved);
+            using (PaintTrace.Measure("Scale canvas")) graphics.DrawImage(image, clip, source, GraphicsUnit.Pixel); graphics.Restore(saved);
         }
         private static Bitmap Create(bool isDark)
         {
