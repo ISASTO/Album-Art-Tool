@@ -7,7 +7,7 @@ namespace AlbumArtTool.Design
 {
     // Transparent WinForms children ask their ancestors to paint again. Generate
     // the expensive, smooth canvas material once per palette, never per child or
-    // resize step. The small shared images have a constant ~2.3 MB memory cost.
+    // resize step. The small shared images have a constant ~3 MB memory cost.
     internal static class CanvasMaterial
     {
         private static readonly Lazy<Bitmap> dark = new Lazy<Bitmap>(() => Create(true));
@@ -21,12 +21,12 @@ namespace AlbumArtTool.Design
             var source = new RectangleF((clip.X - bounds.X) * image.Width / bounds.Width, (clip.Y - bounds.Y) * image.Height / bounds.Height,
                 clip.Width * image.Width / bounds.Width, clip.Height * image.Height / bounds.Height);
             var saved = graphics.Save();
-            graphics.InterpolationMode = InterpolationMode.Bilinear; graphics.PixelOffsetMode = PixelOffsetMode.Half;
+            graphics.InterpolationMode = InterpolationMode.NearestNeighbor; graphics.PixelOffsetMode = PixelOffsetMode.Half;
             using (PaintTrace.Measure("Scale canvas")) graphics.DrawImage(image, clip, source, GraphicsUnit.Pixel); graphics.Restore(saved);
         }
         private static Bitmap Create(bool isDark)
         {
-            var image = new Bitmap(768, 512, PixelFormat.Format24bppRgb);
+            var image = new Bitmap(768, 512, PixelFormat.Format32bppPArgb);
             using (var graphics = Graphics.FromImage(image))
             {
                 using (var fill = new LinearGradientBrush(new Rectangle(Point.Empty, image.Size), isDark ? Color.FromArgb(23, 31, 45) : Color.FromArgb(235, 241, 252),

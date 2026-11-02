@@ -29,11 +29,14 @@ internal static partial class Tests
                 {
                     await Task.Delay(50);
                     var toggle = Descendants(form).OfType<Button>().Single(b => b.AccessibleName == "Toggle light and dark mode");
-                    var clock = Stopwatch.StartNew(); toggle.PerformClick();
+                    Assert(ThemeTransition.MotionAllowed, "the real-button performance check enables Windows client-area animations");
+                    var clock = Stopwatch.StartNew(); toggle.PerformClick(); double coldMs = clock.Elapsed.TotalMilliseconds;
                     Console.WriteLine("ACTUAL TOGGLE cold: click handler=" + clock.Elapsed.TotalMilliseconds.ToString("F1") + "ms; controls=" + Descendants(form).Count() + "; source-hit=" + ThemeTransition.For(form)?.BeforeCached + "; target-hit=" + ThemeTransition.For(form)?.AfterCached + ".");
                     await Task.Delay(280);
-                    clock.Restart(); toggle.PerformClick();
+                    clock.Restart(); toggle.PerformClick(); double repeatMs = clock.Elapsed.TotalMilliseconds;
                     Console.WriteLine("ACTUAL TOGGLE return: click handler=" + clock.Elapsed.TotalMilliseconds.ToString("F1") + "ms; source-hit=" + ThemeTransition.For(form)?.BeforeCached + "; target-hit=" + ThemeTransition.For(form)?.AfterCached + ".");
+                    Assert(ThemeTransition.For(form)?.BeforeCached == true && ThemeTransition.For(form)?.AfterCached == true, "the real theme button reuses both rendered views on a return switch");
+                    Assert(coldMs < 250 && repeatMs < 100, "real theme-button handlers stay within cold/warm responsiveness budgets");
                     await Task.Delay(280);
                     double total = 0, worst = 0, layout = 0, painting = 0;
                     var counts = new Dictionary<string, int>(); var times = new Dictionary<string, double>();
@@ -47,6 +50,7 @@ internal static partial class Tests
                     foreach (var pair in times.OrderByDescending(p => p.Value)) Console.WriteLine("RESIZE PROFILE " + pair.Key + ": " + pair.Value.ToString("F1") + "ms in " + counts[pair.Key] + " calls.");
                     Console.WriteLine("RESIZE PHASES: layout=" + (layout / 8).ToString("F1") + "ms; painting=" + (painting / 8).ToString("F1") + "ms.");
                     Console.WriteLine("ACTUAL RESIZE 8 painted steps to " + form.ClientSize + ": average=" + (total / 8).ToString("F1") + "ms; worst=" + worst.ToString("F1") + "ms.");
+                    Assert(total / 8 < 65 && worst < 100, "full-window resizing stays within the measured repaint responsiveness budget");
                     Assert(AppTheme.IsDark && toggle.Enabled, "real theme clicks and resize retain an interactive main window");
                 }
                 catch (Exception ex) { failure = ex; }

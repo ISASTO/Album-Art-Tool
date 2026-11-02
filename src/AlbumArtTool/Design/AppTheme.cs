@@ -124,7 +124,7 @@ namespace AlbumArtTool.Design
         }
         private static Bitmap MakeGrain()
         {
-            var bitmap = new Bitmap(64, 64); var random = new Random(418);
+            var bitmap = new Bitmap(64, 64, System.Drawing.Imaging.PixelFormat.Format32bppPArgb); var random = new Random(418);
             for (int y = 0; y < 64; y++) for (int x = 0; x < 64; x++) bitmap.SetPixel(x, y, Color.FromArgb(random.Next(0, 5), 67, 84, 115));
             return bitmap;
         }
