@@ -18,7 +18,10 @@ namespace AlbumArtTool.Design
         private readonly Timer timer = new Timer { Interval = 16 };
         private readonly Stopwatch clock = new Stopwatch();
         private bool finished;
-        internal const int Duration = 440;
+        private ThemeWipeBuffer wipe;
+        internal bool BeforeCached { get; private set; }
+        internal bool AfterCached { get; private set; }
+        internal const int Duration = 180;
         internal double Position => Math.Min(1, clock.Elapsed.TotalMilliseconds / Duration);
         internal static bool MotionAllowed
         {
@@ -32,10 +35,17 @@ namespace AlbumArtTool.Design
         {
             if (!form.Visible || form.WindowState == FormWindowState.Minimized || form.ClientSize.Width < 1 || form.ClientSize.Height < 1) return null;
             ThemeTransition previous = form.Controls.OfType<ThemeTransition>().FirstOrDefault();
-            AppTheme.PrepareSurface(form);
-            Bitmap image = previous == null ? CaptureRoots(form) : previous.CurrentImage();
-            previous?.Finish();
-            var layer = new ThemeTransition(form, image);
+            ulong key = ThemeSnapshotCache.Key(form);
+            Bitmap image = previous?.CurrentImage();
+            bool cached = false;
+            if (image == null) { image = ThemeSnapshotCache.Get(form, key, AppTheme.IsDark); cached = image != null; }
+            if (image == null)
+            {
+                AppTheme.PrepareSurface(form); key = ThemeSnapshotCache.Key(form);
+                image = CaptureRoots(form); ThemeSnapshotCache.Store(form, key, AppTheme.IsDark, image);
+            }
+            previous?.Finish(false);
+            var layer = new ThemeTransition(form, image) { BeforeCached = cached };
             try { form.Controls.Add(layer); layer.BringToFront(); layer.Refresh(); return layer; }
             catch { layer.Finish(); throw; }
         }
@@ -50,17 +60,24 @@ namespace AlbumArtTool.Design
         internal void Start()
         {
             if (IsDisposed) return;
-            try { AppTheme.PrepareSurface(form); after = CaptureRoots(form); clock.Start(); timer.Start(); Invalidate(); }
+            try
+            {
+                AppTheme.PrepareSurface(form);
+                ulong key = ThemeSnapshotCache.Key(form);
+                after = ThemeSnapshotCache.Get(form, key, AppTheme.IsDark); AfterCached = after != null;
+                if (after == null) { after = CaptureRoots(form); ThemeSnapshotCache.Store(form, key, AppTheme.IsDark, after); }
+                wipe = new ThemeWipeBuffer(before, after); clock.Start(); timer.Start(); Invalidate();
+            }
             catch { Finish(); throw; }
         }
         private void Resizing(object sender, EventArgs e) => Finish();
-        internal void Finish()
+        internal void Finish(bool reveal = true)
         {
             if (finished) return; finished = true; timer.Stop();
             form.ResizeBegin -= Resizing;
             if (Parent != null) Parent.Controls.Remove(this);
             Dispose();
-            if (!form.IsDisposed && !form.Disposing) { form.Invalidate(true); form.Update(); }
+            if (reveal && !form.IsDisposed && !form.Disposing) { form.Invalidate(true); form.Update(); }
         }
         private static Bitmap CaptureRoots(Form form)
         {
@@ -89,31 +106,11 @@ namespace AlbumArtTool.Design
             graphics.DrawImageUnscaled(before, 0, 0);
             if (after == null || position <= 0) return;
             if (position >= 1) { graphics.DrawImageUnscaled(after, 0, 0); return; }
-            double eased = position * position * (3 - 2 * position);
-            int band = Math.Max(100, before.Width / 5);
-            double edge = -band + eased * (before.Width + 2 * band);
-            int solid = Math.Max(0, Math.Min(before.Width, (int)edge));
-            if (solid > 0) graphics.DrawImage(after, new Rectangle(0, 0, solid, before.Height), new Rectangle(0, 0, solid, before.Height), GraphicsUnit.Pixel);
-            using (var attributes = new ImageAttributes())
-            {
-                int strips = band;
-                for (int n = 0; n < strips; n++)
-                {
-                    int left = Math.Max(0, (int)Math.Floor(edge + band * n / (double)strips));
-                    int right = Math.Min(before.Width, (int)Math.Floor(edge + band * (n + 1) / (double)strips));
-                    if (right <= left) continue;
-                    double t = (n + .5) / strips;
-                    float alpha = (float)(1 - t * t * (3 - 2 * t));
-                    var matrix = new ColorMatrix { Matrix33 = alpha };
-                    attributes.SetColorMatrix(matrix);
-                    var slice = new Rectangle(left, 0, right - left, before.Height);
-                    graphics.DrawImage(after, slice, left, 0, slice.Width, slice.Height, GraphicsUnit.Pixel, attributes);
-                }
-            }
+            wipe.Draw(graphics, position);
         }
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { timer.Dispose(); form.ResizeBegin -= Resizing; before?.Dispose(); after?.Dispose(); before = after = null; }
+            if (disposing) { timer.Dispose(); form.ResizeBegin -= Resizing; wipe?.Dispose(); wipe = null; before?.Dispose(); after?.Dispose(); before = after = null; }
             base.Dispose(disposing);
         }
         [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]

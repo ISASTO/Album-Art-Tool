@@ -40,12 +40,16 @@ internal static partial class Tests
                             frame.Save(Path.Combine(output, "theme-wipe-frame-" + (int)(t * 100) + ".png"), ImageFormat.Png);
                             if (t == .5) Assert(frame.GetPixel(8, 8).R > 200 && frame.GetPixel(frame.Width - 8, 8).R < 80, "the middle frame is a spatial dark-to-light wipe across native controls, not a staggered control repaint");
                         }
+                    // A cached image must not survive a changed view. Include a
+                    // same-count row edit and selection change, not just resizing.
                     await Task.Delay(150);
                     using (var screen = ScreenImage(form.RectangleToScreen(form.ClientRectangle))) screen.Save(Path.Combine(output, "theme-wipe-live.png"), ImageFormat.Png);
+                    input.Text = "A different selected album"; list.Items[0].Text = "A changed track title"; list.Items[2].Selected = false; list.Items[3].Selected = true;
                     var reverse = ThemeTransition.Prepare(form); AppTheme.SetDark(true, false); reverse.Start();
+                    Assert(!reverse.AfterCached, "changed text, same-count list rows and selection invalidate the opposite snapshot");
                     Assert(form.Controls.OfType<ThemeTransition>().Count() == 1, "reversing a theme change replaces its layer instead of stacking overlays");
                     for (int n = 0; n < 100 && form.Controls.OfType<ThemeTransition>().Any(); n++) await Task.Delay(20);
-                    Assert(!form.Controls.OfType<ThemeTransition>().Any() && input.Text == "Keep this staged input" && list.Items[2].Selected,
+                    Assert(!form.Controls.OfType<ThemeTransition>().Any() && input.Text == "A different selected album" && list.Items[3].Selected,
                         "the animation cleans up its buffers and reveals working controls with their state intact");
                 }
                 catch (Exception ex) { failure = ex; }

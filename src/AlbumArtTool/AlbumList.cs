@@ -21,6 +21,7 @@ namespace AlbumArtTool
         internal event Action<Album, string> CoverDropped;
         internal Album SelectedAlbum => SelectedIndices.Count == 0 ? null : albums[SelectedIndices[0]];
         internal int AlbumCount => albums.Count;
+        internal Album AlbumAt(int index) => albums[index];
         internal Func<Album, string> WorkStatus { get; set; }
 
         internal AlbumList()

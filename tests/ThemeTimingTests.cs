@@ -40,6 +40,13 @@ internal static partial class Tests
                             "ms; frame=" + (clock.Elapsed.TotalMilliseconds / 12).ToString("F2") + "ms; duration=" + ThemeTransition.Duration + "ms.");
                     }
                     layer.Finish();
+                    clock.Restart(); var cached = ThemeTransition.Prepare(form); double cachedPrepare = clock.Elapsed.TotalMilliseconds;
+                    clock.Restart(); AppTheme.SetDark(true, false); double cachedRecolor = clock.Elapsed.TotalMilliseconds;
+                    clock.Restart(); cached.Start(); double cachedStart = clock.Elapsed.TotalMilliseconds;
+                    Console.WriteLine("THEME CACHED: prepare=" + cachedPrepare.ToString("F1") + "ms; recolor=" + cachedRecolor.ToString("F1") + "ms; target=" + cachedStart.ToString("F1") +
+                        "ms; source-hit=" + cached.BeforeCached + "; target-hit=" + cached.AfterCached + ".");
+                    Assert(cached.BeforeCached && cached.AfterCached, "unchanged large-window toggles reuse both rendered appearances");
+                    cached.Finish();
                     Assert(rows.Items.Count == 6500 && albums.AlbumCount == 700, "theme timing retains large-library contents");
                 }
                 catch (Exception ex) { failure = ex; }

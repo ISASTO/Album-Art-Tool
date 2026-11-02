@@ -75,7 +75,7 @@ namespace AlbumArtTool.Design
             if (colors.TryGetValue(control.BackColor.ToArgb(), out var fill)) control.BackColor = fill;
             if (control is LinkLabel link) { link.LinkColor = Accent; link.ActiveLinkColor = Ink; link.VisitedLinkColor = Accent; }
             if (control is TreeView tree) tree.LineColor = Border;
-            if (control is ListView list && !list.VirtualMode)
+            if (control is ListView list && !list.VirtualMode && !list.OwnerDraw)
             {
                 list.BeginUpdate();
                 foreach (ListViewItem item in list.Items)
@@ -83,6 +83,10 @@ namespace AlbumArtTool.Design
                 list.EndUpdate();
             }
         }
+        // Styled rows resolve their semantic color at paint time. Recoloring
+        // thousands of off-screen ListViewItems during a toggle is unnecessary.
+        private static readonly Color darkMuted = new ThemePalette(true).Muted, lightMuted = new ThemePalette(false).Muted;
+        internal static bool IsMuted(Color color) => color == darkMuted || color == lightMuted;
         internal static int Scale(Control c, int n) => Math.Max(1, (int)Math.Round(n * c.DeviceDpi / 96.0));
         internal static GraphicsPath Rounded(RectangleF r, float radius)
         {
@@ -232,7 +236,7 @@ namespace AlbumArtTool.Design
                 var text = e.Bounds; text.X += 10; text.Width = Math.Max(1, text.Width - 16);
                 if (e.ColumnIndex == 0 && list.CheckBoxes)
                 { DrawCheck(e.Graphics, new Rectangle(e.Bounds.Left + Scale(list, 4), e.Bounds.Top + (e.Bounds.Height - Scale(list, 14)) / 2, Scale(list, 14), Scale(list, 14)), e.Item.Checked, list.Enabled); text.X += Scale(list, 18); text.Width = Math.Max(1, text.Width - Scale(list, 18)); }
-                Color color = e.Item.ForeColor == Muted || !list.Enabled ? Muted : Ink;
+                Color color = IsMuted(e.Item.ForeColor) || !list.Enabled ? Muted : Ink;
                 TextRenderer.DrawText(e.Graphics, e.SubItem.Text, list.Font, text, color, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             };
         }
