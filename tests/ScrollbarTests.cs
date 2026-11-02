@@ -50,11 +50,15 @@ internal static partial class Tests
             {
                 Cursor.Position = vertical ? new Point(bounds.Left + bounds.Width / 2, bounds.Top + 12 + (bounds.Height - 19) * step / 6) :
                     new Point(bounds.Left + 12 + (bounds.Width - 19) * step / 6, bounds.Top + bounds.Height / 2);
-                await Task.Delay(25);
+                await Task.Delay(60);
             }
+            // Let the final real mouse-move message reach the captured control
+            // before releasing it; hosted Windows runners can coalesce pointer events.
+            await Task.Delay(120);
         }
         finally { mouse_event(4, 0, 0, 0, UIntPtr.Zero); }
         await Task.Delay(40);
+        Console.WriteLine("DRAG END " + (vertical ? "V" : "H") + " cursor=" + Cursor.Position + " scroll=" + bar.AccessibilityObject.Value);
     }
     private static void OtherScrollControlsGuiSmoke(string output)
     {
@@ -161,7 +165,7 @@ internal static partial class Tests
                     Assert(ScrollPosition(rows, false) > 100, "dragging the horizontal thumb scrolls wide track columns");
                     albums.SetAlbums(Enumerable.Range(1, 100000).Select(i => new Album { Key = i.ToString(), Title = "Album " + i, Artist = "Example artist" }));
                     await Task.Delay(60); await DragBar(albumHost.VerticalBar, true);
-                    Assert(albums.TopItem.Index > 90000, "thumb dragging reaches positions above 65,535 in a 100,000-album virtual library");
+                    Assert(albums.TopItem.Index > 90000, "thumb dragging reaches positions above 65,535 in a 100,000-album virtual library (top=" + albums.TopItem.Index + ")");
                     using (var screen = ScreenImage(new Rectangle(form.Location, form.Size))) screen.Save(Path.Combine(output, "scrollbars-dragged-large-library.png"), ImageFormat.Png);
                     for (int i = 0; i < 10; i++)
                     {
