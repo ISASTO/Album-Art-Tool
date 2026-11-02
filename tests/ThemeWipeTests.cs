@@ -31,7 +31,7 @@ internal static partial class Tests
                     // Exercise animation even if the CI desktop requests reduced
                     // motion; the real toggle separately honors that preference.
                     var layer = ThemeTransition.Prepare(form); AppTheme.SetDark(false, false); layer.Start();
-                    Assert(layer.Visible && layer.Bounds == form.ClientRectangle && form.Controls.GetChildIndex(layer) == 0, "a single opaque theme layer stays above every native child window");
+                    Assert(layer.Visible && layer.Bounds == form.RectangleToScreen(form.ClientRectangle) && layer.Owner == form, "a single opaque theme layer stays above every native child window");
                     Assert(input.BackColor == AppTheme.Input && input.Text == "Keep this staged input" && list.Items[2].Selected, "the next theme is ready underneath the wipe without losing edit or selection state");
                     foreach (double t in new[] { .0, .25, .5, .75, 1.0 })
                         using (var frame = new Bitmap(layer.Width, layer.Height))
@@ -47,9 +47,9 @@ internal static partial class Tests
                     input.Text = "A different selected album"; list.Items[0].Text = "A changed track title"; list.Items[2].Selected = false; list.Items[3].Selected = true;
                     var reverse = ThemeTransition.Prepare(form); AppTheme.SetDark(true, false); reverse.Start();
                     Assert(!reverse.AfterCached, "changed text, same-count list rows and selection invalidate the opposite snapshot");
-                    Assert(form.Controls.OfType<ThemeTransition>().Count() == 1, "reversing a theme change replaces its layer instead of stacking overlays");
-                    for (int n = 0; n < 100 && form.Controls.OfType<ThemeTransition>().Any(); n++) await Task.Delay(20);
-                    Assert(!form.Controls.OfType<ThemeTransition>().Any() && input.Text == "A different selected album" && list.Items[3].Selected,
+                    Assert(form.OwnedForms.OfType<ThemeTransition>().Count() == 1, "reversing a theme change replaces its layer instead of stacking overlays");
+                    for (int n = 0; n < 100 && ThemeTransition.For(form) != null; n++) await Task.Delay(20);
+                    Assert(ThemeTransition.For(form) == null && input.Text == "A different selected album" && list.Items[3].Selected,
                         "the animation cleans up its buffers and reveals working controls with their state intact");
                 }
                 catch (Exception ex) { failure = ex; }

@@ -145,11 +145,16 @@ namespace AlbumArtTool.Design
         internal static void PrepareSurface(Form form)
         {
             if (!form.IsHandleCreated || form.IsDisposed || form.Disposing) return;
+            SettleSurface(form);
+            form.Refresh();
+        }
+        internal static void SettleSurface(Form form)
+        {
+            if (!form.IsHandleCreated || form.IsDisposed || form.Disposing) return;
             form.PerformLayout();
             // Settle native client extents before the first paint or a task-state
             // change. Waiting for a posted sync can expose default-sized windows.
             foreach (var host in Snapshot(form).OfType<ThemeScrollbars>()) host.Sync();
-            form.Refresh();
         }
         internal static void ApplyTree(Control root)
         {

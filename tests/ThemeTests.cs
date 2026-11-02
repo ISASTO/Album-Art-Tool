@@ -26,10 +26,10 @@ internal static partial class Tests
     [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr parameter, IntPtr data);
     private static async Task WaitForThemeWipe(Form form, string output, string name)
     {
-        var layer = form.Controls.OfType<ThemeTransition>().FirstOrDefault();
+        var layer = ThemeTransition.For(form);
         if (ThemeTransition.MotionAllowed)
         {
-            Assert(layer != null && layer.Visible && layer.Bounds == form.ClientRectangle, "one transition surface covers every child control during a theme change");
+            Assert(layer != null && layer.Visible && layer.Bounds == form.RectangleToScreen(form.ClientRectangle), "one transition surface covers every child control during a theme change");
             using (var mid = new Bitmap(layer.Width, layer.Height))
             {
                 using (var graphics = Graphics.FromImage(mid)) layer.PaintFrame(graphics, .5);
@@ -40,8 +40,8 @@ internal static partial class Tests
                 Assert(Math.Abs(left.R - right.R) > 40, "the theme wipe simultaneously displays the new left side and the old right side");
             }
         }
-        for (int n = 0; n < 100 && form.Controls.OfType<ThemeTransition>().Any(); n++) await Task.Delay(20);
-        Assert(!form.Controls.OfType<ThemeTransition>().Any(), "the theme wipe finishes and releases its snapshot surface");
+        for (int n = 0; n < 100 && ThemeTransition.For(form) != null; n++) await Task.Delay(20);
+        Assert(ThemeTransition.For(form) == null, "the theme wipe finishes and releases its snapshot surface");
     }
     private static void ThemeGuiSmoke(string output)
     {

@@ -8,22 +8,9 @@ namespace AlbumArtTool.Design
     internal sealed class FrostCanvas : TableLayoutPanel
     {
         internal FrostCanvas() { DoubleBuffered = true; BackColor = AppTheme.Canvas; }
-        protected override void OnPaintBackground(PaintEventArgs e)
-        {
-            if (Width < 1 || Height < 1) return;
-            using (var fill = new LinearGradientBrush(ClientRectangle, AppTheme.IsDark ? Color.FromArgb(23, 31, 45) : Color.FromArgb(235, 241, 252), AppTheme.IsDark ? Color.FromArgb(23, 24, 34) : Color.FromArgb(246, 244, 250), 35)) e.Graphics.FillRectangle(fill, ClientRectangle);
-            Glow(e.Graphics, new Rectangle(-Width / 4, -Height / 3, Width, Height), Color.FromArgb(AppTheme.IsDark ? 12 : 30, 151, 187, 250));
-            Glow(e.Graphics, new Rectangle(Width / 2, 0, Width, Height), Color.FromArgb(AppTheme.IsDark ? 9 : 22, 181, 166, 238));
-        }
-        private static void Glow(Graphics g, Rectangle bounds, Color color)
-        {
-            using (var ellipse = new GraphicsPath())
-            {
-                ellipse.AddEllipse(bounds);
-                using (var brush = new PathGradientBrush(ellipse) { CenterColor = color, SurroundColors = new[] { Color.FromArgb(0, color) } }) g.FillPath(brush, ellipse);
-            }
-        }
+        protected override void OnPaintBackground(PaintEventArgs e) => CanvasMaterial.Draw(e.Graphics, ClientRectangle, AppTheme.IsDark);
     }
+
     internal class FrostPanel : Panel
     {
         internal int CornerRadius { get; set; } = 18;
