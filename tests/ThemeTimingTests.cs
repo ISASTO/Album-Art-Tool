@@ -35,9 +35,11 @@ internal static partial class Tests
                     {
                         clock.Restart();
                         for (int n = 1; n <= 12; n++) layer.PaintFrame(graphics, n / 14.0);
+                        double frameMs = clock.Elapsed.TotalMilliseconds / 12;
+                        Assert(frameMs < 50, "large-window gradient frames stay below the 50 ms rendering budget");
                         Console.WriteLine("THEME TIMING: 700 virtual albums / 6500 track rows / " + layer.Width + "x" + layer.Height +
                             "; prepare=" + prepare.ToString("F1") + "ms; recolor=" + recolor.ToString("F1") + "ms; target=" + start.ToString("F1") +
-                            "ms; frame=" + (clock.Elapsed.TotalMilliseconds / 12).ToString("F2") + "ms; duration=" + ThemeTransition.Duration + "ms.");
+                            "ms; frame=" + frameMs.ToString("F2") + "ms; duration=" + ThemeTransition.Duration + "ms.");
                     }
                     layer.Finish();
                     clock.Restart(); var cached = ThemeTransition.Prepare(form); double cachedPrepare = clock.Elapsed.TotalMilliseconds;

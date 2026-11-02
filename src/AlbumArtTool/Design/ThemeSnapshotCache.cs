@@ -70,6 +70,12 @@ namespace AlbumArtTool.Design
             if (control is PictureBox picture) { hash.Add(picture.Image == null ? 0 : RuntimeHelpers.GetHashCode(picture.Image)); hash.Add((int)picture.SizeMode); }
             if (control is ProgressBar progress) { hash.Add(progress.Value); hash.Add(progress.Minimum); hash.Add(progress.Maximum); hash.Add((int)progress.Style); }
             if (control is ScrollableControl scroll) { hash.Add(scroll.AutoScrollPosition.X); hash.Add(scroll.AutoScrollPosition.Y); }
+            if (control.IsHandleCreated && (control is ListView || control is ListBox || control is TreeView || control is TextBoxBase))
+                for (int bar = 0; bar < 2; bar++)
+                {
+                    var scrollInfo = new ScrollInfo { Size = Marshal.SizeOf(typeof(ScrollInfo)), Mask = 4 };
+                    hash.Add(GetScrollInfo(control.Handle, bar, ref scrollInfo) ? scrollInfo.Position : 0);
+                }
             if (control is ListView list) WriteList(list, hash);
             if (control is ListBox box)
             {
@@ -80,10 +86,10 @@ namespace AlbumArtTool.Design
             if (control is TreeView tree)
             {
                 var node = tree.TopNode; int remaining = tree.ClientSize.Height / Math.Max(1, tree.ItemHeight) + 2;
-                while (node != null && remaining-- > 0) { hash.Add(node.Text); hash.Add(node.Level); hash.Add(node.Checked); hash.Add(node.IsExpanded); hash.Add(node == tree.SelectedNode); node = node.NextVisibleNode; }
+                while (node != null && remaining-- > 0) { hash.Add(node.Text); hash.Add(node.Level); hash.Add(node.Nodes.Count); hash.Add(node.Checked); hash.Add(node.IsExpanded); hash.Add(node == tree.SelectedNode); node = node.NextVisibleNode; }
             }
-            foreach (Control child in control.Controls)
-                if (!(child is ThemeTransition)) Write(child, hash);
+            var children = control.Controls.Cast<Control>().Where(c => !(c is ThemeTransition)).ToArray();
+            hash.Add(children.Length); foreach (Control child in children) Write(child, hash);
         }
         private static void WriteList(ListView list, SceneHash hash)
         {
@@ -92,8 +98,7 @@ namespace AlbumArtTool.Design
             if (list.Items.Count == 0 || !list.IsHandleCreated) return;
             int top = list.TopItem?.Index ?? 0;
             int height = Math.Max(1, list.GetItemRect(top).Height), end = Math.Min(list.Items.Count, top + list.ClientSize.Height / height + 2);
-            hash.Add(top); var info = new ScrollInfo { Size = Marshal.SizeOf(typeof(ScrollInfo)), Mask = 4 };
-            if (GetScrollInfo(list.Handle, 0, ref info)) hash.Add(info.Position);
+            hash.Add(top);
             for (int n = top; n < end; n++)
             {
                 var item = list.Items[n]; hash.Add(item.Selected); hash.Add(item.Checked); hash.Add(AppTheme.IsMuted(item.ForeColor));
