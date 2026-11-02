@@ -55,6 +55,7 @@ internal static partial class Tests
             GuiSmoke(args.Length > 0 ? args[0] : workspace);
             ThemeGuiSmoke(args.Length > 0 ? args[0] : workspace);
             ThemeWipeGuiSmoke(args.Length > 0 ? args[0] : workspace);
+            ThemeTimingGuiSmoke();
             ScrollbarGuiSmoke(args.Length > 0 ? args[0] : workspace);
             QueueGuiSmoke(args.Length > 0 ? args[0] : workspace);
             LibraryToolsGuiSmoke(args.Length > 0 ? args[0] : workspace);
