@@ -7,15 +7,21 @@ namespace AlbumArtTool.Design
 {
     internal sealed class FrostCanvas : TableLayoutPanel
     {
+        private readonly SurfaceCache material = new SurfaceCache();
         internal FrostCanvas() { DoubleBuffered = true; BackColor = AppTheme.Canvas; }
-        protected override void OnPaintBackground(PaintEventArgs e) => CanvasMaterial.Draw(e.Graphics, ClientRectangle, AppTheme.IsDark);
+        protected override void OnPaintBackground(PaintEventArgs e) => material.Paint(this, e, PaintMaterial);
+        private void PaintMaterial(PaintEventArgs e) => CanvasMaterial.Draw(e.Graphics, ClientRectangle, AppTheme.IsDark);
+        protected override void Dispose(bool disposing) { if (disposing) material.Dispose(); base.Dispose(disposing); }
     }
 
     internal class FrostPanel : Panel
     {
+        private readonly SurfaceCache material = new SurfaceCache();
         internal int CornerRadius { get; set; } = 18;
         internal FrostPanel() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor | ControlStyles.ResizeRedraw, true); BackColor = Color.Transparent; Padding = new Padding(10); }
-        protected override void OnPaintBackground(PaintEventArgs e) { base.OnPaintBackground(e); AppTheme.Frost(e.Graphics, ClientRectangle, AppTheme.Scale(this, CornerRadius)); }
+        protected override void OnPaintBackground(PaintEventArgs e) => material.Paint(this, e, PaintMaterial, CornerRadius);
+        private void PaintMaterial(PaintEventArgs e) { base.OnPaintBackground(e); AppTheme.Frost(e.Graphics, ClientRectangle, AppTheme.Scale(this, CornerRadius)); }
+        protected override void Dispose(bool disposing) { if (disposing) material.Dispose(); base.Dispose(disposing); }
     }
     // Buffer each native list locally; compositing the whole details subtree can
     // leave owner-drawn rows stale until the mouse leaves a child window.
@@ -26,12 +32,14 @@ namespace AlbumArtTool.Design
     }
     internal sealed class InsetPanel : Panel
     {
+        private readonly SurfaceCache material = new SurfaceCache();
         internal InsetPanel()
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor | ControlStyles.ResizeRedraw, true);
             BackColor = Color.Transparent; Padding = new Padding(6); Margin = Padding.Empty; Dock = DockStyle.Fill;
         }
-        protected override void OnPaintBackground(PaintEventArgs e)
+        protected override void OnPaintBackground(PaintEventArgs e) => material.Paint(this, e, PaintMaterial);
+        private void PaintMaterial(PaintEventArgs e)
         {
             base.OnPaintBackground(e); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using (var shape = AppTheme.Rounded(new RectangleF(.5f, .5f, Math.Max(1, Width - 1), Math.Max(1, Height - 1)), AppTheme.Scale(this, 12)))
@@ -39,6 +47,7 @@ namespace AlbumArtTool.Design
             using (var edge = new Pen(AppTheme.Blend(AppTheme.Border, AppTheme.Inset, .55f)))
             { e.Graphics.FillPath(fill, shape); e.Graphics.DrawPath(edge, shape); }
         }
+        protected override void Dispose(bool disposing) { if (disposing) material.Dispose(); base.Dispose(disposing); }
     }
     internal sealed class InputFrame : Panel
     {

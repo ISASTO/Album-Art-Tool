@@ -25,10 +25,10 @@ internal static partial class Tests
                     await Task.Delay(50);
                     var toggle = Descendants(form).OfType<Button>().Single(b => b.AccessibleName == "Toggle light and dark mode");
                     var clock = Stopwatch.StartNew(); toggle.PerformClick();
-                    Console.WriteLine("ACTUAL TOGGLE cold: click handler=" + clock.Elapsed.TotalMilliseconds.ToString("F1") + "ms; controls=" + Descendants(form).Count() + ".");
+                    Console.WriteLine("ACTUAL TOGGLE cold: click handler=" + clock.Elapsed.TotalMilliseconds.ToString("F1") + "ms; controls=" + Descendants(form).Count() + "; source-hit=" + ThemeTransition.For(form)?.BeforeCached + "; target-hit=" + ThemeTransition.For(form)?.AfterCached + ".");
                     await Task.Delay(280);
                     clock.Restart(); toggle.PerformClick();
-                    Console.WriteLine("ACTUAL TOGGLE return: click handler=" + clock.Elapsed.TotalMilliseconds.ToString("F1") + "ms.");
+                    Console.WriteLine("ACTUAL TOGGLE return: click handler=" + clock.Elapsed.TotalMilliseconds.ToString("F1") + "ms; source-hit=" + ThemeTransition.For(form)?.BeforeCached + "; target-hit=" + ThemeTransition.For(form)?.AfterCached + ".");
                     await Task.Delay(280);
                     double total = 0, worst = 0;
                     for (int n = 0; n < 8; n++)
