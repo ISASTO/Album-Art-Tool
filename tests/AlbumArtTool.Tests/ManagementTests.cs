@@ -363,8 +363,10 @@ internal static partial class Tests
             Assert(tag.Version == 3 && Id3Standard.Verify(file) && tag.GetFrames<TagLib.Id3v2.TextInformationFrame>().All(f => f.TextEncoding == TagLib.StringType.UTF16), "tags are saved as ID3v2.3 with UTF-16 text");
             Assert(file.Tag.Pictures.Length == 1 && file.Tag.Pictures[0].Data.Data.AsSpan().SequenceEqual(picture), "the embedded cover is unchanged");
         }
-        string raw = System.Text.Encoding.ASCII.GetString(File.ReadAllBytes(modern), 0, 4096);
-        Assert(raw.StartsWith("ID3\u0003") && raw.Contains("TYER") && !raw.Contains("TDRC"), "the year is written as an ID3v2.3 TYER frame");
+        byte[] bytes = File.ReadAllBytes(modern);
+        int tagSize = 10 + (bytes[6] << 21 | bytes[7] << 14 | bytes[8] << 7 | bytes[9]);
+        string raw = System.Text.Encoding.Latin1.GetString(bytes, 0, Math.Min(tagSize, bytes.Length));
+        Assert(raw.StartsWith("ID3\u0003") && raw.Contains("TYER") && !raw.Contains("TDRC"), "the year is written as an ID3v2.3 TYER frame: version " + bytes[3] + ", TYER " + raw.Contains("TYER") + ", TDRC " + raw.Contains("TDRC"));
         Assert(Metadata(modern) == modernMeta && AudioHash(modern) == modernAudio, "Unicode titles, artists, year and comment survive the conversion: " + Metadata(modern));
         using (var file = TagLib.File.Create(legacy))
             Assert(file.GetTag(TagLib.TagTypes.Id3v2, false) is TagLib.Id3v2.Tag { Version: 3 } created && created.Title == "Old title" && created.Album == "Old album" && created.Year == 1999 && created.FirstPerformer == "Old artist",
