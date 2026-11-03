@@ -14,7 +14,6 @@ namespace AlbumArtTool.Management
         private static readonly Regex discSuffix = new Regex(@"(?:\s+[-,:]?\s*|[-,:]\s*|\s*[\[(]\s*)(?:CD|DISC|DISK)\s*[-_. ]*(\d+)(?:\s*(?:OF|/)\s*\d+)?\s*[\])]?\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         private static readonly Regex numberedFile = new Regex(@"^(\d{1,3})\s*[-_.]\s*\d{1,3}(?:\s|[-_.])");
         private static readonly Regex digits = new Regex(@"\d+");
-        private static readonly Regex leadingNumbers = new Regex(@"^(?:\d{1,3}[-_.])?\d{1,3}\s*[-_.]\s*");
 
         private sealed class Part
         {
@@ -63,20 +62,14 @@ namespace AlbumArtTool.Management
                     .ThenBy(p => digits.Replace(Path.GetFileName(p.Track.Path), m => m.Value.PadLeft(12, '0')), StringComparer.OrdinalIgnoreCase).ToArray();
                 var first = ordered[0];
                 string targetFolder = plan.Options.Organize ? Path.Combine(plan.Options.Root, LibraryPaths.Component(first.Artist), LibraryPaths.Component(first.Title)) : first.Scope;
-                int width = Math.Max(2, ordered.Length.ToString().Length);
                 var targets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 try
                 {
                     for (int i = 0; i < ordered.Length; i++)
                     {
-                        var part = ordered[i]; var row = actions[part.Track.Path]; string filename;
-                        if (plan.Options.RenameFromTitle) filename = Path.GetFileName(row.Target);
-                        else
-                        {
-                            string name = row.NewTitle ?? (part.Track.HasTitleTag ? part.Track.Title : Path.GetFileNameWithoutExtension(part.Track.Path));
-                            if (!part.Track.HasTitleTag) name = leadingNumbers.Replace(name, "");
-                            filename = (i + 1).ToString("D" + width) + " - " + LibraryPaths.Component(name) + Path.GetExtension(row.Target);
-                        }
+                        // Merging moves files and renumbers tags only. Filenames stay as they are,
+                        // apart from the separately selected Title rename / featured-artist cleanup.
+                        var row = actions[ordered[i].Track.Path]; string filename = Path.GetFileName(row.Target);
                         string target = Path.Combine(targetFolder, filename); LibraryPaths.Safe(target, plan.Options.Root);
                         if (target.Length > 250) throw new IOException("The combined album's path would exceed 250 characters.");
                         targets.Add(row.Source, target);

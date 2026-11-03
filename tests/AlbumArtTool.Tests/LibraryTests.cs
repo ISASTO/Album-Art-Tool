@@ -202,6 +202,13 @@ internal static partial class Tests
         var plan = LibraryPlanner.Build(options, CancellationToken.None);
         var rows = plan.Actions.Where(a => a.MergeDiscs).OrderBy(a => a.MergedTrack).ToArray();
         Assert(rows.Length == 13 && rows[9].Track.Disc == 10 && rows[12].MergedTrack == 13 && rows.All(a => a.MergedTrackCount == 13), "13-disc sets use numeric order and have no two-disc limit");
+        Assert(rows[0].Target == Path.Combine(album, "01 - Song.mp3") && rows.Skip(1).All(a => Path.GetFileName(a.Target).StartsWith("01 - Song (")),
+            "combining discs keeps each song's filename and only adds a suffix when two discs use the same name");
+        string plain = NewFolder("merge-keeps-names"), plainAlbum = Path.Combine(plain, "A multi-disc album");
+        DiscTrack(Path.Combine(plainAlbum, "Disc 1"), "Opening Song.mp3", 1, 1, "Opening Song"); DiscTrack(Path.Combine(plainAlbum, "Disc 2"), "Closing Song.mp3", 2, 1, "Closing Song");
+        var keep = Options(plain, NewFolder("merge-keeps-names-backups")); keep.CombineDiscs = true;
+        Assert(LibraryPlanner.Build(keep, CancellationToken.None).Actions.Where(a => a.MergeDiscs).Select(a => Path.GetFileName(a.Target)).OrderBy(n => n).SequenceEqual(new[] { "Closing Song.mp3", "Opening Song.mp3" }),
+            "combining discs does not add track numbers to filenames");
         var second = Options(root, NewFolder("thirteen-title-filenames")); second.CombineDiscs = second.RenameFromTitle = true;
         Assert(LibraryPlanner.Build(second, CancellationToken.None).Actions.Where(a => a.MergeDiscs).All(a => Path.GetFileNameWithoutExtension(a.Target) == a.Track.Title), "title-only filenames remain an explicit choice when combining discs");
     }
