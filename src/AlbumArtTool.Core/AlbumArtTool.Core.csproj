@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- UI-free library: scanning, artwork, tag edits, online search, library management and updates.
+       Cross-platform so the full test suite can also run on Linux CI. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>AlbumArtTool.Core</AssemblyName>
+    <RootNamespace>AlbumArtTool</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="TagLibSharp" Version="2.3.0" />
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+    <InternalsVisibleTo Include="AlbumArtTool" />
+    <InternalsVisibleTo Include="AlbumArtTool.Tests" />
+  </ItemGroup>
+</Project>

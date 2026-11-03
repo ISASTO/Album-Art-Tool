@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Published as AlbumArtTool.exe so the built-in updater of v2.x portable copies accepts it.
+       Those updaters require a .NET Framework assembly named AlbumArtTool at the release version.
+       It carries the installer, runs it once, and afterwards just opens the installed app. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>AlbumArtTool</AssemblyName>
+    <RootNamespace>AlbumArtTool.Bridge</RootNamespace>
+    <ApplicationIcon>../AlbumArtTool/Assets/AppIcon.ico</ApplicationIcon>
+    <Prefer32Bit>false</Prefer32Bit>
+    <SetupPath Condition="'$(SetupPath)' == ''">../../dist/AlbumArtTool-Setup.exe</SetupPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="System.Windows.Forms" />
+    <EmbeddedResource Include="$(SetupPath)" LogicalName="AlbumArtTool.Setup.exe" />
+  </ItemGroup>
+</Project>

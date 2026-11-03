@@ -1,0 +1,16 @@
+<Project>
+  <!-- Shared by the app, its core library, the tests and the legacy update bridge. -->
+  <PropertyGroup>
+    <Version>3.0.0</Version>
+    <Product>Music Library Manager</Product>
+    <Company>ISASTO</Company>
+    <Copyright>Copyright (c) ISASTO</Copyright>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Trimming/AOT analyzer warnings from third-party packages are reviewed by the AOT publish step. -->
+    <NoWarn>$(NoWarn);CS1591;NU1603</NoWarn>
+  </PropertyGroup>
+</Project>

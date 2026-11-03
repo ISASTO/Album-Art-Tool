@@ -1,193 +1,263 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Forms;
-using AlbumArtTool.Design;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Templates;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using AlbumArtTool.Core;
 using AlbumArtTool.Management;
+using AlbumArtTool.Ui;
 
 namespace AlbumArtTool
 {
-    internal sealed class LibraryManagerWindow : Form
+    internal sealed class LibraryManagerWindow : Window
     {
         private readonly string root;
         private readonly Func<bool> canStart;
         private readonly Action<bool> exclusive;
         private readonly Func<string, Task> refreshLibrary;
-        private readonly CheckBox convert = Check("Convert lossless / over 320 kbps to MP3 320", true), square = Check("Center-crop embedded artwork to squares", true),
-            duplicates = Check("Remove confirmed duplicate songs / albums", true), organize = Check("Organize all folders into Artist / Album", true),
-            archive = Check("Move old tool backups off the music player", true), compatibility = Check("Also convert other non-MP3 audio (compatibility)", false),
-            rename = Check("Rename song files from Title tags", false), combine = Check("Combine multi-disc albums", false),
-            cleanTitles = Check("Remove featured artists from titles", false);
+        private readonly CheckBox convert = Kit.Check("Convert lossless / over 320 kbps to MP3 320", true), square = Kit.Check("Center-crop embedded artwork to squares", true),
+            duplicates = Kit.Check("Remove confirmed duplicate songs / albums", true), organize = Kit.Check("Organize all folders into Artist / Album", true),
+            archive = Kit.Check("Move old tool backups off the music player", true), compatibility = Kit.Check("Also convert other non-MP3 audio (compatibility)", false),
+            rename = Kit.Check("Rename song files from Title tags", false), combine = Kit.Check("Combine multi-disc albums", false),
+            cleanTitles = Kit.Check("Remove featured artists from titles", false);
         private readonly TextBox backup = new TextBox();
-        private readonly Label state = new Label(), encoderState = new Label();
-        private readonly ProgressBar progress = new ThemeProgressBar();
-        private readonly Button preview = Button("Preview changes"), apply = Button("Apply selected changes"), undo = Button("Preview Undo"), stop = Button("Stop"),
-            download = Button("Download FFmpeg"), chooseEncoder = Button("Choose FFmpeg…"), chooseBackup = Button("Choose backup…"), openBackup = Button("Open backups");
-        private readonly ListView files = new ListView();
+        private readonly TextBlock state = Kit.Label("", Kit.Body), encoderState = Kit.Label("", Kit.Body, cls: "muted");
+        private readonly ProgressBar progress = new ProgressBar { Minimum = 0, Maximum = 100, Margin = new Thickness(0, 8, 0, 2) };
+        private readonly Button preview = Kit.Button("Preview changes"), apply = Kit.Button("Apply selected changes", "primary"), undo = Kit.Button("Preview Undo"), stop = Kit.Button("Stop"),
+            download = Kit.Button("Download FFmpeg"), chooseEncoder = Kit.Button("Choose FFmpeg…"), chooseBackup = Kit.Button("Choose backup…"), openBackup = Kit.Button("Open backups");
+        private readonly ListBox files = new ListBox { Classes = { "grid" } };
+        private readonly Control optionsPanel;
+        private List<FileRow> rows = new List<FileRow>();
+        private Dictionary<string, List<FileRow>> mergeGroups = new Dictionary<string, List<FileRow>>();
         private CancellationTokenSource source;
         private LibraryPlan plan;
         private LibraryJournal undoJournal;
         private string encoder;
-        private bool populatingFiles, syncingMergeSelection;
+        private bool syncingMergeSelection;
         internal bool IsWorking { get; private set; }
         internal LibraryPlan CurrentPlan => plan;
+        internal IReadOnlyList<FileRow> Rows => rows;
+
+        internal sealed class FileRow
+        {
+            internal object Tag;
+            internal string Action, Source, Destination, Details, Tooltip;
+            internal bool Muted, HasCheck = true;
+            internal bool IsChecked { get; private set; }
+            internal event Action Changed;
+            internal Func<FileRow, bool, bool> Toggle;
+            internal void SetChecked(bool value) { if (IsChecked == value) return; IsChecked = value; Changed?.Invoke(); }
+            internal bool RequestChecked(bool value) => Toggle == null || Toggle(this, value);
+        }
 
         internal LibraryManagerWindow(string musicRoot, Func<bool> ready, Action<bool> setExclusive, Func<string, Task> refresh)
         {
             root = musicRoot; canStart = ready; exclusive = setExclusive; refreshLibrary = refresh;
-            Text = "Manage music library"; ClientSize = new Size(1000, 660); MinimumSize = new Size(960, 620);
-            StartPosition = FormStartPosition.CenterParent; AutoScaleMode = AutoScaleMode.Dpi; BackColor = MainForm.Surface; ForeColor = MainForm.Ink; Font = new Font("Segoe UI", 10);
-            var layout = new FrostCanvas { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 8, Padding = new Padding(12) };
-            foreach (int height in new[] { 38, 162, 38, 38, 44, 48 }) layout.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
-            var path = new Label { Text = "Music folder: " + root, Dock = DockStyle.Fill, ForeColor = MainForm.Ink, TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
-            var options = new BufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 5, Margin = Padding.Empty, AccessibleName = "Library management options" };
-            options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            foreach (int unused in new[] { 1, 2, 3, 4, 5 }) options.RowStyles.Add(new RowStyle(SizeType.Percent, 20));
-            options.Controls.Add(convert, 0, 0); options.Controls.Add(square, 1, 0); options.Controls.Add(duplicates, 0, 1); options.Controls.Add(organize, 1, 1);
-            options.Controls.Add(archive, 0, 2); options.Controls.Add(compatibility, 1, 2);
-            rename.AccessibleName = "Rename song files from Title tags"; options.Controls.Add(rename, 0, 3);
-            combine.AccessibleName = "Combine multi-disc albums"; cleanTitles.AccessibleName = "Remove featured artists from titles";
-            options.Controls.Add(combine, 1, 3); options.Controls.Add(cleanTitles, 0, 4);
-            options.Controls.Add(new Label { Text = "Cleans feat. / ft. / featuring credits", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
-                Font = new Font("Segoe UI", 9), ForeColor = MainForm.Muted, AutoEllipsis = true, Margin = new Padding(3) }, 1, 4);
-            var optionsCard = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(10, 5, 10, 5), Margin = new Padding(0, 0, 0, 5) };
-            optionsCard.Controls.Add(options);
-            foreach (var check in new[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles }) check.CheckedChanged += (s, e) => InvalidatePlan();
-            var tools = Row(165, 160); encoderState.ForeColor = MainForm.Muted; encoderState.Dock = DockStyle.Fill; encoderState.TextAlign = ContentAlignment.MiddleLeft; encoderState.AutoEllipsis = true;
-            tools.Controls.Add(encoderState, 0, 0); tools.Controls.Add(download, 1, 0); tools.Controls.Add(chooseEncoder, 2, 0);
-            var backups = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
-            backups.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 76)); backups.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); backups.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
-            backups.Controls.Add(new Label { Text = "Backups", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, ForeColor = MainForm.Ink }, 0, 0);
-            backup.Text = BackupSettings.Root; backup.Dock = DockStyle.Fill; backup.BackColor = MainForm.Surface; backup.ForeColor = MainForm.Ink; backup.BorderStyle = BorderStyle.FixedSingle;
-            backup.Font = new Font("Segoe UI", 9); backup.Margin = new Padding(3, 8, 3, 3); backup.AccessibleName = "PC backup folder";
-            backup.TextChanged += (s, e) => InvalidatePlan(); backups.Controls.Add(backup, 1, 0); backups.Controls.Add(chooseBackup, 2, 0);
-            var actions = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 6, RowCount = 1, Margin = Padding.Empty };
-            foreach (int width in new[] { 165, 180, 145, 140 }) actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, width));
-            actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
-            actions.Controls.Add(preview, 0, 0); actions.Controls.Add(apply, 1, 0); actions.Controls.Add(undo, 2, 0); actions.Controls.Add(openBackup, 3, 0); actions.Controls.Add(stop, 5, 0);
-            state.Dock = DockStyle.Fill; state.ForeColor = MainForm.Ink; state.Text = "Preview first, then check the changes to apply. Originals and removed copies are saved in the PC backup folder, outside your music tree.";
-            state.AccessibleName = "Library management status";
-            files.View = View.Details; files.CheckBoxes = true; files.FullRowSelect = true; files.GridLines = false; files.Dock = DockStyle.Fill;
-            files.BackColor = MainForm.Surface; files.ForeColor = MainForm.Ink; files.BorderStyle = BorderStyle.FixedSingle; files.HideSelection = false;
-            files.Columns.Add("Action", 205); files.Columns.Add("Source", 285); files.Columns.Add("Destination / retained copy", 300); files.Columns.Add("Details", 420);
-            files.AccessibleName = "Planned library changes"; files.ShowItemToolTips = true; files.ItemChecked += (s, e) => UpdateApply();
-            files.ItemCheck += (s, e) =>
-            {
-                if (IsWorking && !populatingFiles) { e.NewValue = e.CurrentValue; return; }
-                if (populatingFiles || syncingMergeSelection || e.Index < 0 || e.Index >= files.Items.Count) return;
-                var row = files.Items[e.Index].Tag as LibraryAction;
-                if (string.IsNullOrEmpty(row?.MergeGroup)) return;
-                syncingMergeSelection = true;
-                try
-                {
-                    foreach (ListViewItem other in files.Items)
-                        if (other.Index != e.Index && other.Tag is LibraryAction action && action.MergeGroup == row.MergeGroup) other.Checked = e.NewValue == CheckState.Checked;
-                }
-                finally { syncingMergeSelection = false; }
-            };
-            progress.Dock = DockStyle.Fill; progress.Margin = new Padding(0, 8, 0, 2); progress.Visible = false; progress.AccessibleName = "Library management progress";
-            var filesCard = new FrostPanel { Dock = DockStyle.Fill, Padding = new Padding(10), Margin = new Padding(0, 2, 0, 0) }; filesCard.Controls.Add(files);
-            layout.Controls.Add(path, 0, 0); layout.Controls.Add(optionsCard, 0, 1); layout.Controls.Add(tools, 0, 2); layout.Controls.Add(backups, 0, 3);
-            layout.Controls.Add(actions, 0, 4); layout.Controls.Add(state, 0, 5); layout.Controls.Add(filesCard, 0, 6); layout.Controls.Add(progress, 0, 7); Controls.Add(layout);
+            Title = "Manage music library"; Width = 1000; Height = 660; MinWidth = 960; MinHeight = 620;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            var path = Kit.Label("Music folder: " + root, Kit.Body);
+            rename.Named("Rename song files from Title tags"); combine.Named("Combine multi-disc albums"); cleanTitles.Named("Remove featured artists from titles");
+            var hint = Kit.Label("Cleans feat. / ft. / featuring credits", Kit.Small, cls: "muted"); hint.Margin = new Thickness(3);
+            var options = Kit.Grid("*,*", "*,*,*,*,*").Add(convert.Cell(0, 0), square.Cell(0, 1), duplicates.Cell(1, 0), organize.Cell(1, 1),
+                archive.Cell(2, 0), compatibility.Cell(2, 1), rename.Cell(3, 0), combine.Cell(3, 1), cleanTitles.Cell(4, 0), hint.Cell(4, 1)).Named("Library management options");
+            optionsPanel = options;
+            var optionsCard = Kit.Frost(options, new Thickness(10, 5, 10, 5)); optionsCard.Margin = new Thickness(0, 0, 0, 5);
+            foreach (var check in new[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles }) check.IsCheckedChanged += (s, e) => InvalidatePlan();
+            var tools = Kit.Grid("*,165,160", "*").Add(encoderState.Cell(0, 0), download.Cell(0, 1), chooseEncoder.Cell(0, 2));
+            backup.Text = BackupSettings.Root; backup.Named("PC backup folder"); backup.FontSize = Kit.Small;
+            backup.TextChanged += (s, e) => InvalidatePlan();
+            var backups = Kit.Grid("76,*,150", "*").Add(Kit.Label("Backups", Kit.Body).Cell(0, 0), backup.Cell(0, 1), chooseBackup.Cell(0, 2));
+            var actions = Kit.Grid("165,180,145,140,*,100", "*").Add(preview.Cell(0, 0), apply.Cell(0, 1), undo.Cell(0, 2), openBackup.Cell(0, 3), stop.Cell(0, 5));
+            state.Text = "Preview first, then check the changes to apply. Originals and removed copies are saved in the PC backup folder, outside your music tree.";
+            state.TextWrapping = TextWrapping.Wrap; state.TextTrimming = TextTrimming.CharacterEllipsis; state.MaxLines = 2;
+            state.Named("Library management status");
+            files.Named("Planned library changes");
+            files.ItemTemplate = new FuncDataTemplate<FileRow>((row, scope) => new FileRowView(), true);
+            var header = Kit.Grid("17*,24*,25*,34*", "28").Add(Kit.Label("Action", Kit.Small, cls: "muted").Cell(0, 0), Kit.Label("Source", Kit.Small, cls: "muted").Cell(0, 1),
+                Kit.Label("Destination / retained copy", Kit.Small, cls: "muted").Cell(0, 2), Kit.Label("Details", Kit.Small, cls: "muted").Cell(0, 3));
+            header.Margin = new Thickness(34, 0, 6, 0);
+            var headerBar = new Border { Child = header, BorderThickness = new Thickness(0, 0, 0, 1) };
+            headerBar.Brush(Border.BorderBrushProperty, "Border"); headerBar.Brush(Border.BackgroundProperty, "InsetHeader");
+            var table = Kit.Inset(Kit.Grid("*", "Auto,*").Add(headerBar.Cell(0, 0), files.Cell(1, 0))); table.Padding = new Thickness(0);
+            var filesCard = Kit.Frost(table, new Thickness(10)); filesCard.Margin = new Thickness(0, 2, 0, 0);
+            progress.Named("Library management progress"); progress.IsVisible = false;
+            var layout = Kit.Grid("*", "38,162,38,38,44,48,*,28").Add(path.Cell(0, 0), optionsCard.Cell(1, 0), tools.Cell(2, 0), backups.Cell(3, 0),
+                actions.Cell(4, 0), state.Cell(5, 0), filesCard.Cell(6, 0), progress.Cell(7, 0));
+            layout.Margin = new Thickness(12);
+            Kit.Prepare(this, layout);
             preview.Click += async (s, e) => await PreviewAsync(); apply.Click += async (s, e) => await ApplyAsync();
             undo.Click += (s, e) => PreviewUndo(); stop.Click += (s, e) => source?.Cancel();
             download.Click += async (s, e) => await DownloadAsync();
-            chooseEncoder.Click += (s, e) => { using (var dialog = new OpenFileDialog { Filter = "FFmpeg|ffmpeg.exe|Executables|*.exe", Title = "Choose ffmpeg.exe" }) if (dialog.ShowDialog(this) == DialogResult.OK) { encoder = dialog.FileName; Directory.CreateDirectory(BackupSettings.AppData); File.WriteAllText(Path.Combine(BackupSettings.AppData, "encoder-path.txt"), encoder); UpdateEncoder(); InvalidatePlan(); } };
-            chooseBackup.Click += (s, e) => { using (var dialog = new FolderBrowserDialog { Description = "Choose a backup folder on your PC, outside the music folder", SelectedPath = backup.Text }) if (dialog.ShowDialog(this) == DialogResult.OK) backup.Text = dialog.SelectedPath; };
-            openBackup.Click += (s, e) => { try { Directory.CreateDirectory(backup.Text); Process.Start(new ProcessStartInfo(backup.Text) { UseShellExecute = true }); } catch (Exception ex) { state.Text = ex.Message; } };
-            FormClosing += (s, e) => { if (IsWorking) { e.Cancel = true; state.Text = "Task is running. Click Stop; the current file is kept safe before stopping."; } };
-            ((ThemeButton)apply).Primary = true;
-            AppTheme.Apply(this);
-            encoder = Encoder.Find(); UpdateEncoder(); SetWorking(false);
+            chooseEncoder.Click += async (s, e) =>
+            {
+                var result = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Choose ffmpeg.exe", AllowMultiple = false,
+                    FileTypeFilter = new[] { new FilePickerFileType("FFmpeg") { Patterns = new[] { Management.Encoder.ExecutableName } }, new FilePickerFileType("Executables") { Patterns = new[] { "*.exe" } } } });
+                string picked = result.Count > 0 ? result[0].TryGetLocalPath() : null;
+                if (picked == null) return;
+                encoder = picked; Management.Encoder.Remember(encoder); UpdateEncoder(); InvalidatePlan();
+            };
+            chooseBackup.Click += async (s, e) =>
+            {
+                var result = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Choose a backup folder on your PC, outside the music folder", AllowMultiple = false });
+                string picked = result.Count > 0 ? result[0].TryGetLocalPath() : null;
+                if (picked != null) backup.Text = picked;
+            };
+            openBackup.Click += (s, e) => { try { Directory.CreateDirectory(backup.Text); using (Process.Start(new ProcessStartInfo(backup.Text) { UseShellExecute = true })) { } } catch (Exception ex) { state.Text = ex.Message; } };
+            Closing += (s, e) => { if (IsWorking) { e.Cancel = true; state.Text = "Task is running. Click Stop; the current file is kept safe before stopping."; } };
+            encoder = Management.Encoder.Find(); UpdateEncoder(); SetWorking(false);
         }
-        private static CheckBox Check(string text, bool value) => new ThemeCheckBox { Text = text, Checked = value, Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9), ForeColor = MainForm.Ink, Margin = new Padding(3) };
-        private static Button Button(string text) => new ThemeButton { Text = text, Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9), ForeColor = MainForm.Ink, BackColor = MainForm.Surface, Margin = new Padding(3) };
-        private static TableLayoutPanel Row(int second, int third)
+
+        private sealed class FileRowView : Border
         {
-            var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
-            panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, second)); panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, third)); return panel;
+            private readonly CheckBox check = new CheckBox { Margin = new Thickness(6, 0, 0, 0), MinWidth = 0, Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Center };
+            private readonly TextBlock action = Cell(), from = Cell(), to = Cell(), details = Cell();
+            private FileRow row;
+            private bool updating;
+            private static TextBlock Cell() => new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0), FontSize = 12.5 };
+            internal FileRowView()
+            {
+                Height = 30; Background = Brushes.Transparent;
+                Child = Kit.Grid("28,17*,24*,25*,34*", "*").Add(check.Cell(0, 0), action.Cell(0, 1), from.Cell(0, 2), to.Cell(0, 3), details.Cell(0, 4));
+                check.IsCheckedChanged += (s, e) =>
+                {
+                    if (updating || row == null) return;
+                    if (!row.RequestChecked(check.IsChecked == true)) { updating = true; check.IsChecked = row.IsChecked; updating = false; }
+                };
+                DataContextChanged += (s, e) =>
+                {
+                    if (row != null) row.Changed -= Update;
+                    row = DataContext as FileRow;
+                    if (row != null) row.Changed += Update;
+                    Update();
+                };
+            }
+            private void Update()
+            {
+                if (row == null) return;
+                updating = true; check.IsVisible = row.HasCheck; check.IsChecked = row.IsChecked; updating = false;
+                action.Text = row.Action; from.Text = row.Source; to.Text = row.Destination; details.Text = row.Details;
+                foreach (var cell in new[] { action, from, to, details }) cell.Classes.Set("muted", row.Muted);
+                ToolTip.SetTip(this, row.Tooltip);
+            }
         }
+
         private string Relative(string path) => BackupSettings.Within(path, root) ? path.Substring(root.TrimEnd(Path.DirectorySeparatorChar).Length).TrimStart(Path.DirectorySeparatorChar) : path;
         private void UpdateEncoder() => encoderState.Text = encoder == null ? "Conversion needs FFmpeg. Download once or choose your copy." : "FFmpeg: " + encoder;
-        private void InvalidatePlan() { if (IsWorking) return; plan = null; undoJournal = null; files.Items.Clear(); UpdateApply(); }
+        private void InvalidatePlan() { if (IsWorking) return; plan = null; undoJournal = null; SetRows(new List<FileRow>()); UpdateApply(); }
+
+        private void SetRows(List<FileRow> next)
+        {
+            rows = next;
+            mergeGroups = rows.Where(r => r.Tag is LibraryAction a && !string.IsNullOrEmpty(a.MergeGroup)).GroupBy(r => ((LibraryAction)r.Tag).MergeGroup).ToDictionary(g => g.Key, g => g.ToList());
+            foreach (var row in rows) row.Toggle = OnToggle;
+            files.ItemsSource = rows;
+        }
+
+        // Rows stay readable and scrollable while work runs, but selections are locked.
+        // A multi-disc merge is selected or cleared as one complete album.
+        private bool OnToggle(FileRow row, bool value)
+        {
+            if (IsWorking) return false;
+            row.SetChecked(value);
+            if (!syncingMergeSelection && row.Tag is LibraryAction action && !string.IsNullOrEmpty(action.MergeGroup) && mergeGroups.TryGetValue(action.MergeGroup, out var group))
+            {
+                syncingMergeSelection = true;
+                try { foreach (var other in group) other.SetChecked(value); }
+                finally { syncingMergeSelection = false; }
+            }
+            UpdateApply();
+            return true;
+        }
+
+        internal void SetRowChecked(int index, bool value) => rows[index].RequestChecked(value);
+        internal int CheckedCount => rows.Count(r => r.HasCheck && r.IsChecked);
+
         private void SetWorking(bool value)
         {
             IsWorking = value;
-            foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles, backup, preview, undo, download, chooseEncoder, chooseBackup }) control.Enabled = !value;
-            stop.Enabled = value; progress.Visible = value; UpdateApply();
-            AppTheme.PrepareSurface(this);
+            foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles, backup, preview, undo, download, chooseEncoder, chooseBackup }) control.IsEnabled = !value;
+            stop.IsEnabled = value; progress.IsVisible = value; UpdateApply();
         }
+
         private void UpdateApply()
         {
-            apply.Enabled = !IsWorking && (plan != null || undoJournal != null) && files.CheckedItems.Cast<ListViewItem>().Any(i => i.Tag is LibraryAction a && a.HasWork || i.Tag is JournalEntry);
-            apply.Text = undoJournal != null ? "Undo selected changes" : "Apply selected changes";
+            apply.IsEnabled = !IsWorking && (plan != null || undoJournal != null) && rows.Any(r => r.IsChecked && (r.Tag is LibraryAction a && a.HasWork || r.Tag is JournalEntry));
+            apply.Content = undoJournal != null ? "Undo selected changes" : "Apply selected changes";
         }
-        private IProgress<ProgressInfo> Reporter()
+
+        internal IProgress<ProgressInfo> Reporter()
         {
             return new Progress<ProgressInfo>(p =>
             {
-                if (IsDisposed || !IsWorking) return;
-                progress.Style = p.Total > 0 ? ProgressBarStyle.Continuous : ProgressBarStyle.Marquee;
+                if (!IsWorking) return;
+                progress.IsIndeterminate = p.Total <= 0;
                 progress.Value = p.Total > 0 ? Math.Max(0, Math.Min(100, (int)(100 * (p.Completed + p.Fraction) / p.Total))) : 0;
-                state.Text = p.Message + (p.Total > 0 ? " · " + progress.Value + "%" : "");
+                state.Text = p.Message + (p.Total > 0 ? " · " + (int)progress.Value + "%" : "");
             });
         }
+
         internal async Task PreviewAsync()
         {
             if (IsWorking || !Ready()) return;
-            var options = new LibraryOptions { Root = root, BackupRoot = backup.Text, EncoderPath = encoder, Convert = convert.Checked, ConvertOtherLossy = compatibility.Checked,
-                Square = square.Checked, Duplicates = duplicates.Checked, Organize = organize.Checked, ArchiveOldBackups = archive.Checked, RenameFromTitle = rename.Checked, CombineDiscs = combine.Checked, RemoveFeaturedTitles = cleanTitles.Checked };
-            source?.Dispose(); source = new CancellationTokenSource(); SetWorking(true); exclusive(true); files.Items.Clear(); plan = null; undoJournal = null;
+            var options = new LibraryOptions { Root = root, BackupRoot = backup.Text, EncoderPath = encoder, Convert = convert.On(), ConvertOtherLossy = compatibility.On(),
+                Square = square.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On() };
+            source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
+            SetWorking(true); exclusive(true); SetRows(new List<FileRow>()); plan = null; undoJournal = null;
             try
             {
-                var reporter = Reporter(); plan = await Task.Run(() => LibraryPlanner.Build(options, source.Token, reporter));
-                files.BeginUpdate(); populatingFiles = true;
-                try
+                var reporter = Reporter(); var built = await Task.Run(() => LibraryPlanner.Build(options, token, reporter));
+                plan = built;
+                var next = new List<FileRow>(built.Actions.Count + built.Issues.Count);
+                foreach (var action in built.Actions)
                 {
-                    foreach (var action in plan.Actions)
-                    {
-                        var item = new ListViewItem(action.HasWork ? action.Description : "Keep") { Tag = action, Checked = action.HasWork, ToolTipText = action.Source + "\n" + (action.Target ?? action.Keeper ?? "PC backup folder") + "\n" + (action.Reason ?? "") };
-                        item.SubItems.Add(Relative(action.Source)); item.SubItems.Add(action.Keeper != null ? "Keep: " + Relative(action.Keeper) : action.Target != null ? Relative(action.Target) : "PC backup folder"); item.SubItems.Add(action.Reason ?? "");
-                        if (!action.HasWork) item.ForeColor = MainForm.Muted; files.Items.Add(item);
-                    }
-                    foreach (string issue in plan.Issues) { var item = new ListViewItem("Skipped") { ForeColor = MainForm.Muted }; item.SubItems.Add(issue); files.Items.Add(item); }
+                    var row = new FileRow { Tag = action, Action = action.HasWork ? action.Description : "Keep", Source = Relative(action.Source),
+                        Destination = action.Keeper != null ? "Keep: " + Relative(action.Keeper) : action.Target != null ? Relative(action.Target) : "PC backup folder",
+                        Details = action.Reason ?? "", Muted = !action.HasWork, Tooltip = action.Source + "\n" + (action.Target ?? action.Keeper ?? "PC backup folder") + "\n" + (action.Reason ?? "") };
+                    row.SetChecked(action.HasWork); next.Add(row);
                 }
-                finally { populatingFiles = false; files.EndUpdate(); }
-                long bytes = plan.Actions.Where(a => a.HasWork && (a.Archive || a.Convert || a.Square || a.ChangesTags)).Sum(a => a.Stamp.Length);
-                state.Text = plan.Actions.Count(a => a.HasWork) + " changes across " + plan.Actions.Count + " files · originals need about " + (bytes / 1048576.0).ToString("N0") + " MB in the backup folder · " + plan.Issues.Count + " skipped/problems. Review, uncheck unwanted changes, then Apply.";
+                foreach (string issue in built.Issues) next.Add(new FileRow { Action = "Skipped", Source = issue, Muted = true, Tooltip = issue });
+                SetRows(next);
+                long bytes = built.Actions.Where(a => a.HasWork && (a.Archive || a.Convert || a.Square || a.ChangesTags)).Sum(a => a.Stamp.Length);
+                state.Text = built.Actions.Count(a => a.HasWork) + " changes across " + built.Actions.Count + " files · originals need about " + (bytes / 1048576.0).ToString("N0") + " MB in the backup folder · " + built.Issues.Count + " skipped/problems. Review, uncheck unwanted changes, then Apply.";
             }
             catch (OperationCanceledException) { state.Text = "Preview stopped. No files were changed."; }
             catch (Exception e) { state.Text = "Preview could not finish: " + e.Message; }
             finally { exclusive(false); SetWorking(false); }
         }
+
         private bool Ready()
         { if (canStart()) return true; state.Text = "Wait for scans, artwork/artist jobs and duplicate scans to finish. Apply or discard any staged cover in the main window first."; return false; }
+
         internal async Task ApplyAsync()
         {
             if (IsWorking || !Ready()) return;
             if (plan == null && undoJournal == null) return;
-            if (plan != null) foreach (ListViewItem item in files.Items) if (item.Tag is LibraryAction action) action.Selected = item.Checked;
-            var selectedUndo = files.CheckedItems.Cast<ListViewItem>().Where(i => i.Tag is JournalEntry).Select(i => (JournalEntry)i.Tag).ToHashSetCompat();
-            source?.Dispose(); source = new CancellationTokenSource(); SetWorking(true); exclusive(true); var reporter = Reporter();
+            if (plan != null) foreach (var row in rows) if (row.Tag is LibraryAction action) action.Selected = row.IsChecked;
+            var selectedUndo = new HashSet<JournalEntry>(rows.Where(r => r.IsChecked && r.Tag is JournalEntry).Select(r => (JournalEntry)r.Tag));
+            source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
+            SetWorking(true); exclusive(true); var reporter = Reporter();
             bool wrote = false;
             try
             {
                 if (undoJournal != null)
                 {
-                    int before = undoJournal.Issues.Count;
-                    int restored = await Task.Run(() => LibraryRunner.Undo(undoJournal, source.Token, reporter, selectedUndo)); wrote = restored > 0;
-                    state.Text = restored + " changes restored · " + (undoJournal.Issues.Count - before) + " issues. See the backup journal for details.";
+                    var journal = undoJournal; int before = journal.Issues.Count;
+                    int restored = await Task.Run(() => LibraryRunner.Undo(journal, token, reporter, selectedUndo)); wrote = restored > 0;
+                    state.Text = restored + " changes restored · " + (journal.Issues.Count - before) + " issues. See the backup journal for details.";
                 }
                 else
                 {
-                    BackupSettings.Root = plan.Options.BackupRoot;
-                    var result = await Task.Run(() => LibraryRunner.Run(plan, source.Token, reporter));
+                    var current = plan;
+                    BackupSettings.Root = current.Options.BackupRoot;
+                    var result = await Task.Run(() => LibraryRunner.Run(current, token, reporter));
                     wrote = result.Entries.Any(e => e.State == "Committed" || e.State == "TargetCreated");
                     state.Text = (result.Stopped ? "Stopped safely. " : "Finished. ") + result.Entries.Count(e => e.State == "Committed") + " changes completed · " + result.Issues.Count + " issues. Backups and Undo journal: " + result.Directory;
                 }
@@ -196,41 +266,47 @@ namespace AlbumArtTool
             catch (Exception e) { state.Text = "Task could not finish: " + e.Message + " Completed changes can be reviewed in the backup journal."; wrote = true; }
             finally
             {
-                plan = null; undoJournal = null; exclusive(false); SetWorking(false); apply.Enabled = false;
+                plan = null; undoJournal = null; exclusive(false); SetWorking(false); apply.IsEnabled = false;
                 if (wrote) await refreshLibrary(root);
             }
         }
+
         private void PreviewUndo()
         {
             try
             {
-                undoJournal = LibraryJournal.Last(); plan = null; files.Items.Clear();
+                undoJournal = LibraryJournal.Last(); plan = null; SetRows(new List<FileRow>());
                 if (undoJournal == null) { state.Text = "There is no saved library run to undo on this PC."; return; }
-                foreach (var entry in undoJournal.Entries.Where(e => new[] { "Committed", "Prepared", "TargetCreated" }.Contains(e.State)))
+                var next = new List<FileRow>();
+                foreach (var entry in undoJournal.Entries.Where(e => e.State == "Committed" || e.State == "Prepared" || e.State == "TargetCreated"))
                 {
-                    var item = new ListViewItem("Restore original") { Tag = entry, Checked = true };
-                    item.SubItems.Add(entry.Target ?? entry.Backup); item.SubItems.Add(entry.Source); item.SubItems.Add(entry.Error ?? "Verified backup / move history"); files.Items.Add(item);
+                    var row = new FileRow { Tag = entry, Action = "Restore original", Source = entry.Target ?? entry.Backup, Destination = entry.Source, Details = entry.Error ?? "Verified backup / move history" };
+                    row.SetChecked(true); next.Add(row);
                 }
+                SetRows(next);
                 state.Text = "Undo preview for " + undoJournal.Root + ". Only files unchanged since that run will be restored. Check the changes to undo, then click Undo selected changes.";
             }
             catch (Exception e) { undoJournal = null; state.Text = "Could not read the last library journal: " + e.Message; }
             finally { UpdateApply(); }
         }
+
         private async Task DownloadAsync()
         {
             if (IsWorking) return;
-            source?.Dispose(); source = new CancellationTokenSource(); SetWorking(true);
+            source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token; SetWorking(true);
             try
             {
+                var reporter = new Progress<int>(n => { if (IsWorking) { progress.IsIndeterminate = false; progress.Value = n; state.Text = "Downloading FFmpeg · " + n + "% (one-time setup; archive is roughly 170 MB)"; } });
                 using (var setup = new EncoderSetup())
-                    encoder = await Task.Run(() => setup.InstallAsync(new Progress<int>(n => { if (!IsDisposed && IsWorking) { progress.Style = ProgressBarStyle.Continuous; progress.Value = n; state.Text = "Downloading FFmpeg · " + n + "% (one-time setup; archive is roughly 170 MB)"; } }), source.Token));
+                    encoder = await Task.Run(() => setup.InstallAsync(reporter, token));
                 UpdateEncoder(); state.Text = "FFmpeg is ready. Preview your library changes.";
             }
             catch (OperationCanceledException) { state.Text = "Encoder setup cancelled."; }
             catch (Exception e) { state.Text = "Encoder setup could not finish: " + e.Message; }
             finally { SetWorking(false); }
         }
+
+        internal void SetWorkingForTest(bool value) => SetWorking(value);
+        internal Control OptionsPanel => optionsPanel;
     }
-    internal static class SetCompatibility
-    { internal static System.Collections.Generic.HashSet<T> ToHashSetCompat<T>(this System.Collections.Generic.IEnumerable<T> values) => new System.Collections.Generic.HashSet<T>(values); }
 }

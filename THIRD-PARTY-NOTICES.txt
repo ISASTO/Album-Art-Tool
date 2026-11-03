@@ -5,14 +5,26 @@ Source: https://github.com/mono/taglib-sharp/tree/TaglibSharp-2.3.0.0
 Package: https://www.nuget.org/packages/TagLibSharp/2.3.0
 Full license: licenses/TagLibSharp-LGPL-2.1.txt
 
-TagLibSharp.dll is embedded for convenient single-file distribution.
-A compatible separately supplied TagLibSharp.dll beside AlbumArtTool.exe
-will be loaded by the .NET assembly loader before the embedded fallback.
-You may modify or replace that library and reverse-engineer the application
-as needed to debug your modifications, as permitted by the LGPL.
-The application source and build project are available in this repository.
+The native (ahead-of-time compiled) build links TagLibSharp into
+AlbumArtTool.exe. The complete application source and build instructions are
+available at https://github.com/ISASTO/Album-Art-Tool so that you can modify
+TagLibSharp and rebuild (relink) the application with your modified version,
+and reverse-engineer the application as needed to debug such modifications,
+as permitted by the LGPL (section 6).
 
-The .NET Framework runtime is supplied by Windows and is not redistributed.
+Avalonia UI (MIT License) - https://github.com/AvaloniaUI/Avalonia
+Copyright (c) AvaloniaUI OÜ and contributors.
+
+SkiaSharp and HarfBuzzSharp (MIT License) - https://github.com/mono/SkiaSharp
+Copyright (c) Microsoft Corporation and contributors. The bundled native
+libSkiaSharp and libHarfBuzzSharp libraries include Skia (BSD-3-Clause,
+Copyright Google LLC) and HarfBuzz (Old MIT license).
+
+ANGLE (BSD-3-Clause) - av_libglesv2.dll, Copyright The ANGLE Project Authors.
+
+.NET runtime libraries (MIT License) - https://github.com/dotnet/runtime
+Copyright (c) .NET Foundation and contributors. They are compiled into the
+application; no separate .NET installation is required.
 
 Optional FFmpeg command-line program
 ------------------------------------

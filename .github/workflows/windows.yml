@@ -1,4 +1,4 @@
-name: Build and test Windows app
+name: Build, test and package
 
 on:
   push:
@@ -10,73 +10,194 @@ on:
 permissions:
   contents: read
 
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
 jobs:
-  windows:
-    runs-on: windows-latest
-    timeout-minutes: 15
+  linux:
+    name: Tests (Linux, headless GUI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
+      - name: Install FFmpeg (test-only audio decoder)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Build
+        run: dotnet build tests/AlbumArtTool.Tests/AlbumArtTool.Tests.csproj -c Release
+      - name: Run tests
+        run: ALBUMART_FFMPEG="$(command -v ffmpeg)" dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll "$PWD/TestResults"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Linux-test-screenshots
+          path: TestResults/*.png
+          if-no-files-found: ignore
+
+  windows:
+    name: Tests, AOT build and installer (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Install test-only audio decoder
         run: python -m pip install imageio-ffmpeg==0.6.0
-      - name: Build
-        run: dotnet build tests/AlbumArtTool.Tests.csproj -c Release
-      - name: Verify real audio files, rollback, scanning and Windows GUI
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version
+          "value=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Version $version"
+
+      - name: Build tests
+        run: dotnet build tests/AlbumArtTool.Tests/AlbumArtTool.Tests.csproj -c Release
+      - name: Run tests (real audio files, rollback, scanning, headless GUI)
         shell: pwsh
         run: |
           $env:ALBUMART_FFMPEG = python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
-          & tests/bin/Release/net48/AlbumArtTool.Tests.exe "$PWD/TestResults"
+          & dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll "$PWD/TestResults"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Check live album lookup and high-resolution image download
+      - name: Scan benchmark
         continue-on-error: true
         shell: pwsh
         run: |
-          & tests/bin/Release/net48/AlbumArtTool.Tests.exe --live-search "$PWD/TestResults"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Check live GitHub release metadata and verified EXE download
+          $env:ALBUMART_FFMPEG = python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
+          & dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll --benchmark
+      - name: Live album lookup and high-resolution image download
         continue-on-error: true
-        shell: pwsh
-        run: |
-          & tests/bin/Release/net48/AlbumArtTool.Tests.exe --live-update
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Verify in-app FFmpeg download, checksum, licenses and launch
+        run: dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll --live-search "${{ github.workspace }}/TestResults"
+      - name: Live FFmpeg download, checksum, licenses and launch
         continue-on-error: true
+        run: dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll --live-encoder
+
+      - name: Publish native (AOT) app
+        run: dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r win-x64 -o dist/app
+      - name: Build installer
         shell: pwsh
         run: |
-          & tests/bin/Release/net48/AlbumArtTool.Tests.exe --live-encoder
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc /Qp "/DAppVersion=${{ steps.version.outputs.value }}" "/DSourceDir=$PWD\dist\app" "/DOutputDir=$PWD\dist" installer\AlbumArtTool.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Package portable executable
+          Get-ChildItem dist\app | Format-Table Name, Length
+          Write-Host ("Installer: {0:N1} MB" -f ((Get-Item dist\AlbumArtTool-Setup.exe).Length / 1MB))
+      - name: Build v2.x update bridge
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item src/AlbumArtTool/bin/Release/net48/AlbumArtTool.exe dist/
-          Copy-Item README.md dist/README.txt
-          Copy-Item LICENSE dist/
-          Copy-Item THIRD-PARTY-NOTICES.txt dist/
-          Copy-Item licenses dist/licenses -Recurse
-          Compress-Archive -Path dist/* -DestinationPath AlbumArtTool-Windows.zip
-          $hash = (Get-FileHash dist/AlbumArtTool.exe -Algorithm SHA256).Hash.ToLower()
-          "$hash  AlbumArtTool.exe" | Set-Content -Encoding ascii SHA256SUMS.txt
-      - name: Launch the isolated single EXE (no adjacent dependencies)
+          dotnet build src/LegacyBridge/LegacyBridge.csproj -c Release "-p:SetupPath=$PWD\dist\AlbumArtTool-Setup.exe" -o dist/bridge
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $bridge = Get-Item dist\bridge\AlbumArtTool.exe
+          $name = [Reflection.AssemblyName]::GetAssemblyName($bridge.FullName)
+          if ($name.Name -ne 'AlbumArtTool' -or $name.Version -ne [Version]"${{ steps.version.outputs.value }}.0") { throw "Bridge identity $($name.Name) $($name.Version) will not be accepted by v2.x updaters." }
+          if ($bridge.Length -gt 50MB) { throw "Bridge is larger than the 50 MB limit of v2.x updaters." }
+          Write-Host ("Bridge: {0:N1} MB, {1} {2}" -f ($bridge.Length / 1MB), $name.Name, $name.Version)
+
+      - name: Install silently, launch, measure startup, uninstall
         shell: pwsh
         run: |
-          $emptyMusic = New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/empty-music"
-          $app = Start-Process "$PWD/dist/AlbumArtTool.exe" -ArgumentList ('"' + $emptyMusic.FullName + '"') -PassThru
-          Start-Sleep -Seconds 4
-          $app.Refresh()
-          if ($app.HasExited -or $app.MainWindowHandle -eq 0 -or -not $app.Responding) { throw "Portable EXE did not open a responsive window." }
-          $null = $app.CloseMainWindow()
-          if (-not $app.WaitForExit(5000)) { $app.Kill(); throw "App did not close cleanly." }
-          if ($app.ExitCode -ne 0) { throw "App exited with an error." }
+          $dir = "$env:RUNNER_TEMP\install-test"
+          $p = Start-Process dist\AlbumArtTool-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER',"/DIR=$dir" -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Setup failed with $($p.ExitCode)" }
+          $exe = Join-Path $dir 'AlbumArtTool.exe'
+          if (-not (Test-Path $exe) -or -not (Test-Path (Join-Path $dir 'unins000.exe'))) { throw 'Installed files are missing.' }
+          $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
+          Write-Host "Installed $($info.ProductName) $($info.FileVersion)"
+          # The native build reads and writes tags in all nine formats and reports a damaged file.
+          $report = "$env:RUNNER_TEMP\self-test.txt"
+          $t = Start-Process $exe -ArgumentList '--self-test', ('"' + "$PWD\tests\AlbumArtTool.Tests\fixtures" + '"'), ('"' + $report + '"') -PassThru -Wait
+          Write-Host "Native self-test: $(Get-Content $report -Raw)"
+          if ($t.ExitCode -ne 0) { throw "Native self-test failed with $($t.ExitCode)" }
+          $music = New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\empty-music"
+          function Measure-Startup($path) {
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            $app = Start-Process $path -ArgumentList ('"' + $music.FullName + '"') -PassThru
+            while ($clock.Elapsed.TotalSeconds -lt 30) { $app.Refresh(); if ($app.HasExited) { throw "$path exited during startup." }; if ($app.MainWindowHandle -ne 0 -and $app.Responding) { break }; Start-Sleep -Milliseconds 20 }
+            $ms = $clock.ElapsedMilliseconds
+            Start-Sleep -Seconds 2; $app.Refresh()
+            if ($app.HasExited -or $app.MainWindowHandle -eq 0 -or -not $app.Responding) { throw "$path did not open a responsive window." }
+            $mb = [math]::Round($app.WorkingSet64 / 1MB)
+            $null = $app.CloseMainWindow()
+            if (-not $app.WaitForExit(10000)) { $app.Kill(); throw "$path did not close cleanly." }
+            return @($ms, $mb)
+          }
+          $new = @(1..3 | ForEach-Object { Measure-Startup $exe })
+          Write-Host "v${{ steps.version.outputs.value }} window ready (ms, MB): $($new -join ', ')"
+          try {
+            $old = "$env:RUNNER_TEMP\v2\AlbumArtTool.exe"; New-Item -ItemType Directory -Force (Split-Path $old) | Out-Null
+            Invoke-WebRequest https://github.com/ISASTO/Album-Art-Tool/releases/download/v2.5.2/AlbumArtTool.exe -OutFile $old
+            $prior = @(1..3 | ForEach-Object { Measure-Startup $old })
+            Write-Host "v2.5.2 window ready (ms, MB): $($prior -join ', ')"
+            "| | Window ready (ms) | Memory (MB) |`n|---|---|---|`n| v${{ steps.version.outputs.value }} | $($new[0]), $($new[2]), $($new[4]) | $($new[1]) |`n| v2.5.2 | $($prior[0]), $($prior[2]), $($prior[4]) | $($prior[1]) |" >> $env:GITHUB_STEP_SUMMARY
+          } catch { Write-Host "Comparison with v2.5.2 skipped: $_" }
+          $u = Start-Process (Join-Path $dir 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+          Start-Sleep -Seconds 2
+          if ($u.ExitCode -ne 0 -or (Test-Path $exe)) { throw 'Uninstall did not remove the app.' }
+
+      - name: Upgrade a v2.5.2 portable copy through its own built-in updater
+        shell: pwsh
+        run: |
+          # Runs the real v2.5.2 update helper against the new bridge, exactly as "Get updates" does.
+          $root = "$env:RUNNER_TEMP\legacy"; $app = "$root\app\AlbumArtTool.exe"; $stage = "$root\stage"; $music = "$root\music & 100% élite"
+          New-Item -ItemType Directory -Force "$root\app", $stage, $music | Out-Null
+          Invoke-WebRequest https://github.com/ISASTO/Album-Art-Tool/releases/download/v2.5.2/AlbumArtTool.exe -OutFile $app
+          Copy-Item $app "$stage\Updater.exe"; Copy-Item dist\bridge\AlbumArtTool.exe "$stage\Download.exe"
+          $hash = { param($p) (Get-FileHash $p -Algorithm SHA256).Hash.ToLower() }
+          $parent = Start-Process $app -ArgumentList ('"' + $music + '"') -PassThru
+          Start-Sleep -Seconds 4; $parent.Refresh()
+          $id = [guid]::NewGuid().ToString('N')
+          $job = [ordered]@{ Target = $app; MusicFolder = $music; OriginalHash = (& $hash $app); DownloadHash = (& $hash "$stage\Download.exe");
+                             Version = "${{ steps.version.outputs.value }}.0"; Id = $id; ParentId = $parent.Id; ParentStarted = $parent.StartTime.ToUniversalTime().Ticks }
+          $job | ConvertTo-Json | Set-Content -Encoding utf8 "$stage\job.json"
+          $ready = New-Object Threading.EventWaitHandle($false, 'ManualReset', "Local\AlbumArtTool-update-ready-$id")
+          $helper = Start-Process "$stage\Updater.exe" -ArgumentList '--apply-update' -WorkingDirectory $stage -PassThru
+          if (-not $ready.WaitOne(30000)) { if (Test-Path "$stage\error.txt") { Get-Content "$stage\error.txt" }; throw 'The v2.5.2 helper did not accept the update.' }
+          $null = $parent.CloseMainWindow(); if (-not $parent.WaitForExit(15000)) { $parent.Kill() }
+          if (-not $helper.WaitForExit(90000)) { throw 'The v2.5.2 helper did not finish.' }
+          if (Test-Path "$stage\error.txt") { Get-Content "$stage\error.txt"; throw 'The v2.5.2 helper reported an error.' }
+          if ($helper.ExitCode -ne 0) { throw "Helper exit code $($helper.ExitCode)" }
+          if ((& $hash $app) -ne $job.DownloadHash) { throw 'The portable EXE was not replaced by the bridge.' }
+          $installed = "$env:LOCALAPPDATA\Programs\Music Library Manager\AlbumArtTool.exe"
+          $clock = [Diagnostics.Stopwatch]::StartNew()
+          while (-not (Get-Process AlbumArtTool -ErrorAction SilentlyContinue | Where-Object { try { $_.Path -eq $installed -and $_.MainWindowHandle -ne 0 } catch { $false } })) {
+            if ($clock.Elapsed.TotalSeconds -gt 90) { throw 'The installed app did not start after the upgrade.' }; Start-Sleep -Milliseconds 250 }
+          $running = Get-Process AlbumArtTool | Where-Object { $_.Path -eq $installed }
+          $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId = $($running.Id)").CommandLine
+          Write-Host "Upgraded and reopened: $cmd"
+          if ($cmd -notlike "*$music*") { throw 'The music folder was not preserved.' }
+          $null = $running.CloseMainWindow(); $null = $running.WaitForExit(10000)
+          # Later launches of the old portable EXE just open the installed app.
+          $forward = Start-Process $app -PassThru; $null = $forward.WaitForExit(30000)
+          Start-Sleep -Seconds 3
+          $again = Get-Process AlbumArtTool -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $installed }
+          if (-not $again) { throw 'The old portable EXE did not forward to the installed app.' }
+          $again | ForEach-Object { $null = $_.CloseMainWindow(); $null = $_.WaitForExit(10000) }
+          Start-Process "$env:LOCALAPPDATA\Programs\Music Library Manager\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES' -Wait
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item dist\AlbumArtTool-Setup.exe release\
+          Copy-Item dist\bridge\AlbumArtTool.exe release\
+          Copy-Item LICENSE, THIRD-PARTY-NOTICES.txt dist\app\
+          Copy-Item licenses dist\app\licenses -Recurse -Force
+          Compress-Archive -Path dist\app\* -DestinationPath release\AlbumArtTool-Portable.zip
+          Get-ChildItem release -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } | Set-Content -Encoding ascii release\SHA256SUMS.txt
+          Get-Content release\SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Windows-test-preview
+          name: Windows-test-screenshots
           path: |
             TestResults/*.png
             TestResults/live-cover.jpg
@@ -84,14 +205,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: AlbumArtTool-Windows
-          path: |
-            AlbumArtTool-Windows.zip
-            dist/AlbumArtTool.exe
-            SHA256SUMS.txt
+          path: release/*
           if-no-files-found: error
+
   release:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]'))
-    needs: windows
+    needs: [linux, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -101,7 +220,7 @@ jobs:
         with:
           name: AlbumArtTool-Windows
           path: release
-      - name: Publish tested portable build
+      - name: Publish tested build
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -109,6 +228,8 @@ jobs:
           RELEASE_COMMIT: ${{ github.sha }}
         run: |
           if [ "$RELEASE_TAG" = "main" ]; then
-            RELEASE_TAG="v$(python3 -c 'import xml.etree.ElementTree as e; print(e.parse("src/AlbumArtTool/AlbumArtTool.csproj").find(".//Version").text)')"
+            RELEASE_TAG="v$(python3 -c 'import xml.etree.ElementTree as e; print(e.parse("Directory.Build.props").find(".//Version").text)')"
           fi
-          gh release create "$RELEASE_TAG" release/AlbumArtTool-Windows.zip release/dist/AlbumArtTool.exe release/SHA256SUMS.txt --target "$RELEASE_COMMIT" --title "Music Library Manager $RELEASE_TAG" --notes "Fixes slow theme changes and window resizing by caching complete frosted materials in a fast pixel format and copying them without resampling for transparent controls. Moves the gradient wipe into an independent non-activating window above native edits, lists and headers; live controls repaint before the cover is removed. Avoids resetting the Windows backdrop on every toggle. Adds full-window button/resize performance checks and forced native repaint-isolation checks, including focus and resize/close cleanup. Retains the 180 ms wipe, reduced-motion support and all existing library-management features. Use Get updates or download AlbumArtTool.exe. Windows GUI, audio-integrity and rollback checks passed."
+          gh release create "$RELEASE_TAG" release/AlbumArtTool-Setup.exe release/AlbumArtTool.exe release/AlbumArtTool-Portable.zip release/SHA256SUMS.txt \
+            --target "$RELEASE_COMMIT" --title "Music Library Manager $RELEASE_TAG" \
+            --notes "Rewritten for speed: native (ahead-of-time compiled) .NET 10 app with a GPU-rendered Avalonia interface, parallel scanning and a library cache saved between launches. Now installs per user with a Start menu entry and uninstaller (no administrator prompt). Install AlbumArtTool-Setup.exe, or use Get updates in v2.x: it installs this version and the old portable EXE then opens the installed app. All library features, backups and Undo journals carry over."
