@@ -268,19 +268,21 @@ internal static partial class Tests
             { file.Tag.Pictures = new[] { P(small, TagLib.PictureType.FrontCover), P(back, TagLib.PictureType.BackCover), P(keeper, TagLib.PictureType.FrontCover) }; file.Save(); }
             using (var file = TagLib.File.Create(single)) { file.Tag.Pictures = new[] { P(standard, TagLib.PictureType.FrontCover) }; file.Save(); }
             // Formats that do not store picture types (MP4) report every picture as a front cover, so the largest wins there.
-            byte[] expected;
-            using (var file = TagLib.File.Create(path)) expected = Artwork.Standardize(file.Tag.Pictures[Artwork.BestPictureIndex(file.Tag.Pictures)].Data.Data);
+            // APE tags (WavPack) hold only one picture per slot, so the formats differ in what is available to keep.
+            byte[] kept, expected;
+            using (var file = TagLib.File.Create(path)) kept = file.Tag.Pictures[Artwork.BestPictureIndex(file.Tag.Pictures)].Data.Data;
+            expected = Artwork.Standardize(kept); bool resized = !ReferenceEquals(expected, kept);
             string original = CoverEditor.Hash(path), singleHash = CoverEditor.Hash(single), metadata = Metadata(path), audio = AudioHash(path); long before = new FileInfo(path).Length;
             var options = Options(root, NewFolder("one-picture-backup-" + name)); options.EncoderPath = null; options.Shrink = true;
             var plan = LibraryPlanner.Build(options, CancellationToken.None);
             var work = plan.Actions.Where(a => a.HasWork).ToArray();
             string detail = string.Join(" | ", work.Select(a => Path.GetFileName(a.Source) + ": " + a.Description + " — " + a.Reason)) + " | issues: " + string.Join(";", plan.Issues);
             var row = work.FirstOrDefault(a => a.Source == path);
-            Assert(work.Length == 1 && row != null && row.SinglePicture && row.Shrink && row.Description == "One front cover + Resize art" && row.Reason.Contains("keeps only the"), extension + " only the song with several pictures is fixed, and the preview names the kept picture: " + detail);
+            Assert(work.Length == 1 && row != null && row.SinglePicture && row.Shrink == resized && row.Description == (resized ? "One front cover + Resize art" : "One front cover") && row.Reason.Contains("keeps only the"), extension + " only the song with several pictures is fixed, and the preview names the kept picture: " + detail);
             Assert(LibraryRunner.Run(plan, CancellationToken.None).Issues.Count == 0, extension + " the artwork standard applies cleanly");
             using (var file = TagLib.File.Create(path))
                 Assert(file.Tag.Pictures.Length == 1 && file.Tag.Pictures[0].Type == TagLib.PictureType.FrontCover && file.Tag.Pictures[0].Data.Data.AsSpan().SequenceEqual(expected) &&
-                    Size(expected).Width == 600 && Artwork.IsJpeg(expected), extension + " exactly one 600 px JPEG front cover remains");
+                    Math.Max(Size(expected).Width, Size(expected).Height) <= 600 && Artwork.IsJpeg(expected), extension + " exactly one JPEG front cover of at most 600 px remains");
             long after = new FileInfo(path).Length;
             Console.WriteLine("ONE PICTURE " + extension + ": " + before + " -> " + after + " bytes");
             Assert(after < before - back.Length / 2, extension + " removing the extra pictures makes the file smaller");

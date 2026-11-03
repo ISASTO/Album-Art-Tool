@@ -230,7 +230,8 @@ namespace AlbumArtTool.Management
                                 int keep = Artwork.BestPictureIndex(pictures);
                                 row.SinglePicture = true;
                                 string kept = shapes.Describe(pictures[keep]);
-                                AddReason(row, pictures.Length > 1 ? "Several embedded pictures (" + Artwork.Describe(pictures) + ") → keeps only the " + kept + ", as the front cover."
+                                string slot = pictures[keep].Type == TagLib.PictureType.FrontCover ? "" : ", moved to the front-cover slot";
+                                AddReason(row, pictures.Length > 1 ? "Several embedded pictures (" + Artwork.Describe(pictures) + ") → keeps only the " + kept + slot + "."
                                     : "Embedded " + kept + " → moved to the front-cover slot.");
                                 // Cropping and resizing then only concern the picture that stays.
                                 pictures = new[] { pictures[keep] };
