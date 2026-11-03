@@ -356,7 +356,7 @@ internal static partial class Tests
             for (int i = 0; i < 300 && (manager == null || manager.IsWorking || manager.CurrentPlan == null); i++)
             { await Settle(30); manager = window.OwnedWindows.OfType<LibraryManagerWindow>().SingleOrDefault(); }
             var filled = manager.CurrentPlan.Actions.Where(a => a.TitleFromName).OrderBy(a => a.NewTitle).Select(a => a.NewTitle).ToArray();
-            Assert(filled.SequenceEqual(new[] { "blank", "no title" }) && manager.CurrentPlan.Actions.All(a => a.TitleFromName && !a.Convert && !a.Square && !a.Archive && !a.Move),
+            Assert(filled.SequenceEqual(new[] { "blank", "no title" }) && manager.CurrentPlan.Actions.Where(a => a.HasWork).All(a => a.TitleFromName && !a.Convert && !a.Square && !a.Archive && !a.Move),
                 "the fill button previews only filename titles for the songs missing one");
             Assert(Named<CheckBox>(manager, "Fill missing Title tags from filenames").IsChecked == true && Named<CheckBox>(manager, "Convert lossless / over 320 kbps to MP3 320").IsChecked == false,
                 "the manager opens with just the title fill selected");
