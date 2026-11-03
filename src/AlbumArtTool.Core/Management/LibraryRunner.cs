@@ -232,6 +232,7 @@ namespace AlbumArtTool.Management
                         picture.MimeType = Artwork.MimeType(edited);
                     }
                     expected = pictures.Select(p => p.Data.Data).ToArray(); file.Tag.Pictures = pictures;
+                    if (shrink) TagCompaction.RebuildId3v2(file);
                 }
                 if (row?.NewTitle != null) file.Tag.Title = row.NewTitle;
                 if (row?.MergeDiscs == true)
@@ -244,6 +245,7 @@ namespace AlbumArtTool.Management
                 }
                 file.Save();
             }
+            if (shrink) TagCompaction.RemoveFlacPadding(path);
             using (var file = TagLib.File.Create(path, TagLib.ReadStyle.None))
             {
                 if (pictureEdit)

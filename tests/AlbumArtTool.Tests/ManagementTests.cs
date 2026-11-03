@@ -258,6 +258,8 @@ internal static partial class Tests
         }
         string original = CoverEditor.Hash(path), audio = AudioHash(path), metadata = Metadata(path);
         long before = new FileInfo(path).Length;
+        TagLib.PictureType[] types;
+        using (var file = TagLib.File.Create(path)) types = file.Tag.Pictures.Select(p => p.Type).ToArray();
         var options = Options(root, backups); options.Shrink = true;
         var plan = LibraryPlanner.Build(options, CancellationToken.None);
         var row = plan.Actions.Single();
@@ -267,12 +269,14 @@ internal static partial class Tests
         using (var file = TagLib.File.Create(path))
         {
             var pictures = file.Tag.Pictures;
-            Assert(pictures.Length == 2 && pictures[0].Type == TagLib.PictureType.FrontCover && pictures[1].Type == TagLib.PictureType.BackCover, extension + " picture count, types and order are kept");
+            Assert(pictures.Length == 2 && pictures.Select(p => p.Type).SequenceEqual(types), extension + " picture count, types and order are kept");
             Assert(Size(pictures[0].Data.Data) == (1600, 1067) && pictures[0].MimeType == "image/jpeg", extension + " the oversized front cover becomes a 1600 px JPEG");
             Assert(pictures[1].Data.Data.SequenceEqual(small), extension + " normal-sized pictures stay byte identical");
         }
         long after = new FileInfo(path).Length;
-        Console.WriteLine("SHRINK " + extension + ": " + before + " -> " + after + " bytes (pictures " + large.Length + " -> " + Size(large) + ")");
+        Console.WriteLine("SHRINK " + extension + ": " + before + " -> " + after + " bytes");
+        if (new[] { ".mp3", ".flac", ".aiff", ".wav" }.Contains(extension))
+            Assert(after < before - large.Length / 2, extension + " the file itself gets substantially smaller, not just padded: " + before + " -> " + after);
         Assert(AudioHash(path) == audio && Metadata(path) == metadata, extension + " shrinking preserves decoded audio and music tags");
         Assert(LibraryRunner.Undo(journal, CancellationToken.None) == 1 && CoverEditor.Hash(path) == original, extension + " Undo restores the exact original artwork and file");
     }
