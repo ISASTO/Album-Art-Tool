@@ -13,13 +13,16 @@ namespace AlbumArtTool.Management
     {
         /// <summary>Files whose tags this applies to: MP3s always; AIFF and WAV when they already carry an ID3v2 tag.</summary>
         internal static bool Applies(TagLib.File file) =>
-            file is TagLib.Mpeg.AudioFile || file.GetTag(TagTypes.Id3v2, false) != null && (file is TagLib.Aiff.File || file is TagLib.Riff.File);
+            file is TagLib.Mpeg.AudioFile || OnDisk(file) && (file is TagLib.Aiff.File || file is TagLib.Riff.File);
+
+        // TagLib adds an empty in-memory ID3v2 tag to every MP3 it opens; only a tag stored in the file counts.
+        private static bool OnDisk(TagLib.File file) => (file.TagTypesOnDisk & TagTypes.Id3v2) != 0;
 
         /// <summary>"ID3v2.4, Latin-1/UTF-8 text" when the file is not yet ID3v2.3 with UTF-16 text; null when it already is (or does not apply).</summary>
         internal static string Describe(TagLib.File file)
         {
             if (!Applies(file)) return null;
-            if (!(file.GetTag(TagTypes.Id3v2, false) is TagLib.Id3v2.Tag tag)) return "no ID3v2 tag";
+            if (!OnDisk(file) || !(file.GetTag(TagTypes.Id3v2, false) is TagLib.Id3v2.Tag tag)) return "no ID3v2 tag";
             var encodings = tag.Select(Encoding).Where(e => e.HasValue && e.Value != StringType.UTF16).Select(e => Name(e.Value)).Distinct().ToArray();
             if (tag.Version == 3 && encodings.Length == 0) return null;
             return "ID3v2." + tag.Version + (encodings.Length > 0 ? ", " + string.Join("/", encodings) + " text" : "");
@@ -29,7 +32,7 @@ namespace AlbumArtTool.Management
         internal static void Apply(TagLib.File file)
         {
             if (!Applies(file)) return;
-            bool existed = file.GetTag(TagTypes.Id3v2, false) != null;
+            bool existed = OnDisk(file);
             // Collect what other tag types hold before creating a new ID3v2 tag, so nothing is lost.
             var others = new List<TagLib.Tag>();
             if (!existed)

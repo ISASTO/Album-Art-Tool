@@ -355,7 +355,7 @@ internal static partial class Tests
         var plan = LibraryPlanner.Build(options, CancellationToken.None);
         var work = plan.Actions.Where(a => a.HasWork).ToArray();
         Assert(work.Length == 2 && work.All(a => a.Id3v23 && a.Description == "ID3v2.3" && a.Source.EndsWith(".mp3")), "only MP3s are standardized");
-        Assert(work.Single(a => a.Source == modern).Reason.Contains("ID3v2.4") && work.Single(a => a.Source == legacy).Reason.Contains("no ID3v2 tag"), "the preview names the current tag form");
+        Assert(work.Single(a => a.Source == modern).Reason.Contains("ID3v2.4") && work.Single(a => a.Source == legacy).Reason.Contains("no ID3v2 tag"), "the preview names the current tag form: " + string.Join(" | ", work.Select(w => Path.GetFileName(w.Source) + ": " + w.Reason)));
         Assert(LibraryRunner.Run(plan, CancellationToken.None).Issues.Count == 0, "ID3v2.3 conversion applies cleanly");
         using (var file = TagLib.File.Create(modern))
         {
