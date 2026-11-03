@@ -76,7 +76,7 @@ namespace AlbumArtTool.Management
                     case TextInformationFrame text: return text.FrameId.ToString();
                     case CommentsFrame comment: return "COMM\u001f" + (comment.Description ?? "") + "\u001f" + (comment.Language ?? "");
                     case UnsynchronisedLyricsFrame lyrics: return "USLT\u001f" + (lyrics.Description ?? "") + "\u001f" + (lyrics.Language ?? "");
-                    case AttachmentFrame picture: return picture.FrameId + "\u001f" + (int)picture.Type + "\u001f" + Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(picture.Data?.Data ?? Array.Empty<byte>()));
+                    case AttachmentFrame picture: return picture.FrameId.ToString() + "\u001f" + (int)picture.Type + "\u001f" + Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(picture.Data?.Data ?? Array.Empty<byte>()));
                     default: return null;
                 }
             }
