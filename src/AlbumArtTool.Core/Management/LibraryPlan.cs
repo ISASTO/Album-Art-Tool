@@ -41,7 +41,7 @@ namespace AlbumArtTool.Management
         public bool Shrink { get; set; }
         /// <summary>Keep only the best embedded picture (see Artwork.BestPictureIndex), as the front cover, and drop the rest.</summary>
         public bool SinglePicture { get; set; }
-        /// <summary>Rewrite the ID3v2 tag as version 2.3 with UTF-16 text.</summary>
+        /// <summary>Rewrite the ID3v2 tag as version 2.3: Latin-1 where the text fits, UTF-16 where it does not.</summary>
         public bool Id3v23 { get; set; }
         public bool Archive { get; set; }
         public bool Selected { get; set; } = true;
@@ -248,7 +248,7 @@ namespace AlbumArtTool.Management
                             {
                                 string current = Id3Standard.Describe(file);
                                 row.Id3v23 = current != null;
-                                if (row.Id3v23) AddReason(row, "Tags: " + current + " → ID3v2.3, UTF-16.");
+                                if (row.Id3v23) AddReason(row, "Tags: " + current + " → ID3v2.3 (Latin-1, or UTF-16 where needed).");
                             }
                         }
                     if (options.Organize)

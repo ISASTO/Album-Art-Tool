@@ -360,7 +360,10 @@ internal static partial class Tests
         using (var file = TagLib.File.Create(modern))
         {
             var tag = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, false);
-            Assert(tag.Version == 3 && Id3Standard.Verify(file) && tag.GetFrames<TagLib.Id3v2.TextInformationFrame>().All(f => f.TextEncoding == TagLib.StringType.UTF16), "tags are saved as ID3v2.3 with UTF-16 text");
+            TagLib.StringType Enc(string id) => tag.GetFrames<TagLib.Id3v2.TextInformationFrame>(TagLib.ByteVector.FromString(id, TagLib.StringType.Latin1)).Single().TextEncoding;
+            Assert(tag.Version == 3 && Id3Standard.Verify(file) && Enc("TIT2") == TagLib.StringType.UTF16 && Enc("TPE1") == TagLib.StringType.Latin1,
+                "UTF-8 text becomes UTF-16 only where Latin-1 cannot hold it (星), and Latin-1 otherwise (Ünïcode): TIT2 " + Enc("TIT2") + ", TPE1 " + Enc("TPE1"));
+            Assert(tag.GetFrames<TagLib.Id3v2.CommentsFrame>().All(f => f.TextEncoding == TagLib.StringType.Latin1), "an ASCII comment is written as Latin-1");
             Assert(file.Tag.Pictures.Length == 1 && file.Tag.Pictures[0].Data.Data.AsSpan().SequenceEqual(picture), "the embedded cover is unchanged");
         }
         byte[] bytes = File.ReadAllBytes(modern);
@@ -451,11 +454,22 @@ internal static partial class Tests
         }
 
         // Everything together: artwork standard + ID3v2.3.
-        var hashes = new[] { latin, ape, old, damaged }.ToDictionary(p => p, CoverEditor.Hash);
-        var options = Options(root, NewFolder("id3-real-world-backups")); options.EncoderPath = null; options.Shrink = options.Id3v23 = true;
+        // 5. A Latin-1 ID3v2.3 file whose missing title is filled with characters Latin-1 cannot hold.
+        string mixed = Path.Combine(root, "日本語 – Ñandú.mp3"); File.Copy(latin, mixed);
+        using (var file = TagLib.File.Create(mixed))
+        {
+            var tag = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, false);
+            foreach (var frame in tag.GetFrames<TagLib.Id3v2.TextInformationFrame>(TagLib.ByteVector.FromString("TIT2", TagLib.StringType.Latin1)).ToArray()) tag.RemoveFrame(frame);
+            file.RemoveTags(TagLib.TagTypes.Id3v1 | TagLib.TagTypes.Ape);
+            file.Save();
+        }
+        using (var file = TagLib.File.Create(mixed)) Assert(string.IsNullOrEmpty(file.Tag.Title), "the mixed fixture has no title in any tag");
+        var hashes = new[] { latin, ape, old, damaged, mixed }.ToDictionary(p => p, CoverEditor.Hash);
+        var options = Options(root, NewFolder("id3-real-world-backups")); options.EncoderPath = null; options.Shrink = options.Id3v23 = options.TitleFromFilename = true;
         var plan = LibraryPlanner.Build(options, CancellationToken.None);
         Assert(plan.Actions.Single(a => a.Source == damaged).Reason.Contains("duplicate frame") && plan.Actions.Single(a => a.Source == ape).Reason.Contains("APE tag") &&
-            plan.Actions.Single(a => a.Source == latin).Reason.Contains("Latin-1") && plan.Actions.Single(a => a.Source == old).Reason.Contains("ID3v2.2"), "the preview explains each file's tag problem");
+            !plan.Actions.Single(a => a.Source == latin).HasWork && plan.Actions.Single(a => a.Source == old).Reason.Contains("ID3v2.2"),
+            "the preview explains each file's tag problem, and a correct Latin-1 ID3v2.3 file needs nothing");
         var journal = LibraryRunner.Run(plan, CancellationToken.None);
         Assert(journal.Issues.Count == 0, "every real-world tag shape converts: " + string.Join(" | ", journal.Issues));
         foreach (string path in hashes.Keys)
@@ -463,14 +477,23 @@ internal static partial class Tests
             {
                 var tag = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, false);
                 Assert(tag.Version == 3 && Id3Standard.Verify(file) && File.ReadAllBytes(path)[3] == 3 && (file.TagTypesOnDisk & TagLib.TagTypes.Ape) == 0,
-                    Path.GetFileName(path) + " is ID3v2.3 with UTF-16 text and no APE tag");
+                    Path.GetFileName(path) + " is ID3v2.3 in Latin-1/UTF-16 with no APE tag");
                 Assert(Id3Standard.Duplicates(tag).Count == 0, Path.GetFileName(path) + " has no duplicate frames");
             }
+        Assert(CoverEditor.Hash(latin) == hashes[latin], "the Latin-1 ID3v2.3 file is left byte for byte");
+        using (var file = TagLib.File.Create(mixed))
+        {
+            var tag = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, false);
+            TagLib.StringType Enc(string id) => tag.GetFrames<TagLib.Id3v2.TextInformationFrame>(TagLib.ByteVector.FromString(id, TagLib.StringType.Latin1)).Single().TextEncoding;
+            Assert(file.Tag.Title == "日本語 – Ñandú" && Enc("TIT2") == TagLib.StringType.UTF16 && Enc("TALB") == TagLib.StringType.Latin1 && Enc("TPE1") == TagLib.StringType.Latin1 && file.Tag.Album == "Début",
+                "a new title Latin-1 cannot hold is UTF-16 and kept character for character, while the other Latin-1 fields stay Latin-1: title=" + file.Tag.Title + " frames=" +
+                string.Join(",", tag.GetFrames<TagLib.Id3v2.TextInformationFrame>().Select(f => f.FrameId.ToString() + ":" + f.TextEncoding + ":" + string.Join("/", f.Text))) + " plan=" + plan.Actions.Single(a => a.Source == mixed).Reason);
+        }
         using (var file = TagLib.File.Create(latin)) Assert(file.Tag.Title == "Café" && file.Tag.FirstPerformer == "Björk" && file.Tag.Album == "Début" && file.Tag.Year == 1993 && file.Tag.Comment == "plain", "Latin-1 text is converted without losing accents");
         using (var file = TagLib.File.Create(ape)) Assert(file.Tag.Title == longTitle && file.Tag.Pictures.Length == 1 && Size(file.Tag.Pictures[0].Data.Data) == (600, 600), "the APE file keeps its full title and one 600 px cover");
         using (var file = TagLib.File.Create(old)) Assert(file.Tag.Title == "Old Title" && file.Tag.FirstPerformer == "Old Artist" && file.Tag.Album == "Old Album" && file.Tag.Year == 2009 && file.Tag.Pictures.Length == 1, "the ID3v2.2 file is upgraded with every field and its cover");
         using (var file = TagLib.File.Create(damaged)) Assert(file.Tag.Title == longTitle, "the duplicate title left by earlier versions is repaired, keeping the real one");
-        Assert(LibraryRunner.Undo(journal, CancellationToken.None) == 4 && hashes.All(p => CoverEditor.Hash(p.Key) == p.Value), "Undo restores all four originals exactly");
+        Assert(LibraryRunner.Undo(journal, CancellationToken.None) == 4 && hashes.All(p => CoverEditor.Hash(p.Key) == p.Value), "Undo restores every changed original exactly");
     }
 
     private static byte[] Text(string value) => new byte[] { 0 }.Concat(System.Text.Encoding.Latin1.GetBytes(value)).Concat(new byte[] { 0 }).ToArray();
