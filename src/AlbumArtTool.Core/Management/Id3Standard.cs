@@ -24,8 +24,11 @@ namespace AlbumArtTool.Management
             if (!Applies(file)) return null;
             if (!OnDisk(file) || !(file.GetTag(TagTypes.Id3v2, false) is TagLib.Id3v2.Tag tag)) return "no ID3v2 tag";
             var encodings = tag.Select(Encoding).Where(e => e.HasValue && e.Value != StringType.UTF16).Select(e => Name(e.Value)).Distinct().ToArray();
-            if (tag.Version == 3 && encodings.Length == 0) return null;
-            return "ID3v2." + tag.Version + (encodings.Length > 0 ? ", " + string.Join("/", encodings) + " text" : "");
+            int duplicates = Duplicates(tag).Count;
+            bool ape = HasApe(file);
+            if (tag.Version == 3 && encodings.Length == 0 && duplicates == 0 && !ape) return null;
+            return "ID3v2." + tag.Version + (encodings.Length > 0 ? ", " + string.Join("/", encodings) + " text" : "") +
+                (duplicates > 0 ? ", " + duplicates + " duplicate frame" + (duplicates == 1 ? "" : "s") : "") + (ape ? ", extra APE tag" : "");
         }
 
         /// <summary>Converts the in-memory tag; the caller saves and verifies.</summary>
@@ -43,9 +46,44 @@ namespace AlbumArtTool.Management
                 }
             if (!(file.GetTag(TagTypes.Id3v2, true) is TagLib.Id3v2.Tag tag)) throw new IOException("An ID3v2 tag could not be created. Original kept.");
             foreach (var other in others) other.CopyTo(tag, false);
+            foreach (var frame in Duplicates(tag)) tag.RemoveFrame(frame);
+            // An APE tag on an MP3 is non-standard (and often holds a second copy of the cover): fill any gaps from it, then drop it.
+            if (HasApe(file))
+            {
+                file.GetTag(TagTypes.Ape, false)?.CopyTo(tag, false);
+                file.RemoveTags(TagTypes.Ape);
+            }
             tag.Version = 3;
             DowngradeDates(tag);
-            foreach (var frame in tag.ToArray()) SetUtf16(frame);
+            // Reading the encoding first matters: TagLib re-reads an unparsed frame when saving and would discard the change.
+            foreach (var frame in tag.ToArray()) if (Encoding(frame).HasValue) SetUtf16(frame);
+        }
+
+        private static bool HasApe(TagLib.File file) => file is TagLib.Mpeg.AudioFile && (file.TagTypesOnDisk & TagTypes.Ape) != 0 && file.GetTag(TagTypes.Ape, false) != null;
+
+        /// <summary>
+        /// Frames that repeat one that may appear only once (the same text frame, TXXX/COMM/USLT description, or an identical picture).
+        /// Earlier versions of this tool could leave such repeats, copied from an ID3v1/APE tag, in front of the real frame,
+        /// so the last of each group is the one kept.
+        /// </summary>
+        internal static List<Frame> Duplicates(TagLib.Id3v2.Tag tag)
+        {
+            string Key(Frame frame)
+            {
+                switch (frame)
+                {
+                    case UserTextInformationFrame user: return "TXXX\u001f" + (user.Description ?? "").ToUpperInvariant();
+                    case TextInformationFrame text: return text.FrameId.ToString();
+                    case CommentsFrame comment: return "COMM\u001f" + (comment.Description ?? "") + "\u001f" + (comment.Language ?? "");
+                    case UnsynchronisedLyricsFrame lyrics: return "USLT\u001f" + (lyrics.Description ?? "") + "\u001f" + (lyrics.Language ?? "");
+                    case AttachmentFrame picture: return picture.FrameId.ToString() + "\u001f" + (int)picture.Type + "\u001f" + Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(picture.Data?.Data ?? Array.Empty<byte>()));
+                    default: return null;
+                }
+            }
+            var frames = tag.ToArray();
+            var last = new Dictionary<string, Frame>();
+            foreach (var frame in frames) { string key = Key(frame); if (key != null) last[key] = frame; }
+            return frames.Where(f => Key(f) is string key && !ReferenceEquals(last[key], f)).ToList();
         }
 
         // ID3v2.4 keeps dates in TDRC/TDOR ("2024-05-17T10:30"); ID3v2.3 players read TYER, TDAT (DDMM), TIME (HHMM) and TORY.
@@ -72,7 +110,19 @@ namespace AlbumArtTool.Management
 
         /// <summary>True when the saved file's ID3v2 tag is version 2.3 with only UTF-16 text.</summary>
         internal static bool Verify(TagLib.File file) =>
-            !Applies(file) || file.GetTag(TagTypes.Id3v2, false) is TagLib.Id3v2.Tag tag && tag.Version == 3 && tag.All(f => Encoding(f) is null || Encoding(f) == StringType.UTF16);
+            !Applies(file) || file.GetTag(TagTypes.Id3v2, false) is TagLib.Id3v2.Tag tag && tag.Version == 3 && tag.All(f => Encoding(f) is null || Encoding(f) == StringType.UTF16) &&
+            Duplicates(tag).Count == 0 && !HasApe(file);
+
+        /// <summary>Why Verify failed, for the error message.</summary>
+        internal static string Problem(TagLib.File file)
+        {
+            if (!(file.GetTag(TagTypes.Id3v2, false) is TagLib.Id3v2.Tag tag)) return "no ID3v2 tag was written";
+            if (tag.Version != 3) return "the tag is ID3v2." + tag.Version;
+            var latin = tag.Where(f => Encoding(f) is StringType e && e != StringType.UTF16).Select(f => f.FrameId.ToString()).Distinct().ToArray();
+            if (latin.Length > 0) return string.Join(", ", latin) + " kept non-UTF-16 text";
+            if (Duplicates(tag).Count > 0) return "duplicate frames remain";
+            return HasApe(file) ? "the APE tag remains" : "unknown";
+        }
 
         private static StringType? Encoding(Frame frame)
         {
@@ -82,8 +132,8 @@ namespace AlbumArtTool.Management
                 case CommentsFrame comment: return comment.TextEncoding;
                 case UnsynchronisedLyricsFrame lyrics: return lyrics.TextEncoding;
                 case SynchronisedLyricsFrame synced: return synced.TextEncoding;
-                case AttachedPictureFrame picture: return picture.TextEncoding;
-                case GeneralEncapsulatedObjectFrame item: return item.TextEncoding;
+                // Pictures (APIC) and objects (GEOB) read from a file are AttachmentFrames.
+                case AttachmentFrame attachment: return attachment.TextEncoding;
                 case TermsOfUseFrame terms: return terms.TextEncoding;
                 default: return null;
             }
@@ -97,8 +147,7 @@ namespace AlbumArtTool.Management
                 case CommentsFrame comment: comment.TextEncoding = StringType.UTF16; break;
                 case UnsynchronisedLyricsFrame lyrics: lyrics.TextEncoding = StringType.UTF16; break;
                 case SynchronisedLyricsFrame synced: synced.TextEncoding = StringType.UTF16; break;
-                case AttachedPictureFrame picture: picture.TextEncoding = StringType.UTF16; break;
-                case GeneralEncapsulatedObjectFrame item: item.TextEncoding = StringType.UTF16; break;
+                case AttachmentFrame attachment: attachment.TextEncoding = StringType.UTF16; break;
                 case TermsOfUseFrame terms: terms.TextEncoding = StringType.UTF16; break;
             }
         }

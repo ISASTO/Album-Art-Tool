@@ -373,5 +373,121 @@ internal static partial class Tests
                 "an MP3 with only an ID3v1 tag gets an ID3v2.3 tag carrying the same fields");
         Assert(LibraryPlanner.Build(options, CancellationToken.None).Actions.All(a => !a.HasWork), "standardized files are left alone the next time");
         Assert(LibraryRunner.Undo(LibraryJournal.Last(), CancellationToken.None) == 2 && CoverEditor.Hash(modern) == modernHash && CoverEditor.Hash(legacy) == legacyHash, "Undo restores the original tags exactly");
+        Id3RealWorldTests();
+    }
+
+    // Shapes seen in real libraries: ID3v2.3 Latin-1 (iTunes), ID3v2.2, an extra APE tag with its own cover, an ID3v1 tag,
+    // and the duplicate frames earlier versions could leave behind.
+    private static void Id3RealWorldTests()
+    {
+        const string longTitle = "A Title Much Longer Than Thirty Characters (Deluxe)";
+        string root = NewFolder("id3-real-world");
+        byte[] bigCover = NoisyArt(800, 800);
+        byte[] bigJpeg = Artwork.Normalize(bigCover, 800, ImageKind.Jpeg, 95);
+
+        // 1. ID3v2.3 with Latin-1 text, the way iTunes writes it.
+        string latin = CopyTrack(root, "latin.mp3");
+        using (var file = TagLib.File.Create(latin))
+        {
+            var tag = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, true);
+            tag.Version = 3; tag.Title = "Café"; tag.Performers = new[] { "Björk" }; tag.Album = "Début"; tag.Year = 1993; tag.Comment = "plain";
+            foreach (var frame in tag.GetFrames<TagLib.Id3v2.TextInformationFrame>().ToArray()) frame.TextEncoding = TagLib.StringType.Latin1;
+            foreach (var frame in tag.GetFrames<TagLib.Id3v2.CommentsFrame>().ToArray()) frame.TextEncoding = TagLib.StringType.Latin1;
+            file.Save();
+        }
+        Assert(File.ReadAllBytes(latin)[3] == 3, "the Latin-1 fixture is ID3v2.3");
+
+        // 2. ID3v2.3 + APE tag holding a second copy of an 800 px cover + ID3v1 with a truncated title.
+        string ape = CopyTrack(root, "ape.mp3");
+        using (var file = TagLib.File.Create(ape))
+        {
+            file.RemoveTags(TagLib.TagTypes.AllTags); file.Save();
+        }
+        using (var file = TagLib.File.Create(ape))
+        {
+            var v2 = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, true); v2.Version = 3; v2.Title = longTitle; v2.Performers = new[] { "Artist" }; v2.Album = "Album";
+            var apeTag = file.GetTag(TagLib.TagTypes.Ape, true); apeTag.Title = longTitle; apeTag.Album = "Album";
+            var v1 = file.GetTag(TagLib.TagTypes.Id3v1, true); v1.Title = longTitle; v1.Album = "Album"; v1.Performers = new[] { "Artist" };
+            file.Tag.Pictures = new[] { new TagLib.Picture(new TagLib.ByteVector(bigJpeg)) { Type = TagLib.PictureType.FrontCover, MimeType = "image/jpeg" } };
+            file.Save();
+        }
+        using (var file = TagLib.File.Create(ape))
+            Assert((file.TagTypesOnDisk & TagLib.TagTypes.Ape) != 0 && (file.TagTypesOnDisk & TagLib.TagTypes.Id3v1) != 0 && file.GetTag(TagLib.TagTypes.Ape).Pictures.Length == 1, "the APE fixture has APE and ID3v1 tags and an APE cover");
+
+        // 3. ID3v2.2 (written by hand: TagLib cannot write 2.2).
+        string old = Path.Combine(root, "v22.mp3");
+        string bare = CopyTrack(root, "bare.mp3");
+        using (var file = TagLib.File.Create(bare)) { file.RemoveTags(TagLib.TagTypes.AllTags); file.Save(); }
+        File.WriteAllBytes(old, Id3v22(new[] { ("TT2", Text("Old Title")), ("TP1", Text("Old Artist")), ("TAL", Text("Old Album")), ("TYE", Text("2009")), ("TCO", Text("(13)")),
+            ("PIC", Picture22(bigJpeg)) }).Concat(File.ReadAllBytes(bare)).ToArray());
+        File.Delete(bare);
+        using (var file = TagLib.File.Create(old)) Assert(file.Tag.Title == "Old Title" && file.Tag.Pictures.Length == 1 && File.ReadAllBytes(old)[3] == 2, "the ID3v2.2 fixture reads correctly");
+
+        // 4. Damage left by earlier versions: a truncated ID3v1-derived title in front of the real one.
+        string damaged = CopyTrack(root, "damaged.mp3");
+        using (var file = TagLib.File.Create(damaged))
+        {
+            var tag = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, true);
+            foreach (var frame in tag.GetFrames<TagLib.Id3v2.TextInformationFrame>(TagLib.ByteVector.FromString("TIT2", TagLib.StringType.Latin1)).ToArray()) tag.RemoveFrame(frame);
+            var truncated = new TagLib.Id3v2.TextInformationFrame(TagLib.ByteVector.FromString("TIT2", TagLib.StringType.Latin1)) { Text = new[] { longTitle.Substring(0, 30) } };
+            var real = new TagLib.Id3v2.TextInformationFrame(TagLib.ByteVector.FromString("TIT2", TagLib.StringType.Latin1)) { Text = new[] { longTitle } };
+            tag.AddFrame(truncated); tag.AddFrame(real); file.Save();
+        }
+        using (var file = TagLib.File.Create(damaged)) Assert(file.Tag.Title == longTitle.Substring(0, 30), "the damaged fixture shows the truncated title first");
+
+        // Artwork standard alone must not duplicate or truncate frames from the ID3v1/APE tags.
+        string apeCopy = Path.Combine(NewFolder("id3-real-world-artwork"), "ape.mp3"); File.Copy(ape, apeCopy);
+        var artwork = Options(Path.GetDirectoryName(apeCopy), NewFolder("id3-real-world-artwork-backups")); artwork.EncoderPath = null; artwork.Shrink = true;
+        var artPlan = LibraryPlanner.Build(artwork, CancellationToken.None);
+        Assert(LibraryRunner.Run(artPlan, CancellationToken.None).Issues.Count == 0, "resizing artwork in a file with ID3v1 and APE tags succeeds: " + string.Join(";", LibraryJournal.Last().Issues));
+        using (var file = TagLib.File.Create(apeCopy))
+        {
+            var tag = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, false);
+            Assert(file.Tag.Title == longTitle && tag.GetFrames<TagLib.Id3v2.TextInformationFrame>(TagLib.ByteVector.FromString("TIT2", TagLib.StringType.Latin1)).Count() == 1 &&
+                tag.Count(f => f.FrameId.ToString() == "APIC") == 1 && Size(file.Tag.Pictures[0].Data.Data) == (600, 600),
+                "resizing artwork keeps one full-length title and one 600 px cover in the ID3v2 tag: title=" + file.Tag.Title + " TIT2=" +
+                tag.GetFrames<TagLib.Id3v2.TextInformationFrame>(TagLib.ByteVector.FromString("TIT2", TagLib.StringType.Latin1)).Count() + " APIC=" + tag.Count(f => f.FrameId.ToString() == "APIC") +
+                " size=" + Size(file.Tag.Pictures[0].Data.Data) + " frames=" + string.Join(",", tag.Select(f => f.FrameId.ToString())) + " plan=" + string.Join(";", artPlan.Actions.Select(a => a.Description + ": " + a.Reason)));
+        }
+
+        // Everything together: artwork standard + ID3v2.3.
+        var hashes = new[] { latin, ape, old, damaged }.ToDictionary(p => p, CoverEditor.Hash);
+        var options = Options(root, NewFolder("id3-real-world-backups")); options.EncoderPath = null; options.Shrink = options.Id3v23 = true;
+        var plan = LibraryPlanner.Build(options, CancellationToken.None);
+        Assert(plan.Actions.Single(a => a.Source == damaged).Reason.Contains("duplicate frame") && plan.Actions.Single(a => a.Source == ape).Reason.Contains("APE tag") &&
+            plan.Actions.Single(a => a.Source == latin).Reason.Contains("Latin-1") && plan.Actions.Single(a => a.Source == old).Reason.Contains("ID3v2.2"), "the preview explains each file's tag problem");
+        var journal = LibraryRunner.Run(plan, CancellationToken.None);
+        Assert(journal.Issues.Count == 0, "every real-world tag shape converts: " + string.Join(" | ", journal.Issues));
+        foreach (string path in hashes.Keys)
+            using (var file = TagLib.File.Create(path))
+            {
+                var tag = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, false);
+                Assert(tag.Version == 3 && Id3Standard.Verify(file) && File.ReadAllBytes(path)[3] == 3 && (file.TagTypesOnDisk & TagLib.TagTypes.Ape) == 0,
+                    Path.GetFileName(path) + " is ID3v2.3 with UTF-16 text and no APE tag");
+                Assert(Id3Standard.Duplicates(tag).Count == 0, Path.GetFileName(path) + " has no duplicate frames");
+            }
+        using (var file = TagLib.File.Create(latin)) Assert(file.Tag.Title == "Café" && file.Tag.FirstPerformer == "Björk" && file.Tag.Album == "Début" && file.Tag.Year == 1993 && file.Tag.Comment == "plain", "Latin-1 text is converted without losing accents");
+        using (var file = TagLib.File.Create(ape)) Assert(file.Tag.Title == longTitle && file.Tag.Pictures.Length == 1 && Size(file.Tag.Pictures[0].Data.Data) == (600, 600), "the APE file keeps its full title and one 600 px cover");
+        using (var file = TagLib.File.Create(old)) Assert(file.Tag.Title == "Old Title" && file.Tag.FirstPerformer == "Old Artist" && file.Tag.Album == "Old Album" && file.Tag.Year == 2009 && file.Tag.Pictures.Length == 1, "the ID3v2.2 file is upgraded with every field and its cover");
+        using (var file = TagLib.File.Create(damaged)) Assert(file.Tag.Title == longTitle, "the duplicate title left by earlier versions is repaired, keeping the real one");
+        Assert(LibraryRunner.Undo(journal, CancellationToken.None) == 4 && hashes.All(p => CoverEditor.Hash(p.Key) == p.Value), "Undo restores all four originals exactly");
+    }
+
+    private static byte[] Text(string value) => new byte[] { 0 }.Concat(System.Text.Encoding.Latin1.GetBytes(value)).Concat(new byte[] { 0 }).ToArray();
+    private static byte[] Picture22(byte[] jpeg) => new byte[] { 0 }.Concat(System.Text.Encoding.ASCII.GetBytes("JPG")).Concat(new byte[] { 3, 0 }).Concat(jpeg).ToArray();
+
+    private static byte[] Id3v22((string Id, byte[] Data)[] frames)
+    {
+        var body = new List<byte>();
+        foreach (var (id, data) in frames)
+        {
+            body.AddRange(System.Text.Encoding.ASCII.GetBytes(id));
+            body.Add((byte)(data.Length >> 16)); body.Add((byte)(data.Length >> 8)); body.Add((byte)data.Length);
+            body.AddRange(data);
+        }
+        body.AddRange(new byte[1024]);
+        int size = body.Count;
+        var header = new byte[] { (byte)'I', (byte)'D', (byte)'3', 2, 0, 0, (byte)(size >> 21 & 0x7f), (byte)(size >> 14 & 0x7f), (byte)(size >> 7 & 0x7f), (byte)(size & 0x7f) };
+        return header.Concat(body).ToArray();
     }
 }
