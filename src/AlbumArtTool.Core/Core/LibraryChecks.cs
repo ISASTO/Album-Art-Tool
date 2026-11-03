@@ -28,6 +28,17 @@ namespace AlbumArtTool.Core
             return extension == "M4A" || extension == "M4B" || extension == "MP4" ? "AAC/M4A" : extension;
         }
 
+        // A leading track number such as "01 - ", "1. " or "07 -" is not part of the song's name.
+        private static readonly System.Text.RegularExpressions.Regex LeadingNumber =
+            new System.Text.RegularExpressions.Regex(@"^\s*\d{1,3}(?:\s*-\s+|\s+-\s*|\.\s+)(?=\S)");
+
+        /// <summary>The Title a song without one would get from its filename: the name without extension or a leading track number.</summary>
+        public static string SuggestedTitle(string path)
+        {
+            string name = System.IO.Path.GetFileNameWithoutExtension(path) ?? "";
+            return LeadingNumber.Replace(name, "", 1).Trim();
+        }
+
         public const int DefaultLowBitrate = 192;
         public static readonly int[] BitrateChoices = { 96, 128, 160, 192, 256, 320 };
 

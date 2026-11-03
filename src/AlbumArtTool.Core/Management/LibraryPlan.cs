@@ -21,6 +21,7 @@ namespace AlbumArtTool.Management
         public bool RenameFromTitle { get; set; }
         public bool CombineDiscs { get; set; }
         public bool RemoveFeaturedTitles { get; set; }
+        public bool TitleFromFilename { get; set; }
         public bool Duplicates { get; set; }
         public bool ArchiveOldBackups { get; set; }
     }
@@ -40,6 +41,8 @@ namespace AlbumArtTool.Management
         public bool Archive { get; set; }
         public bool Selected { get; set; } = true;
         public string NewTitle { get; set; }
+        /// <summary>NewTitle fills a missing Title tag from the filename (rather than cleaning an existing title).</summary>
+        public bool TitleFromName { get; set; }
         public bool MergeDiscs { get; set; }
         public string MergeGroup { get; set; }
         public string MergeSourceRoot { get; set; }
@@ -54,7 +57,7 @@ namespace AlbumArtTool.Management
         internal bool Rename => !string.IsNullOrEmpty(Target) && !Path.GetFileNameWithoutExtension(Source).Equals(Path.GetFileNameWithoutExtension(Target), StringComparison.Ordinal);
         internal bool HasWork => Archive || Convert || Square || Move || Rename || ChangesTags;
         internal string Description => Archive ? Keeper != null ? "Remove duplicate (backed up)" : "Archive old backup" :
-            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, Shrink ? "Shrink art" : null, MergeDiscs ? "Combine discs · track " + MergedTrack : null, NewTitle != null ? "Clean title" : null, Rename ? "Rename" : null,
+            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, Shrink ? "Shrink art" : null, MergeDiscs ? "Combine discs · track " + MergedTrack : null, NewTitle != null ? TitleFromName ? "Title from filename" : "Clean title" : null, Rename ? "Rename" : null,
                 Move && !Path.GetDirectoryName(Source).Equals(Path.GetDirectoryName(Target), StringComparison.OrdinalIgnoreCase) ? "Move" : null }.Where(s => s != null));
     }
 
@@ -234,21 +237,29 @@ namespace AlbumArtTool.Management
                             row.Target = Path.Combine(dest, Path.GetFileName(track.Path));
                         }
                     }
+                    if (options.TitleFromFilename && !track.HasTitleTag)
+                    {
+                        string name = LibraryChecks.SuggestedTitle(track.Path);
+                        if (name.Length == 0) AddReason(row, "Title not filled: the filename has no usable text.");
+                        else { row.NewTitle = name; row.TitleFromName = true; AddReason(row, "Missing Title tag → \"" + name + "\" (from filename)."); }
+                    }
                     if (options.RenameFromTitle)
                     {
-                        // Scanner titles fall back to filenames; only real Title metadata can name a file.
-                        string title = track.HasTitleTag ? LibraryPaths.Component(track.Title) : "";
+                        // Scanner titles fall back to filenames; only real (or newly filled) Title metadata can name a file.
+                        string title = row.TitleFromName ? LibraryPaths.Component(row.NewTitle) : track.HasTitleTag ? LibraryPaths.Component(track.Title) : "";
                         if (title.Length == 0) AddReason(row, "Filename kept: missing usable Title tag.");
                         else row.Target = Path.Combine(Path.GetDirectoryName(row.Target), title + Path.GetExtension(row.Target));
                     }
                     if (options.RemoveFeaturedTitles)
                     {
-                        string title = track.HasTitleTag ? TitleCleanup.Clean(track.Title) : null;
-                        if (title != null && !title.Equals(track.Title, StringComparison.Ordinal)) row.NewTitle = title;
+                        string current = row.NewTitle ?? (track.HasTitleTag ? track.Title : null);
+                        string title = current != null ? TitleCleanup.Clean(current) : null;
+                        bool cleaned = title != null && !title.Equals(current, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(title);
+                        if (cleaned) row.NewTitle = title;
                         string previousName = Path.GetFileNameWithoutExtension(row.Target);
                         string name = TitleCleanup.Clean(previousName);
                         if (name != previousName && !string.IsNullOrWhiteSpace(name)) row.Target = Path.Combine(Path.GetDirectoryName(row.Target), LibraryPaths.Component(name) + Path.GetExtension(row.Target));
-                        if (row.NewTitle != null) AddReason(row, "Title: " + track.Title + " → " + row.NewTitle);
+                        if (cleaned) AddReason(row, "Title: " + current + " → " + row.NewTitle);
                     }
                     if (row.Convert) row.Target = Path.ChangeExtension(row.Target, ".mp3");
                     LibraryPaths.Safe(row.Target, options.Root);

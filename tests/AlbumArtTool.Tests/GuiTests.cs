@@ -349,6 +349,18 @@ internal static partial class Tests
             int index = dialog.Rows.ToList().FindIndex(r => r.Path != null && r.Path.EndsWith("05 - two covers.mp3"));
             dialog.Select(index); Click(show);
             Assert(opened.FileName == "explorer.exe" && opened.Arguments == "/select," + UpdateInstaller.QuoteArgument(dialog.Rows[index].Path), "the selected song is highlighted in File Explorer");
+            var fill = ButtonStarting(dialog, "Fill titles from filenames");
+            Assert(fill.IsEnabled, "songs missing titles can be filled from their filenames");
+            Click(fill);
+            LibraryManagerWindow manager = null;
+            for (int i = 0; i < 300 && (manager == null || manager.IsWorking || manager.CurrentPlan == null); i++)
+            { await Settle(30); manager = window.OwnedWindows.OfType<LibraryManagerWindow>().SingleOrDefault(); }
+            var filled = manager.CurrentPlan.Actions.Where(a => a.TitleFromName).OrderBy(a => a.NewTitle).Select(a => a.NewTitle).ToArray();
+            Assert(filled.SequenceEqual(new[] { "blank", "no title" }) && manager.CurrentPlan.Actions.All(a => a.TitleFromName && !a.Convert && !a.Square && !a.Archive && !a.Move),
+                "the fill button previews only filename titles for the songs missing one");
+            Assert(Named<CheckBox>(manager, "Fill missing Title tags from filenames").IsChecked == true && Named<CheckBox>(manager, "Convert lossless / over 320 kbps to MP3 320").IsChecked == false,
+                "the manager opens with just the title fill selected");
+            manager.Close();
             SetFilenameTitle(Path.Combine(root, "03 - no title.mp3"), "Now titled");
             await window.ScanAsync();
             Click(ButtonStarting(dialog, "Check again"));
@@ -438,7 +450,7 @@ internal static partial class Tests
             var checks = Controls(form.OptionsPanel).OfType<CheckBox>().ToArray();
             for (int n = 1; n <= 8; n++) reporter.Report(new ProgressInfo { Completed = n * 300, Total = 6589, Message = n * 300 + "/6589 tracks scanned · Artist/Album " + n });
             await Settle(60);
-            Assert(checks.Length == 10 && checks.All(c => !c.IsEnabled), "options are locked while work runs");
+            Assert(checks.Length == 11 && checks.All(c => !c.IsEnabled), "options are locked while work runs");
             Assert(Named<TextBlock>(form, "Library management status").Text.StartsWith("2400/6589") && Named<ListBox>(form, "Planned library changes").IsEnabled,
                 "progress updates the status while the preview stays scrollable");
             form.SetWorkingForTest(false);

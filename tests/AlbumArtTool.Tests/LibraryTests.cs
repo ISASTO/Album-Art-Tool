@@ -151,7 +151,7 @@ internal static partial class Tests
         };
         foreach (var example in examples) Assert(TitleCleanup.Clean(example.Key) == example.Value, "featured-title rule: " + example.Key + " → " + TitleCleanup.Clean(example.Key));
         foreach (string extension in Fixtures().Select(Path.GetExtension)) AlbumCleanupRoundTrip(extension);
-        ManyDiscs(); DiscTitleVariants(); CleanupWithoutTitleTags(); PartialMergeSelection(); CombinedAlbumCleanup();
+        ManyDiscs(); DiscTitleVariants(); CleanupWithoutTitleTags(); TitlesFromFilenames(); PartialMergeSelection(); CombinedAlbumCleanup();
     }
 
     internal static string DiscTrack(string folder, string filename, uint disc, uint number, string title, string album = "A multi-disc album")
@@ -236,6 +236,39 @@ internal static partial class Tests
         var options = Options(root, NewFolder("filename-feature-backups")); options.RemoveFeaturedTitles = true;
         var row = LibraryPlanner.Build(options, CancellationToken.None).Actions.Single();
         Assert(row.NewTitle == null && Path.GetFileName(row.Target) == "01 - Song.mp3", "filename-only credits are cleaned without inventing a missing Title tag");
+    }
+
+    private static void TitlesFromFilenames()
+    {
+        Assert(LibraryChecks.SuggestedTitle(@"C:\Music\01 - Song.mp3") == "Song" && LibraryChecks.SuggestedTitle("/m/7. Intro.flac") == "Intro" &&
+            LibraryChecks.SuggestedTitle("/m/99 Problems.mp3") == "99 Problems" && LibraryChecks.SuggestedTitle("/m/2-Pac Song.mp3") == "2-Pac Song" &&
+            LibraryChecks.SuggestedTitle("/m/Song.Name v2.mp3") == "Song.Name v2" && LibraryChecks.SuggestedTitle("/m/  Spaced  .mp3") == "Spaced",
+            "suggested titles drop only the extension and a clear leading track number");
+        foreach (string fixture in Fixtures())
+        {
+            string extension = Path.GetExtension(fixture), name = extension.Substring(1);
+            string root = NewFolder("title-fill-" + name), backups = NewFolder("title-fill-backup-" + name);
+            string missing = CopyTrack(root, "Rêverie – 星 (feat. Guest)" + extension), titled = CopyTrack(root, "02 - Other name" + extension);
+            string bare = CopyTrack(root, "03 - Bare" + extension);
+            SetFilenameTitle(missing, null); SetFilenameTitle(titled, "Real title");
+            using (var file = TagLib.File.Create(bare)) { file.RemoveTags(TagLib.TagTypes.AllTags); file.Save(); }
+            string missingHash = CoverEditor.Hash(missing), titledHash = CoverEditor.Hash(titled), bareHash = CoverEditor.Hash(bare);
+            var options = Options(root, backups); options.EncoderPath = null; options.TitleFromFilename = true;
+            var plan = LibraryPlanner.Build(options, CancellationToken.None);
+            Assert(plan.Actions.Count == 2 && plan.Actions.Single(a => a.Source == bare).NewTitle == "Bare", extension + " a file with no tags at all is filled too");
+            var row = plan.Actions.Single(a => a.Source == missing);
+            Assert(row.Source == missing && row.TitleFromName && row.NewTitle == "Rêverie – 星 (feat. Guest)" && !row.Move && row.Description == "Title from filename",
+                extension + " only the song without a Title tag gets its filename as the title, and the file keeps its name");
+            var journal = LibraryRunner.Run(plan, CancellationToken.None);
+            using (var file = TagLib.File.Create(missing)) Assert(journal.Issues.Count == 0 && file.Tag.Title == "Rêverie – 星 (feat. Guest)", extension + " the filename title is written to the file");
+            using (var file = TagLib.File.Create(bare)) Assert(file.Tag.Title == "Bare", extension + " the title is written even when the file had no tag block");
+            Assert(CoverEditor.Hash(titled) == titledHash, extension + " songs that already have a title are untouched");
+            Assert(LibraryRunner.Undo(LibraryJournal.Last(), CancellationToken.None) == 2 && CoverEditor.Hash(missing) == missingHash && CoverEditor.Hash(bare) == bareHash, extension + " Undo restores the untitled original exactly");
+        }
+        string combined = NewFolder("title-fill-combined"), track = CopyTrack(combined, "01 - Song (feat. Guest).mp3"); SetFilenameTitle(track, null);
+        var both = Options(combined, NewFolder("title-fill-combined-backups")); both.EncoderPath = null; both.TitleFromFilename = both.RemoveFeaturedTitles = both.RenameFromTitle = true;
+        var only = LibraryPlanner.Build(both, CancellationToken.None).Actions.Single();
+        Assert(only.NewTitle == "Song" && Path.GetFileName(only.Target) == "Song.mp3", "a filled title can also be cleaned and used to rename the file");
     }
 
     private static void PartialMergeSelection()

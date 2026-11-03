@@ -201,22 +201,23 @@ namespace AlbumArtTool
             if (showingArtists) UpdateArtistPreview();
         }
 
-        private void ShowLibraryManager()
+        private LibraryManagerWindow ShowLibraryManager()
         {
-            if (managerWindow != null) { managerWindow.Activate(); return; }
+            if (managerWindow != null) { managerWindow.Activate(); return managerWindow; }
             managerWindow = new LibraryManagerWindow(folder.Text,
                 () => !busy && !queueRunning && !maintenanceRunning && pending == null && (duplicatesWindow == null || !duplicatesWindow.IsScanning),
                 value => { maintenanceRunning = value; UpdateQueueControls(); },
                 async root => { lastEdit = null; folder.Text = root; await ScanAsync(); });
             managerWindow.Closed += (s, e) => managerWindow = null;
             managerWindow.Show(this);
+            return managerWindow;
         }
 
         internal LibraryCheckWindow CheckTags()
         {
             if (checkWindow != null) { checkWindow.Check(); checkWindow.Activate(); return checkWindow; }
             if (busy || library.Albums.Count == 0) return null;
-            var window = checkWindow = new LibraryCheckWindow(() => library.Albums.ToArray(), info => StartExplorer(info));
+            var window = checkWindow = new LibraryCheckWindow(() => library.Albums.ToArray(), info => StartExplorer(info), () => ShowLibraryManager().PreviewTitleFill());
             window.Closed += (s, e) => { if (checkWindow == window) checkWindow = null; };
             window.Show(this);
             return window;

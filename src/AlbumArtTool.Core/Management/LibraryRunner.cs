@@ -234,7 +234,20 @@ namespace AlbumArtTool.Management
                     expected = pictures.Select(p => p.Data.Data).ToArray(); file.Tag.Pictures = pictures;
                     if (shrink) TagCompaction.RebuildId3v2(file);
                 }
-                if (row?.NewTitle != null) file.Tag.Title = row.NewTitle;
+                if (row?.NewTitle != null)
+                {
+                    file.Tag.Title = row.NewTitle;
+                    // A file with no tag block at all ignores the write; create the format's native tag.
+                    if (file.Tag.Title != row.NewTitle)
+                        foreach (var type in new[] { TagLib.TagTypes.Id3v2, TagLib.TagTypes.Xiph, TagLib.TagTypes.Apple, TagLib.TagTypes.Asf, TagLib.TagTypes.Ape, TagLib.TagTypes.RiffInfo })
+                        {
+                            TagLib.Tag created;
+                            try { created = file.GetTag(type, true); } catch (NotSupportedException) { continue; } catch (NotImplementedException) { continue; }
+                            if (created == null) continue;
+                            created.Title = row.NewTitle;
+                            if (file.Tag.Title == row.NewTitle) break;
+                        }
+                }
                 if (row?.MergeDiscs == true)
                 {
                     file.Tag.Album = row.MergedAlbum; file.Tag.Track = row.MergedTrack; file.Tag.TrackCount = row.MergedTrackCount;
@@ -253,7 +266,7 @@ namespace AlbumArtTool.Management
                     var pictures = file.Tag.Pictures;
                     if (pictures.Length != expected.Length || pictures.Where((p, i) => !p.Data.Data.AsSpan().SequenceEqual(expected[i])).Any()) throw new IOException("The format did not retain all edited pictures. Original kept.");
                 }
-                if (row?.NewTitle != null && file.Tag.Title != row.NewTitle) throw new IOException("The format did not retain the cleaned song title. Original kept.");
+                if (row?.NewTitle != null && file.Tag.Title != row.NewTitle) throw new IOException("The format did not retain the new song title. Original kept.");
                 if (row?.MergeDiscs == true && (file.Tag.Album != row.MergedAlbum || file.Tag.Track != row.MergedTrack || file.Tag.TrackCount != row.MergedTrackCount ||
                     file.Tag.Disc != 1 || file.Tag.DiscCount != 1 || file.Tag.FirstAlbumArtist != row.MergedArtist)) throw new IOException("The format did not retain the combined album and track numbering. Original kept.");
             }
