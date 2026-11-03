@@ -20,7 +20,7 @@ namespace AlbumArtTool
                 Directory.CreateDirectory(work);
                 foreach (string file in Directory.GetFiles(source)) File.Copy(file, Path.Combine(work, Path.GetFileName(file)));
                 File.WriteAllText(Path.Combine(work, "broken.mp3"), "not audio");
-                Environment.SetEnvironmentVariable("ALBUMART_DATA", Path.Combine(work, ".data"));
+                Environment.SetEnvironmentVariable("ALBUMART_DATA", work + "-data");
                 ScanCache.Persistent = false;
                 var scanner = new Scanner();
                 var before = scanner.Scan(work, CancellationToken.None, useCache: false);
@@ -37,7 +37,7 @@ namespace AlbumArtTool
                 int missing = after.Albums.Sum(a => a.MissingCount);
                 string result = "tracks=" + before.FilesRead + " issues=" + before.Issues.Count + " written=" + written + " missingAfter=" + missing;
                 File.WriteAllText(report, result);
-                try { Directory.Delete(work, true); } catch { }
+                try { Directory.Delete(work, true); Directory.Delete(work + "-data", true); } catch { }
                 return before.FilesRead > 0 && before.Issues.Count == 1 && written == before.FilesRead && missing == 0 ? 0 : 2;
             }
             catch (Exception e) { File.WriteAllText(report, "error: " + e); return 1; }
