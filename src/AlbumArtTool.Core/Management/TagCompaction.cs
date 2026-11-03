@@ -17,10 +17,15 @@ namespace AlbumArtTool.Management
         internal static void RebuildId3v2(TagLib.File file)
         {
             if (!(file.GetTag(TagLib.TagTypes.Id3v2, false) is TagLib.Id3v2.Tag old)) return;
-            byte version = old.Version;
-            var frames = old.Select(frame => frame.Clone()).ToList();
+            // TagLib cannot write ID3v2.2; such tags are rewritten as 2.3.
+            byte version = Math.Max(old.Version, (byte)3);
+            // A frame that renders to nothing clones to null; it would not have been saved anyway.
+            var frames = old.Select(frame => frame.Clone()).Where(frame => frame != null).ToList();
             file.RemoveTags(TagLib.TagTypes.Id3v2);
             if (!(file.GetTag(TagLib.TagTypes.Id3v2, true) is TagLib.Id3v2.Tag fresh)) throw new IOException("The tag could not be rewritten. Original kept.");
+            // TagLib fills a newly created ID3v2 tag from the file's other tags (ID3v1, APE). Those copies would
+            // duplicate (and, from ID3v1, truncate) the real frames, so the new tag starts empty.
+            foreach (var frame in fresh.ToArray()) fresh.RemoveFrame(frame);
             fresh.Version = version;
             foreach (var frame in frames) fresh.AddFrame(frame);
         }
