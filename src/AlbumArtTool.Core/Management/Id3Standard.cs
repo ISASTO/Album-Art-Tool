@@ -76,7 +76,7 @@ namespace AlbumArtTool.Management
                     case TextInformationFrame text: return text.FrameId.ToString();
                     case CommentsFrame comment: return "COMM\u001f" + (comment.Description ?? "") + "\u001f" + (comment.Language ?? "");
                     case UnsynchronisedLyricsFrame lyrics: return "USLT\u001f" + (lyrics.Description ?? "") + "\u001f" + (lyrics.Language ?? "");
-                    case AttachedPictureFrame picture: return "APIC\u001f" + (int)picture.Type + "\u001f" + Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(picture.Data?.Data ?? Array.Empty<byte>()));
+                    case AttachmentFrame picture: return picture.FrameId + "\u001f" + (int)picture.Type + "\u001f" + Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(picture.Data?.Data ?? Array.Empty<byte>()));
                     default: return null;
                 }
             }
@@ -132,8 +132,8 @@ namespace AlbumArtTool.Management
                 case CommentsFrame comment: return comment.TextEncoding;
                 case UnsynchronisedLyricsFrame lyrics: return lyrics.TextEncoding;
                 case SynchronisedLyricsFrame synced: return synced.TextEncoding;
-                case AttachedPictureFrame picture: return picture.TextEncoding;
-                case GeneralEncapsulatedObjectFrame item: return item.TextEncoding;
+                // Pictures (APIC) and objects (GEOB) read from a file are AttachmentFrames.
+                case AttachmentFrame attachment: return attachment.TextEncoding;
                 case TermsOfUseFrame terms: return terms.TextEncoding;
                 default: return null;
             }
@@ -147,8 +147,7 @@ namespace AlbumArtTool.Management
                 case CommentsFrame comment: comment.TextEncoding = StringType.UTF16; break;
                 case UnsynchronisedLyricsFrame lyrics: lyrics.TextEncoding = StringType.UTF16; break;
                 case SynchronisedLyricsFrame synced: synced.TextEncoding = StringType.UTF16; break;
-                case AttachedPictureFrame picture: picture.TextEncoding = StringType.UTF16; break;
-                case GeneralEncapsulatedObjectFrame item: item.TextEncoding = StringType.UTF16; break;
+                case AttachmentFrame attachment: attachment.TextEncoding = StringType.UTF16; break;
                 case TermsOfUseFrame terms: terms.TextEncoding = StringType.UTF16; break;
             }
         }
