@@ -226,10 +226,14 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
           RELEASE_COMMIT: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           if [ "$RELEASE_TAG" = "main" ]; then
             RELEASE_TAG="v$(python3 -c 'import xml.etree.ElementTree as e; print(e.parse("Directory.Build.props").find(".//Version").text)')"
           fi
+          # Notes come from the release commit message (without the [release] marker).
+          NOTES="$(printf '%s' "$COMMIT_MESSAGE" | sed -e 's/\[release\] *//' -e '/^Co-Authored-By:/d' -e '/^Claude-Session:/d')"
+          [ -n "$NOTES" ] || NOTES="Music Library Manager $RELEASE_TAG"
+          NOTES="$(printf '%s\n\nInstall AlbumArtTool-Setup.exe, or use Get updates in the app.' "$NOTES")"
           gh release create "$RELEASE_TAG" release/AlbumArtTool-Setup.exe release/AlbumArtTool.exe release/AlbumArtTool-Portable.zip release/SHA256SUMS.txt \
-            --target "$RELEASE_COMMIT" --title "Music Library Manager $RELEASE_TAG" \
-            --notes "Rewritten for speed: native (ahead-of-time compiled) .NET 10 app with a GPU-rendered Avalonia interface, parallel scanning and a library cache saved between launches. Now installs per user with a Start menu entry and uninstaller (no administrator prompt). Install AlbumArtTool-Setup.exe, or use Get updates in v2.x: it installs this version and the old portable EXE then opens the installed app. All library features, backups and Undo journals carry over."
+            --target "$RELEASE_COMMIT" --title "Music Library Manager $RELEASE_TAG" --notes "$NOTES"

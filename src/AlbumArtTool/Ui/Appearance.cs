@@ -21,7 +21,7 @@ namespace AlbumArtTool.Ui
     {
         internal static event Action Changed;
         internal static bool IsDark => Application.Current?.ActualThemeVariant != ThemeVariant.Light;
-        internal static TimeSpan WipeDuration { get; } = TimeSpan.FromMilliseconds(180);
+        internal static TimeSpan WipeDuration { get; } = TimeSpan.FromMilliseconds(320);
         internal static int TransitionsRunning { get; private set; }
 
         internal static void Initialize(Application application) =>
@@ -61,19 +61,31 @@ namespace AlbumArtTool.Ui
             return Brushes.Transparent;
         }
 
-        // A short gradient wipe from a snapshot of the previous appearance. The snapshot is a
+        // A soft diagonal sweep from a snapshot of the previous appearance. The snapshot is a
         // single GPU-composited image above the live window, which repaints underneath it once.
+        // The mask's gradient stops stay fixed (a smoothstep feather) and the gradient itself
+        // moves across the window, so the edge stays equally soft from start to finish.
         private sealed class Wipe
         {
+            private const int FeatherStops = 12;
+            private static readonly double Angle = 18 * Math.PI / 180;
             private readonly Window window;
             private readonly Image overlay;
             private readonly RenderTargetBitmap snapshot;
-            private readonly GradientStop clearEdge, solidEdge;
+            private readonly LinearGradientBrush mask;
+            private readonly double width, height, feather, travel;
             private readonly Stopwatch clock = new Stopwatch();
             private DispatcherTimer timer;
 
-            private Wipe(Window window, Image overlay, RenderTargetBitmap snapshot, GradientStop clearEdge, GradientStop solidEdge)
-            { this.window = window; this.overlay = overlay; this.snapshot = snapshot; this.clearEdge = clearEdge; this.solidEdge = solidEdge; }
+            private Wipe(Window window, Image overlay, RenderTargetBitmap snapshot, LinearGradientBrush mask)
+            {
+                this.window = window; this.overlay = overlay; this.snapshot = snapshot; this.mask = mask;
+                width = window.Bounds.Width; height = window.Bounds.Height;
+                // Distance the edge covers along the sweep direction, corner to corner.
+                travel = width * Math.Cos(Angle) + height * Math.Sin(Angle);
+                feather = Math.Max(240, travel * 0.38);
+                Place(-feather);
+            }
 
             internal static Wipe Capture(Window window)
             {
@@ -83,31 +95,41 @@ namespace AlbumArtTool.Ui
                 var size = new PixelSize(Math.Max(1, (int)Math.Ceiling(window.Bounds.Width * scale)), Math.Max(1, (int)Math.Ceiling(window.Bounds.Height * scale)));
                 var snapshot = new RenderTargetBitmap(size, new Vector(96 * scale, 96 * scale));
                 snapshot.Render(window);
-                var clearEdge = new GradientStop(Colors.Transparent, 0);
-                var solidEdge = new GradientStop(Colors.Black, 0.08);
-                var mask = new LinearGradientBrush
+                var mask = new LinearGradientBrush { SpreadMethod = GradientSpreadMethod.Pad };
+                for (int i = 0; i < FeatherStops; i++)
                 {
-                    StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0.35, RelativeUnit.Relative),
-                    GradientStops = { new GradientStop(Colors.Transparent, 0), clearEdge, solidEdge, new GradientStop(Colors.Black, 1) }
-                };
+                    double t = i / (double)(FeatherStops - 1), alpha = t * t * (3 - 2 * t);
+                    mask.GradientStops.Add(new GradientStop(Color.FromArgb((byte)Math.Round(alpha * 255), 0, 0, 0), t));
+                }
                 var overlay = new Image { Source = snapshot, Stretch = Stretch.Fill, Width = window.Bounds.Width, Height = window.Bounds.Height, IsHitTestVisible = false, OpacityMask = mask };
                 layer.Children.Add(overlay);
                 TransitionsRunning++;
-                return new Wipe(window, overlay, snapshot, clearEdge, solidEdge);
+                return new Wipe(window, overlay, snapshot, mask);
             }
 
             internal void Start()
             {
                 clock.Start();
-                timer = new DispatcherTimer(TimeSpan.FromMilliseconds(15), DispatcherPriority.Render, (s, e) => Frame());
+                timer = new DispatcherTimer(TimeSpan.FromMilliseconds(8), DispatcherPriority.Render, (s, e) => Frame());
                 timer.Start();
+            }
+
+            // The new appearance is revealed behind the feather's leading edge.
+            private void Place(double edge)
+            {
+                double cos = Math.Cos(Angle), sin = Math.Sin(Angle);
+                mask.StartPoint = new RelativePoint(edge * cos, edge * sin, RelativeUnit.Absolute);
+                mask.EndPoint = new RelativePoint((edge + feather) * cos, (edge + feather) * sin, RelativeUnit.Absolute);
             }
 
             private void Frame()
             {
                 double progress = Math.Min(1, clock.Elapsed.TotalMilliseconds / WipeDuration.TotalMilliseconds);
-                double eased = 1 - Math.Pow(1 - progress, 3), edge = -0.08 + eased * 1.16;
-                clearEdge.Offset = Math.Clamp(edge, 0, 1); solidEdge.Offset = Math.Clamp(edge + 0.08, 0, 1);
+                double eased = progress < .5 ? 4 * progress * progress * progress : 1 - Math.Pow(-2 * progress + 2, 3) / 2;
+                Place(-feather + eased * (travel + feather));
+                // Fade whatever remains in the far corner so the sweep never ends on a visible line.
+                double tail = Math.Clamp((progress - .7) / .3, 0, 1);
+                overlay.Opacity = 1 - tail * tail * (3 - 2 * tail);
                 overlay.InvalidateVisual();
                 if (progress < 1 && window.IsVisible) return;
                 Finish();
