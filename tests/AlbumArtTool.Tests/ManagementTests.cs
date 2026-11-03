@@ -460,8 +460,10 @@ internal static partial class Tests
         {
             var tag = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, false);
             foreach (var frame in tag.GetFrames<TagLib.Id3v2.TextInformationFrame>(TagLib.ByteVector.FromString("TIT2", TagLib.StringType.Latin1)).ToArray()) tag.RemoveFrame(frame);
+            file.RemoveTags(TagLib.TagTypes.Id3v1 | TagLib.TagTypes.Ape);
             file.Save();
         }
+        using (var file = TagLib.File.Create(mixed)) Assert(string.IsNullOrEmpty(file.Tag.Title), "the mixed fixture has no title in any tag");
         var hashes = new[] { latin, ape, old, damaged, mixed }.ToDictionary(p => p, CoverEditor.Hash);
         var options = Options(root, NewFolder("id3-real-world-backups")); options.EncoderPath = null; options.Shrink = options.Id3v23 = options.TitleFromFilename = true;
         var plan = LibraryPlanner.Build(options, CancellationToken.None);
