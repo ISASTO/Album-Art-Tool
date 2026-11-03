@@ -327,7 +327,7 @@ internal static partial class Tests
 
     private static async Task TagCheckGui()
     {
-        string root = LibraryCheckFolder();
+        string root = LibraryCheckFolder("library-checks-gui");
         var window = new MainWindow(root, false, new FakeCoverSearch(Cover));
         window.Show();
         try

@@ -278,9 +278,9 @@ internal static partial class Tests
 
 internal static partial class Tests
 {
-    internal static string LibraryCheckFolder()
+    internal static string LibraryCheckFolder(string name = "library-checks")
     {
-        string root = NewFolder("library-checks");
+        string root = NewFolder(name);
         string untitled = CopyTrack(root, "03 - no title.mp3", "Checks album", "Check Artist"); SetFilenameTitle(untitled, null);
         string blank = CopyTrack(root, "04 - blank.flac", "Checks album", "Check Artist"); SetFilenameTitle(blank, "   ");
         CopyTrack(root, "01 - fine.mp3", "Checks album", "Check Artist");
