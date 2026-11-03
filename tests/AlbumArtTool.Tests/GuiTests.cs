@@ -163,7 +163,7 @@ internal static partial class Tests
         Assert(CoverEditor.Hash(selected.Tracks[0].Path) == before, "a stale artwork result cannot edit a different album");
         string opened = null; panel.OpenUrl = url => opened = url;
         Named<TextBox>(window, "Online artwork search query").Text = "query & more";
-        Click(ButtonStarting(panel, "Bandcamp"));
+        Click(Controls(panel).OfType<Button>().Single(b => b.Text() == "Bandcamp ↗"));
         Assert(opened == "https://bandcamp.com/search?q=query%20%26%20more&item_type=a", "the Bandcamp button opens the same search in the browser");
         Shot(window, "online-cover-search.png");
         await window.ApplyOnlineCoverAsync(selected.Key, new CoverCandidate { Source = "Broken source", ImageUrl = "invalid" });

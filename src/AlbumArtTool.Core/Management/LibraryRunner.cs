@@ -275,10 +275,13 @@ namespace AlbumArtTool.Management
                     }
                     else if (same)
                     {
-                        string current = CoverEditor.Hash(entry.Source);
-                        if (current != entry.OriginalHash)
-                        { if (current != entry.WrittenHash) throw new IOException("File changed after this run. Backup kept."); RestoreBackup(entry, true, token); }
-                        if (!Path.GetFileName(entry.Source).Equals(Path.GetFileName(entry.Target), StringComparison.Ordinal)) File.Move(entry.Target, entry.Source);
+                        // A capitalization-only rename: on a case-sensitive filesystem only the new name exists.
+                        string existing = File.Exists(entry.Source) ? entry.Source : entry.Target;
+                        string current = CoverEditor.Hash(existing);
+                        if (current != entry.OriginalHash && current != entry.WrittenHash) throw new IOException("File changed after this run. Backup kept.");
+                        if (!ReferenceEquals(existing, entry.Source)) File.Move(entry.Target, entry.Source);
+                        if (current != entry.OriginalHash) RestoreBackup(entry, true, token);
+                        if (ReferenceEquals(existing, entry.Source) && !Path.GetFileName(entry.Source).Equals(Path.GetFileName(entry.Target), StringComparison.Ordinal)) File.Move(entry.Target, entry.Source);
                     }
                     else
                     {
