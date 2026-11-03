@@ -484,7 +484,8 @@ internal static partial class Tests
             var tag = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, false);
             TagLib.StringType Enc(string id) => tag.GetFrames<TagLib.Id3v2.TextInformationFrame>(TagLib.ByteVector.FromString(id, TagLib.StringType.Latin1)).Single().TextEncoding;
             Assert(file.Tag.Title == "日本語 – Ñandú" && Enc("TIT2") == TagLib.StringType.UTF16 && Enc("TALB") == TagLib.StringType.Latin1 && Enc("TPE1") == TagLib.StringType.Latin1 && file.Tag.Album == "Début",
-                "a new title Latin-1 cannot hold is UTF-16 and kept character for character, while the other Latin-1 fields stay Latin-1");
+                "a new title Latin-1 cannot hold is UTF-16 and kept character for character, while the other Latin-1 fields stay Latin-1: title=" + file.Tag.Title + " frames=" +
+                string.Join(",", tag.GetFrames<TagLib.Id3v2.TextInformationFrame>().Select(f => f.FrameId + ":" + f.TextEncoding + ":" + string.Join("/", f.Text))) + " plan=" + plan.Actions.Single(a => a.Source == mixed).Reason);
         }
         using (var file = TagLib.File.Create(latin)) Assert(file.Tag.Title == "Café" && file.Tag.FirstPerformer == "Björk" && file.Tag.Album == "Début" && file.Tag.Year == 1993 && file.Tag.Comment == "plain", "Latin-1 text is converted without losing accents");
         using (var file = TagLib.File.Create(ape)) Assert(file.Tag.Title == longTitle && file.Tag.Pictures.Length == 1 && Size(file.Tag.Pictures[0].Data.Data) == (600, 600), "the APE file keeps its full title and one 600 px cover");
