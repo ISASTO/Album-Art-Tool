@@ -18,7 +18,7 @@ namespace AlbumArtTool.Core
             internal Album[] Albums;
             internal long Age, Bytes;
         }
-        private const int FormatVersion = 3;
+        private const int FormatVersion = 4;
         private const long Limit = 48L * 1024 * 1024;
         private static readonly object gate = new object();
         private static readonly Dictionary<string, Entry> folders = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
@@ -191,6 +191,7 @@ namespace AlbumArtTool.Core
                 Text(writer, t.AlbumTitle); writer.Write(t.Disc); writer.Write(t.DiscCount); writer.Write(t.Number); writer.Write(t.Bitrate);
                 Text(writer, t.Codec); writer.Write(t.Lossless); writer.Write(t.HasVideo); writer.Write(t.Duration.Ticks); writer.Write(t.HasTitleTag);
                 writer.Write(t.AudioStart); writer.Write(t.AudioEnd); writer.Write(t.SampleRate); writer.Write(t.Channels); writer.Write(t.HasCover);
+                writer.Write(t.PictureCount); writer.Write(t.CoverPictures); Text(writer, t.PictureSummary);
                 WriteStamp(writer, t.Stamp);
             }
         }
@@ -209,6 +210,7 @@ namespace AlbumArtTool.Core
                     AlbumTitle = Text(reader), Disc = reader.ReadUInt32(), DiscCount = reader.ReadUInt32(), Number = reader.ReadUInt32(), Bitrate = reader.ReadInt32(),
                     Codec = Text(reader), Lossless = reader.ReadBoolean(), HasVideo = reader.ReadBoolean(), Duration = new TimeSpan(reader.ReadInt64()), HasTitleTag = reader.ReadBoolean(),
                     AudioStart = reader.ReadInt64(), AudioEnd = reader.ReadInt64(), SampleRate = reader.ReadInt32(), Channels = reader.ReadInt32(), HasCover = reader.ReadBoolean(),
+                    PictureCount = reader.ReadInt32(), CoverPictures = reader.ReadInt32(), PictureSummary = Text(reader) ?? "",
                     Stamp = ReadStamp(reader)
                 });
             return album;
@@ -225,7 +227,8 @@ namespace AlbumArtTool.Core
                     Performers = (string[])t.Performers.Clone(), AlbumArtists = (string[])t.AlbumArtists.Clone(),
                     AlbumTitle = t.AlbumTitle, Disc = t.Disc, DiscCount = t.DiscCount, Number = t.Number, Bitrate = t.Bitrate,
                     Codec = t.Codec, Lossless = t.Lossless, HasVideo = t.HasVideo, Duration = t.Duration, HasTitleTag = t.HasTitleTag,
-                    AudioStart = t.AudioStart, AudioEnd = t.AudioEnd, SampleRate = t.SampleRate, Channels = t.Channels, HasCover = t.HasCover, Stamp = t.Stamp });
+                    AudioStart = t.AudioStart, AudioEnd = t.AudioEnd, SampleRate = t.SampleRate, Channels = t.Channels, HasCover = t.HasCover, Stamp = t.Stamp,
+                    PictureCount = t.PictureCount, CoverPictures = t.CoverPictures, PictureSummary = t.PictureSummary });
             return album;
         }
     }

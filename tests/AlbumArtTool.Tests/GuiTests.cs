@@ -35,6 +35,7 @@ internal static partial class Tests
                 await Gui("main window and online covers", MainWindowGui);
                 await Gui("queue", QueueGui);
                 await Gui("track artists and duplicates", LibraryToolsGui);
+                await Gui("tag checks", TagCheckGui);
                 await Gui("library manager", ManagerGui);
                 await Gui("album cleanup manager", AlbumCleanupGui);
                 await Gui("update handoff", UpdateHandoffGui);
@@ -324,6 +325,38 @@ internal static partial class Tests
         finally { service.Release.TrySetResult(true); window.ClearWaitingJobs(); await window.QueueCompletion; window.Close(); }
     }
 
+    private static async Task TagCheckGui()
+    {
+        string root = LibraryCheckFolder();
+        var window = new MainWindow(root, false, new FakeCoverSearch(Cover));
+        window.Show();
+        try
+        {
+            var button = ButtonStarting(window, "Check tags");
+            Assert(!button.IsEnabled, "tag checks wait for a library scan");
+            await window.ScanAsync();
+            Click(button); await Settle();
+            var dialog = window.OwnedWindows.OfType<LibraryCheckWindow>().Single();
+            Assert(dialog.Result.MissingTitles.Count == 2 && dialog.Result.MultiplePictures.Count == 2, "the tag check window opens with both checks");
+            Assert(Named<TextBlock>(dialog, "Tag check summary").Text.StartsWith("2 missing a Title tag · 2 with several embedded pictures (1 with several covers)"), "the summary counts each finding");
+            Assert(dialog.Rows.Count(r => r.Header) == 2 && dialog.Rows.Count(r => r.Path != null) == 4, "results are grouped under the two checks");
+            ProcessStartInfo opened = null; window.StartExplorer = info => opened = info;
+            var show = ButtonStarting(dialog, "Show selected file");
+            Assert(!show.IsEnabled, "a song must be selected before it can be shown");
+            int index = dialog.Rows.ToList().FindIndex(r => r.Path != null && r.Path.EndsWith("05 - two covers.mp3"));
+            dialog.Select(index); Click(show);
+            Assert(opened.FileName == "explorer.exe" && opened.Arguments == "/select," + UpdateInstaller.QuoteArgument(dialog.Rows[index].Path), "the selected song is highlighted in File Explorer");
+            SetFilenameTitle(Path.Combine(root, "03 - no title.mp3"), "Now titled");
+            await window.ScanAsync();
+            Click(ButtonStarting(dialog, "Check again"));
+            Assert(dialog.Result.MissingTitles.Count == 1, "checking again uses the latest scan");
+            Shot(dialog, "tag-checks.png");
+            Assert(ReferenceEquals(window.CheckTags(), dialog), "the button reuses the open window");
+            dialog.Close();
+        }
+        finally { window.Close(); }
+    }
+
     private static async Task UpdateGui(MainWindow window)
     {
         var button = ButtonStarting(window, "Get updates");
@@ -402,7 +435,7 @@ internal static partial class Tests
             var checks = Controls(form.OptionsPanel).OfType<CheckBox>().ToArray();
             for (int n = 1; n <= 8; n++) reporter.Report(new ProgressInfo { Completed = n * 300, Total = 6589, Message = n * 300 + "/6589 tracks scanned · Artist/Album " + n });
             await Settle(60);
-            Assert(checks.Length == 9 && checks.All(c => !c.IsEnabled), "options are locked while work runs");
+            Assert(checks.Length == 10 && checks.All(c => !c.IsEnabled), "options are locked while work runs");
             Assert(Named<TextBlock>(form, "Library management status").Text.StartsWith("2400/6589") && Named<ListBox>(form, "Planned library changes").IsEnabled,
                 "progress updates the status while the preview stays scrollable");
             form.SetWorkingForTest(false);

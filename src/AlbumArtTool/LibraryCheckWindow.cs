@@ -1,0 +1,122 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Templates;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Platform.Storage;
+using AlbumArtTool.Core;
+using AlbumArtTool.Ui;
+
+namespace AlbumArtTool
+{
+    // Lists songs without a Title tag and songs with more than one embedded picture.
+    // Works from the main window's scan, so it opens instantly and never changes a file.
+    internal sealed class LibraryCheckWindow : Window
+    {
+        private readonly Func<Album[]> currentAlbums;
+        private readonly Action<ProcessStartInfo> openFolder;
+        private readonly ListBox list = new ListBox { Classes = { "grid" } };
+        private readonly TextBlock summary = Kit.Label("", Kit.Body);
+        private readonly Button refresh = Kit.Button("Check again", "primary"), save = Kit.Button("Save report…"), show = Kit.Button("Show selected file");
+        internal LibraryCheckResult Result { get; private set; }
+        internal IReadOnlyList<Row> Rows { get; private set; } = Array.Empty<Row>();
+
+        internal sealed class Row
+        {
+            internal string Text, Detail, Path, Tip;
+            internal bool Header;
+        }
+
+        internal LibraryCheckWindow(Func<Album[]> albums, Action<ProcessStartInfo> openFolder)
+        {
+            currentAlbums = albums; this.openFolder = openFolder;
+            Title = "Check tags"; Width = 960; Height = 570; MinWidth = 720; MinHeight = 420;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            var help = Kit.Label("Songs without a Title tag show their filename in players. Songs with several embedded pictures can show the wrong cover or carry extra artwork. Results use the last library scan; nothing is changed.", Kit.Body, cls: "muted");
+            help.TextWrapping = TextWrapping.Wrap; help.TextTrimming = TextTrimming.None;
+            summary.Named("Tag check summary");
+            list.Named("Tag check results");
+            list.ItemTemplate = new FuncDataTemplate<Row>((row, scope) => new RowView(), true);
+            list.SelectionChanged += (s, e) => show.IsEnabled = (list.SelectedItem as Row)?.Path != null;
+            refresh.Click += (s, e) => Check();
+            save.Click += async (s, e) => await SaveAsync();
+            show.IsEnabled = false; show.Click += (s, e) => ShowSelected();
+            foreach (var b in new[] { refresh, save, show }) b.Margin = new Thickness(3, 6, 3, 0);
+            var buttons = Kit.Grid("165,180,*,165", "*").Add(refresh.Cell(0, 0), save.Cell(0, 1), show.Cell(0, 3));
+            var card = Kit.Frost(Kit.Inset(list), new Thickness(10)); card.Margin = new Thickness(0, 2, 0, 0);
+            var layout = Kit.Grid("*", "48,32,*,45").Add(help.Cell(0, 0), summary.Cell(1, 0), card.Cell(2, 0), buttons.Cell(3, 0));
+            layout.Margin = new Thickness(16);
+            Kit.Prepare(this, layout);
+            Check();
+        }
+
+        private sealed class RowView : Border
+        {
+            private readonly TextBlock text = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+            private readonly TextBlock detail = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+            internal RowView()
+            {
+                Height = 30; Padding = new Thickness(10, 0, 8, 0); Background = Brushes.Transparent;
+                detail.Classes.Add("muted");
+                Child = Kit.Grid("*,Auto", "*").Add(text.Cell(0, 0), detail.Cell(0, 1));
+                DataContextChanged += (s, e) =>
+                {
+                    if (!(DataContext is Row row)) return;
+                    text.Text = row.Text; detail.Text = row.Detail;
+                    text.FontWeight = row.Header ? FontWeight.Bold : FontWeight.Normal;
+                    Padding = new Thickness(row.Header ? 10 : 26, 0, 8, 0);
+                    ToolTip.SetTip(this, row.Tip);
+                };
+            }
+        }
+
+        internal void Check()
+        {
+            Result = LibraryChecks.Run(currentAlbums());
+            var rows = new List<Row>();
+            rows.Add(new Row { Header = true, Text = "Songs missing a Title tag", Detail = Count(Result.MissingTitles.Count) });
+            if (Result.MissingTitles.Count == 0) rows.Add(new Row { Text = "Every song has a Title tag." });
+            foreach (var t in Result.MissingTitles)
+                rows.Add(new Row { Text = t.Path, Detail = Describe(t), Path = t.Path, Tip = t.Path + "\nShown as: " + Path.GetFileNameWithoutExtension(t.Path) });
+            rows.Add(new Row { Header = true, Text = "Songs with more than one embedded picture", Detail = Count(Result.MultiplePictures.Count) });
+            if (Result.MultiplePictures.Count == 0) rows.Add(new Row { Text = "No song has more than one embedded picture." });
+            foreach (var t in Result.MultiplePictures)
+                rows.Add(new Row { Text = t.Path, Detail = t.PictureSummary, Path = t.Path,
+                    Tip = t.Path + "\n" + t.PictureSummary + (t.CoverPictures > 1 ? "\nSeveral front/unlabeled covers: players may show any of them." : "") });
+            Rows = rows; list.ItemsSource = rows; show.IsEnabled = false;
+            summary.Text = Result.MissingTitles.Count + " missing a Title tag · " + Result.MultiplePictures.Count + " with several embedded pictures (" +
+                Result.MultiplePictures.Count(t => t.CoverPictures > 1) + " with several covers) · " + Result.TracksChecked + " songs checked";
+            save.IsEnabled = Result.MissingTitles.Count + Result.MultiplePictures.Count > 0;
+        }
+
+        private static string Count(int n) => n + (n == 1 ? " song" : " songs");
+        private static string Describe(Track t) => string.Join(" · ", new[] { t.ArtistText, t.AlbumTitle }.Where(s => !string.IsNullOrWhiteSpace(s)));
+
+        internal void Select(int index) => list.SelectedIndex = index;
+
+        private void ShowSelected()
+        {
+            if (!(list.SelectedItem is Row { Path: string path })) return;
+            try { openFolder(new ProcessStartInfo("explorer.exe", "/select," + Updates.UpdateInstaller.QuoteArgument(path)) { UseShellExecute = true }); }
+            catch (Exception e) { _ = Dialogs.ShowMessage(this, "Could not open folder", e.Message); }
+        }
+
+        private async Task SaveAsync()
+        {
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            { Title = "Save tag check report", SuggestedFileName = "music-tag-check.csv", DefaultExtension = "csv",
+              FileTypeChoices = new[] { new FilePickerFileType("CSV report") { Patterns = new[] { "*.csv" } } } });
+            string path = file?.TryGetLocalPath();
+            if (path == null) return;
+            try { File.WriteAllText(path, LibraryChecks.Csv(Result), new UTF8Encoding(true)); }
+            catch (Exception e) { await Dialogs.ShowMessage(this, "Could not save report", e.Message); }
+        }
+    }
+}

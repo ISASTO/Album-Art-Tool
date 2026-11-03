@@ -275,3 +275,58 @@ internal static partial class Tests
             "one persistent Undo restores the exact pre-conversion, pre-merge and pre-cleanup library");
     }
 }
+
+internal static partial class Tests
+{
+    internal static string LibraryCheckFolder()
+    {
+        string root = NewFolder("library-checks");
+        string untitled = CopyTrack(root, "03 - no title.mp3", "Checks album", "Check Artist"); SetFilenameTitle(untitled, null);
+        string blank = CopyTrack(root, "04 - blank.flac", "Checks album", "Check Artist"); SetFilenameTitle(blank, "   ");
+        CopyTrack(root, "01 - fine.mp3", "Checks album", "Check Artist");
+        string single = CopyTrack(root, "02 - one cover.mp3", "Checks album", "Check Artist");
+        using (var file = TagLib.File.Create(single)) { file.Tag.Pictures = new[] { new TagLib.Picture(new TagLib.ByteVector(Cover)) { Type = TagLib.PictureType.FrontCover } }; file.Save(); }
+        string covers = CopyTrack(root, "05 - two covers.mp3", "Checks album", "Check Artist");
+        using (var file = TagLib.File.Create(covers))
+        {
+            file.Tag.Pictures = new[] {
+                new TagLib.Picture(new TagLib.ByteVector(Cover)) { Type = TagLib.PictureType.FrontCover },
+                new TagLib.Picture(new TagLib.ByteVector(MakeCover(SKColors.Coral))) { Type = TagLib.PictureType.FrontCover, Description = "Second" },
+                new TagLib.Picture(new TagLib.ByteVector(MakeCover(SKColors.Gray))) { Type = TagLib.PictureType.BackCover, Description = "Back" } };
+            file.Save();
+        }
+        string booklet = CopyTrack(root, "06 - cover and back.flac", "Checks album", "Check Artist");
+        using (var file = TagLib.File.Create(booklet))
+        {
+            file.Tag.Pictures = new[] {
+                new TagLib.Picture(new TagLib.ByteVector(Cover)) { Type = TagLib.PictureType.FrontCover },
+                new TagLib.Picture(new TagLib.ByteVector(MakeCover(SKColors.Gray))) { Type = TagLib.PictureType.BackCover, Description = "Back" } };
+            file.Save();
+        }
+        return root;
+    }
+
+    private static void LibraryCheckTests()
+    {
+        string root = LibraryCheckFolder();
+        foreach (bool restarted in new[] { false, true })
+        {
+            if (restarted) { ScanCache.Flush(); ScanCache.Unload(); }
+            var scan = Scanner.Scan(root, CancellationToken.None);
+            Assert(!restarted || scan.FilesOpened == 0, "the tag check data comes from the saved scan cache after a restart");
+            var result = LibraryChecks.Run(scan.Albums);
+            Assert(result.TracksChecked == 6, "every scanned song is checked");
+            Assert(result.MissingTitles.Select(t => Path.GetFileName(t.Path)).SequenceEqual(new[] { "03 - no title.mp3", "04 - blank.flac" }),
+                "missing and blank Title tags are listed, not songs whose title is shown from the filename: restarted=" + restarted);
+            Assert(result.MultiplePictures.Select(t => Path.GetFileName(t.Path)).SequenceEqual(new[] { "05 - two covers.mp3", "06 - cover and back.flac" }),
+                "songs with several embedded pictures are listed, several covers first, single covers excluded: restarted=" + restarted);
+            Assert(result.MultiplePictures[0].PictureSummary == "2 front covers, 1 back cover" && result.MultiplePictures[0].CoverPictures == 2 &&
+                result.MultiplePictures[1].PictureSummary == "1 front cover, 1 back cover", "each listed song describes its embedded pictures");
+            string csv = LibraryChecks.Csv(result);
+            Assert(csv.Contains("\"Missing Title tag\"") && csv.Contains("\"Several embedded covers\"") && csv.Contains("2 front covers, 1 back cover") && csv.Contains("04 - blank.flac"),
+                "the report lists each finding with its path and pictures");
+        }
+        Assert(Artwork.Describe(new TagLib.IPicture[] { new TagLib.Picture { Type = TagLib.PictureType.LeafletPage }, new TagLib.Picture { Type = TagLib.PictureType.LeafletPage }, new TagLib.Picture { Type = TagLib.PictureType.Media } })
+            == "1 disc picture, 2 booklet pages", "picture descriptions name each picture type");
+    }
+}

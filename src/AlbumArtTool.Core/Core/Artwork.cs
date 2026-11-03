@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using SkiaSharp;
 using TagLib;
 
@@ -17,9 +18,11 @@ namespace AlbumArtTool.Core
 
         public static byte[] GetCover(TagLib.Tag tag) => GetCover(tag, null);
 
-        internal static byte[] GetCover(TagLib.Tag tag, ArtworkValidationCache cache)
+        internal static byte[] GetCover(TagLib.Tag tag, ArtworkValidationCache cache) => GetCover(tag.Pictures, cache);
+
+        internal static byte[] GetCover(IPicture[] pictures, ArtworkValidationCache cache)
         {
-            var pictures = tag.Pictures;
+            if (pictures == null) return null;
             // Front covers first, then unclassified pictures, each in tag order.
             for (int pass = 0; pass < 2; pass++)
                 foreach (var picture in pictures)
@@ -31,6 +34,36 @@ namespace AlbumArtTool.Core
                     if (IsValid(bytes)) return bytes;
                 }
             return null;
+        }
+
+        /// <summary>A short description such as "2 front covers, 1 back cover".</summary>
+        public static string Describe(IPicture[] pictures)
+        {
+            if (pictures == null || pictures.Length == 0) return "";
+            var parts = new List<string>();
+            foreach (var group in pictures.GroupBy(p => p.Type).OrderBy(g => g.Key == PictureType.FrontCover ? 0 : g.Key == PictureType.Other ? 1 : 2).ThenBy(g => (int)g.Key))
+            {
+                string name = PictureName(group.Key);
+                parts.Add(group.Count() + " " + name + (group.Count() == 1 ? "" : name.EndsWith("s") ? "es" : "s"));
+            }
+            return string.Join(", ", parts);
+        }
+
+        private static string PictureName(PictureType type)
+        {
+            switch (type)
+            {
+                case PictureType.FrontCover: return "front cover";
+                case PictureType.BackCover: return "back cover";
+                case PictureType.Other: return "unlabeled picture";
+                case PictureType.Media: return "disc picture";
+                case PictureType.LeafletPage: return "booklet page";
+                case PictureType.FileIcon: case PictureType.OtherFileIcon: return "file icon";
+                case PictureType.NotAPicture: return "attachment";
+            }
+            var text = new System.Text.StringBuilder();
+            foreach (char c in type.ToString()) { if (char.IsUpper(c) && text.Length > 0) text.Append(' '); text.Append(char.ToLowerInvariant(c)); }
+            return text + " picture";
         }
 
         public static bool IsImageError(Exception e) => e is ArgumentException || e is OutOfMemoryException ||
@@ -106,6 +139,25 @@ namespace AlbumArtTool.Core
                     return Encode(square, jpeg ? ImageKind.Jpeg : ImageKind.Png);
                 }
             }
+        }
+
+        /// <summary>Longest side for embedded artwork, and the size above which a picture is worth re-encoding.</summary>
+        public const int SensibleSide = 1600;
+        public const int LargeBytes = 1024 * 1024;
+
+        /// <summary>True for embedded pictures larger than 1600 px or 1 MB.</summary>
+        public static bool IsOversized(byte[] bytes)
+        {
+            var size = ReadInfo(bytes);
+            return Math.Max(size.Width, size.Height) > SensibleSide || bytes.Length > LargeBytes;
+        }
+
+        /// <summary>Re-encodes as a JPEG of at most 1600 px (aspect kept, never enlarged).
+        /// Returns the original bytes when that would not make the picture smaller.</summary>
+        public static byte[] Shrink(byte[] bytes)
+        {
+            byte[] smaller = Normalize(bytes, SensibleSide, ImageKind.Jpeg);
+            return smaller.Length < bytes.Length ? smaller : bytes;
         }
 
         public static byte[] Thumbnail(byte[] bytes) => Normalize(bytes, 128, ImageKind.Png);

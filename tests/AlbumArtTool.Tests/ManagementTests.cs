@@ -43,7 +43,7 @@ internal static partial class Tests
         Assert(LibraryPaths.ShouldConvert(new Track { Path = "x.m4a", Bitrate = 128 }, new LibraryOptions { Convert = true, ConvertOtherLossy = true }), "explicit compatibility mode converts other non-MP3 audio");
         Assert(LibraryPaths.Component("AC/DC: Live?") == "AC_DC- Live_" && LibraryPaths.Component("CON") == "_CON", "Windows folder names are sanitized without creating extra directory levels");
         foreach (string fixture in Fixtures()) SquareRoundTrip(fixture);
-        ManagementCombined(); ManagementConflicts(); ManagementStaleAndCancel(); ManagementRecovery(); ManagementUnknownDuplicates(); JournalCompatibility();
+        ManagementCombined(); ManagementConflicts(); ManagementStaleAndCancel(); ManagementRecovery(); ManagementUnknownDuplicates(); JournalCompatibility(); ShrinkTests();
         FilenameTests();
     }
 
@@ -204,5 +204,75 @@ internal static partial class Tests
             Console.WriteLine("LIVE ENCODER: verified upstream checksum, license extraction, startup and actual MP3 320 conversion with retained artwork.");
         }
         return 0;
+    }
+}
+
+internal static partial class Tests
+{
+    // Photographic-style detail so a PNG is genuinely large and a JPEG genuinely smaller.
+    internal static byte[] NoisyArt(int width, int height)
+    {
+        var random = new Random(width * 31 + height);
+        using (var bitmap = new SkiaSharp.SKBitmap(width, height))
+        {
+            var pixels = new SkiaSharp.SKColor[width * height];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = new SkiaSharp.SKColor((byte)random.Next(256), (byte)random.Next(256), (byte)random.Next(256));
+            bitmap.Pixels = pixels;
+            return Encode(bitmap, SkiaSharp.SKEncodedImageFormat.Png, 100);
+        }
+    }
+
+    private static void ShrinkTests()
+    {
+        byte[] large = NoisyArt(1800, 1200), small = MakeCover(SkiaSharp.SKColors.Gray, 500);
+        Assert(large.Length > Artwork.LargeBytes && Artwork.IsOversized(large) && !Artwork.IsOversized(small), "pictures over 1600 px or 1 MB are oversized; normal covers are not");
+        byte[] shrunk = Artwork.Shrink(large);
+        Assert(Size(shrunk) == (1600, 1067) && shrunk[0] == 0xff && shrunk[1] == 0xd8 && shrunk.Length < large.Length / 2, "shrinking re-encodes as a 1600 px JPEG with the same shape");
+        Assert(ReferenceEquals(Artwork.Shrink(small), small) || Artwork.Shrink(small).Length < small.Length, "shrinking never makes a picture larger");
+        foreach (string fixture in Fixtures()) ShrinkRoundTrip(fixture, large, small);
+        // Square crop and shrink together: crop at full resolution first, then re-encode.
+        string root = NewFolder("shrink-square"), path = CopyTrack(root, "one.flac");
+        using (var file = TagLib.File.Create(path)) { file.Tag.Pictures = new[] { new TagLib.Picture(new TagLib.ByteVector(NoisyArt(2400, 1800))) { Type = TagLib.PictureType.FrontCover, MimeType = "image/png" } }; file.Save(); }
+        var options = Options(root, NewFolder("shrink-square-backups")); options.Square = options.Shrink = true;
+        var plan = LibraryPlanner.Build(options, CancellationToken.None);
+        Assert(plan.Actions.Single().Square && plan.Actions.Single().Shrink && plan.Actions.Single().Description == "Square art + Shrink art", "square and shrink are previewed together");
+        Assert(LibraryRunner.Run(plan, CancellationToken.None).Issues.Count == 0, "square crop and shrink apply together");
+        using (var file = TagLib.File.Create(path)) Assert(Size(file.Tag.Pictures[0].Data.Data) == (1600, 1600) && file.Tag.Pictures[0].MimeType == "image/jpeg", "cropped artwork is then reduced to a 1600 px JPEG");
+        // Files with only normal-sized artwork are left alone.
+        string plain = NewFolder("shrink-nothing"); string normal = CopyTrack(plain, "one.mp3");
+        using (var file = TagLib.File.Create(normal)) { file.Tag.Pictures = new[] { new TagLib.Picture(new TagLib.ByteVector(Cover)) { Type = TagLib.PictureType.FrontCover } }; file.Save(); }
+        options = Options(plain, NewFolder("shrink-nothing-backups")); options.Shrink = true;
+        Assert(LibraryPlanner.Build(options, CancellationToken.None).Actions.All(a => !a.HasWork), "normal-sized artwork is not re-encoded");
+    }
+
+    private static void ShrinkRoundTrip(string fixture, byte[] large, byte[] small)
+    {
+        string extension = Path.GetExtension(fixture), root = NewFolder("shrink-" + extension.Substring(1)), backups = NewFolder("shrink-backup-" + extension.Substring(1));
+        string path = CopyTrack(root, "one" + extension);
+        using (var file = TagLib.File.Create(path))
+        {
+            file.Tag.Pictures = new TagLib.IPicture[] {
+                new TagLib.Picture(new TagLib.ByteVector(large)) { Type = TagLib.PictureType.FrontCover, MimeType = "image/png", Description = "Front" },
+                new TagLib.Picture(new TagLib.ByteVector(small)) { Type = TagLib.PictureType.BackCover, MimeType = "image/jpeg", Description = "Back" } };
+            file.Save();
+        }
+        string original = CoverEditor.Hash(path), audio = AudioHash(path), metadata = Metadata(path);
+        long before = new FileInfo(path).Length;
+        var options = Options(root, backups); options.Shrink = true;
+        var plan = LibraryPlanner.Build(options, CancellationToken.None);
+        var row = plan.Actions.Single();
+        Assert(row.Shrink && row.Reason.Contains("1800 × 1200") && CoverEditor.Hash(path) == original, extension + " shrink preview names the large picture and changes nothing");
+        var journal = LibraryRunner.Run(plan, CancellationToken.None);
+        Assert(journal.Issues.Count == 0 && journal.Entries.Single().State == "Committed", extension + " shrink commits: " + string.Join(";", journal.Issues));
+        using (var file = TagLib.File.Create(path))
+        {
+            var pictures = file.Tag.Pictures;
+            Assert(pictures.Length == 2 && pictures[0].Type == TagLib.PictureType.FrontCover && pictures[1].Type == TagLib.PictureType.BackCover, extension + " picture count, types and order are kept");
+            Assert(Size(pictures[0].Data.Data) == (1600, 1067) && pictures[0].MimeType == "image/jpeg", extension + " the oversized front cover becomes a 1600 px JPEG");
+            Assert(pictures[1].Data.Data.SequenceEqual(small), extension + " normal-sized pictures stay byte identical");
+        }
+        Assert(new FileInfo(path).Length < before - large.Length / 2, extension + " the file gets substantially smaller");
+        Assert(AudioHash(path) == audio && Metadata(path) == metadata, extension + " shrinking preserves decoded audio and music tags");
+        Assert(LibraryRunner.Undo(journal, CancellationToken.None) == 1 && CoverEditor.Hash(path) == original, extension + " Undo restores the exact original artwork and file");
     }
 }

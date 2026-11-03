@@ -51,6 +51,10 @@ namespace AlbumArtTool.Core
         public int Channels { get; set; }
         public string ArtistText => string.Join(", ", Performers);
         public bool HasCover { get; set; }
+        /// <summary>Embedded pictures of any type, and how many are front/unlabeled covers.</summary>
+        public int PictureCount { get; set; }
+        public int CoverPictures { get; set; }
+        public string PictureSummary { get; set; } = "";
         public FileStamp Stamp { get; set; }
 
         // Normalizing the single track credit is the hot path of artist cleanup counts,

@@ -27,7 +27,8 @@ namespace AlbumArtTool
             duplicates = Kit.Check("Remove confirmed duplicate songs / albums", true), organize = Kit.Check("Organize all folders into Artist / Album", true),
             archive = Kit.Check("Move old tool backups off the music player", true), compatibility = Kit.Check("Also convert other non-MP3 audio (compatibility)", false),
             rename = Kit.Check("Rename song files from Title tags", false), combine = Kit.Check("Combine multi-disc albums", false),
-            cleanTitles = Kit.Check("Remove featured artists from titles", false);
+            cleanTitles = Kit.Check("Remove featured artists from titles", false),
+            shrink = Kit.Check("Shrink oversized embedded artwork (JPEG, max 1600 px)", false);
         private readonly TextBox backup = new TextBox();
         private readonly TextBlock state = Kit.Label("", Kit.Body), encoderState = Kit.Label("", Kit.Body, cls: "muted");
         private readonly ProgressBar progress = new ProgressBar { Minimum = 0, Maximum = 100, Margin = new Thickness(0, 8, 0, 2) };
@@ -65,12 +66,15 @@ namespace AlbumArtTool
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             var path = Kit.Label("Music folder: " + root, Kit.Body);
             rename.Named("Rename song files from Title tags"); combine.Named("Combine multi-disc albums"); cleanTitles.Named("Remove featured artists from titles");
-            var hint = Kit.Label("Cleans feat. / ft. / featuring credits", Kit.Small, cls: "muted"); hint.Margin = new Thickness(3);
+            cleanTitles.Tip("Cleans feat. / ft. / featuring credits from Title tags and filenames.");
+            shrink.Named("Shrink oversized embedded artwork");
+            shrink.Tip("Re-encodes embedded pictures larger than " + Artwork.SensibleSide + " px or 1 MB as JPEGs of at most " + Artwork.SensibleSide +
+                " px, keeping their shape and picture type. Pictures that would not get smaller are left alone. Audio and other tags are unchanged.");
             var options = Kit.Grid("*,*", "*,*,*,*,*").Add(convert.Cell(0, 0), square.Cell(0, 1), duplicates.Cell(1, 0), organize.Cell(1, 1),
-                archive.Cell(2, 0), compatibility.Cell(2, 1), rename.Cell(3, 0), combine.Cell(3, 1), cleanTitles.Cell(4, 0), hint.Cell(4, 1)).Named("Library management options");
+                archive.Cell(2, 0), compatibility.Cell(2, 1), rename.Cell(3, 0), combine.Cell(3, 1), cleanTitles.Cell(4, 0), shrink.Cell(4, 1)).Named("Library management options");
             optionsPanel = options;
             var optionsCard = Kit.Frost(options, new Thickness(10, 5, 10, 5)); optionsCard.Margin = new Thickness(0, 0, 0, 5);
-            foreach (var check in new[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles }) check.IsCheckedChanged += (s, e) => InvalidatePlan();
+            foreach (var check in new[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles, shrink }) check.IsCheckedChanged += (s, e) => InvalidatePlan();
             var tools = Kit.Grid("*,165,160", "*").Add(encoderState.Cell(0, 0), download.Cell(0, 1), chooseEncoder.Cell(0, 2));
             backup.Text = BackupSettings.Root; backup.Named("PC backup folder"); backup.FontSize = Kit.Small;
             backup.TextChanged += (s, e) => InvalidatePlan();
@@ -183,7 +187,7 @@ namespace AlbumArtTool
         private void SetWorking(bool value)
         {
             IsWorking = value;
-            foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles, backup, preview, undo, download, chooseEncoder, chooseBackup }) control.IsEnabled = !value;
+            foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles, shrink, backup, preview, undo, download, chooseEncoder, chooseBackup }) control.IsEnabled = !value;
             stop.IsEnabled = value; progress.IsVisible = value; UpdateApply();
         }
 
@@ -208,7 +212,7 @@ namespace AlbumArtTool
         {
             if (IsWorking || !Ready()) return;
             var options = new LibraryOptions { Root = root, BackupRoot = backup.Text, EncoderPath = encoder, Convert = convert.On(), ConvertOtherLossy = compatibility.On(),
-                Square = square.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On() };
+                Square = square.On(), Shrink = shrink.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On() };
             source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
             SetWorking(true); exclusive(true); SetRows(new List<FileRow>()); plan = null; undoJournal = null;
             try
