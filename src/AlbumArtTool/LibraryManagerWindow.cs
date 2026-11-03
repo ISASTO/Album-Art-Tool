@@ -30,7 +30,7 @@ namespace AlbumArtTool
             cleanTitles = Kit.Check("Remove featured artists from titles", false),
             shrink = Kit.Check("Standardize embedded artwork (one front cover, JPEG ≤ 600 px)", false),
             titleFromName = Kit.Check("Fill missing Title tags from filenames", false),
-            id3v23 = Kit.Check("Standardize MP3 tags to ID3v2.3 (UTF-16)", false);
+            id3v23 = Kit.Check("Standardize MP3 tags to ID3v2.3 (Latin-1 / UTF-16)", false);
         private readonly TextBox backup = new TextBox();
         private readonly TextBlock state = Kit.Label("", Kit.Body), encoderState = Kit.Label("", Kit.Body, cls: "muted");
         private readonly ProgressBar progress = new ProgressBar { Minimum = 0, Maximum = 100, Margin = new Thickness(0, 8, 0, 2) };
@@ -157,9 +157,11 @@ namespace AlbumArtTool
             titleFromName.Tip("Gives songs without a Title tag their filename as the title, without the extension or a leading track number: \"01 - Song.mp3\" → \"Song\".\n\n" +
                 "Songs that already have a title are left alone and files keep their names. Files with no tags at all get one. " +
                 "Combined with \"Remove featured artists\" the new title is cleaned too." + safe);
-            id3v23.Tip("Rewrites MP3 tags as ID3v2.3 with UTF-16 text, the version every player and Windows reads, keeping accented and non-Latin characters intact.\n\n" +
-                "Tag contents are unchanged. ID3v2.4 dates are written as their v2.3 fields (TYER, TDAT, TIME, TORY). An MP3 with only an old ID3v1/APE tag gets an ID3v2.3 tag with the same fields. " +
-                "ID3 tags in AIFF and WAV files are converted too. Files already in that form are left alone." + safe);
+            id3v23.Tip("Rewrites MP3 tags as ID3v2.3, the version every player and Windows reads.\n\n" +
+                "Text that Latin-1 can hold (English and Western European accents such as é, ñ, ü) is kept in, or converted to, Latin-1. A field with any other character (星, Ж, emoji…) is written as UTF-16, so nothing is ever replaced with \"?\". " +
+                "Each saved file is reread and every field compared, character for character, before the original is replaced.\n\n" +
+                "ID3v2.4 dates are written as their v2.3 fields (TYER, TDAT, TIME, TORY). Old ID3v2.2 tags are upgraded. An MP3 with only an ID3v1 tag gets an ID3v2.3 tag with the same fields; " +
+                "an extra APE tag is merged in and removed (with its second copy of the cover). Duplicate frames left by older versions of this tool are repaired. ID3 tags in AIFF and WAV files are converted too. Files already in this form are left alone." + safe);
             encoderState.Tip("FFmpeg converts audio to MP3. It is only needed for the conversion options; every other option works without it.");
             download.Tip("Downloads a Windows build of FFmpeg (about 170 MB, once) from BtbN/FFmpeg-Builds on GitHub into this PC's app cache.\n\n" +
                 "The download's SHA-256 checksum is verified before anything is extracted or run. License notices are included.");
