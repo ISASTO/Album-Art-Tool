@@ -358,7 +358,7 @@ internal static partial class Tests
             var filled = manager.CurrentPlan.Actions.Where(a => a.TitleFromName).OrderBy(a => a.NewTitle).Select(a => a.NewTitle).ToArray();
             Assert(filled.SequenceEqual(new[] { "blank", "no title" }) && manager.CurrentPlan.Actions.Where(a => a.HasWork).All(a => a.TitleFromName && !a.Convert && !a.Square && !a.Archive && !a.Move),
                 "the fill button previews only filename titles for the songs missing one");
-            Assert(Named<CheckBox>(manager, "Fill missing Title tags from filenames").IsChecked == true && Named<CheckBox>(manager, "Convert lossless / over 320 kbps to MP3 320").IsChecked == false,
+            Assert(Named<CheckBox>(manager, "Fill missing Title tags from filenames").IsChecked == true && Controls(manager.OptionsPanel).OfType<CheckBox>().Count(c => c.IsChecked == true) == 1,
                 "the manager opens with just the title fill selected");
             manager.Close(); await Settle();
             Click(ButtonStarting(dialog, "Fix embedded pictures"));
