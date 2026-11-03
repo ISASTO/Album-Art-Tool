@@ -240,7 +240,7 @@ internal static partial class Tests
 
     private static void TitlesFromFilenames()
     {
-        Assert(LibraryChecks.SuggestedTitle(@"C:\Music\01 - Song.mp3") == "Song" && LibraryChecks.SuggestedTitle("/m/7. Intro.flac") == "Intro" &&
+        Assert(LibraryChecks.SuggestedTitle(Path.Combine("Music", "01 - Song.mp3")) == "Song" && LibraryChecks.SuggestedTitle("/m/7. Intro.flac") == "Intro" &&
             LibraryChecks.SuggestedTitle("/m/99 Problems.mp3") == "99 Problems" && LibraryChecks.SuggestedTitle("/m/2-Pac Song.mp3") == "2-Pac Song" &&
             LibraryChecks.SuggestedTitle("/m/Song.Name v2.mp3") == "Song.Name v2" && LibraryChecks.SuggestedTitle("/m/  Spaced  .mp3") == "Spaced",
             "suggested titles drop only the extension and a clear leading track number");
