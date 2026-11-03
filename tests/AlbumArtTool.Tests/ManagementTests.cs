@@ -275,7 +275,7 @@ internal static partial class Tests
         }
         long after = new FileInfo(path).Length;
         Console.WriteLine("SHRINK " + extension + ": " + before + " -> " + after + " bytes");
-        if (new[] { ".mp3", ".flac", ".aiff", ".wav" }.Contains(extension))
+        if (!new[] { ".wma", ".wv" }.Contains(extension))
             Assert(after < before - large.Length / 2, extension + " the file itself gets substantially smaller, not just padded: " + before + " -> " + after);
         Assert(AudioHash(path) == audio && Metadata(path) == metadata, extension + " shrinking preserves decoded audio and music tags");
         Assert(LibraryRunner.Undo(journal, CancellationToken.None) == 1 && CoverEditor.Hash(path) == original, extension + " Undo restores the exact original artwork and file");

@@ -245,7 +245,7 @@ namespace AlbumArtTool.Management
                 }
                 file.Save();
             }
-            if (shrink) TagCompaction.RemoveFlacPadding(path);
+            if (shrink) TagCompaction.Compact(path);
             using (var file = TagLib.File.Create(path, TagLib.ReadStyle.None))
             {
                 if (pictureEdit)
