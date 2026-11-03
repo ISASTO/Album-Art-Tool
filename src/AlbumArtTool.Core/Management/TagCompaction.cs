@@ -110,6 +110,7 @@ namespace AlbumArtTool.Management
         }
 
         private static readonly Guid AsfHeader = new Guid("75B22630-668E-11CF-A6D9-00AA0062CE6C");
+        private static readonly Guid AsfFileProperties = new Guid("8CABDCA1-A947-11CF-8EE4-00C00C205365");
         private static readonly Guid AsfPadding = new Guid("1806D474-CADF-4509-A4BA-9AABCB96AAE8");
 
         // ASF/WMA: drop Padding Objects from the header. Audio packets are addressed by number,
@@ -140,7 +141,14 @@ namespace AlbumArtTool.Management
                     BitConverter.GetBytes(headerSize - removed).CopyTo(newHead, 16);
                     BitConverter.GetBytes(kept).CopyTo(newHead, 24);
                     output.Write(newHead, 0, 30);
-                    foreach (var (offset, size) in children) Copy(input, output, offset, size);
+                    foreach (var (offset, size) in children)
+                    {
+                        var object_ = new byte[size]; input.Position = offset;
+                        int read = 0; while (read < size) { int n = input.Read(object_, read, (int)(size - read)); if (n == 0) throw new EndOfStreamException(); read += n; }
+                        // The File Properties Object records the total file size.
+                        if (new Guid(object_.AsSpan(0, 16)) == AsfFileProperties && size >= 48) BitConverter.GetBytes(input.Length - removed).CopyTo(object_, 40);
+                        output.Write(object_, 0, object_.Length);
+                    }
                     Copy(input, output, headerSize, input.Length - headerSize);
                 }
             }
