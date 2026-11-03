@@ -84,12 +84,13 @@ Use **Open album folder** below the artist preview to open the selected album in
 
 [Track artist cleanup preview](docs/track-artists.png)
 
-## Check tags
+## Check library
 
-Click **Check tags…** after a scan to list:
+Click **Check library…** after a scan to list:
 
 - **Songs missing a Title tag.** Players show these by filename. Blank titles count as missing.
 - **Songs with more than one embedded picture**, with a description such as *2 front covers, 1 back cover*. Songs with several front or unlabeled covers come first, because players may show any of them.
+- **Lossy songs below a bitrate you choose** (96–320 kbps, 192 by default), lowest first, with their format — handy for finding songs to download again in better quality. Lossless files (FLAC, ALAC, WAV, AIFF…) are never listed.
 
 The check uses the last library scan, so it opens instantly and never changes a file. Select a song and click **Show selected file** to highlight it in File Explorer, or **Save report…** for a CSV. Rescan and click **Check again** after fixing files.
 

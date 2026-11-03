@@ -326,6 +326,15 @@ internal static partial class Tests
             Assert(csv.Contains("\"Missing Title tag\"") && csv.Contains("\"Several embedded covers\"") && csv.Contains("2 front covers, 1 back cover") && csv.Contains("04 - blank.flac"),
                 "the report lists each finding with its path and pictures");
         }
+        var library = Scanner.Scan(root, CancellationToken.None).Albums;
+        var all = LibraryChecks.Run(library, 320);
+        Assert(all.LowBitrate.Count == 4 && all.LowBitrate.All(t => t.Path.EndsWith(".mp3")) && all.LowBitrateLimit == 320,
+            "lossy songs below the chosen bitrate are listed; lossless FLAC never is");
+        Assert(LibraryChecks.Run(library, 96).LowBitrate.Count == library.SelectMany(a => a.Tracks).Count(t => !t.Lossless && t.Bitrate > 0 && t.Bitrate < 96), "the threshold controls which songs are listed");
+        Assert(LibraryChecks.IsLowBitrate(new Track { Path = "a.mp3", Bitrate = 96 }, 128) && !LibraryChecks.IsLowBitrate(new Track { Path = "a.flac", Bitrate = 96, Lossless = true }, 128) &&
+            !LibraryChecks.IsLowBitrate(new Track { Path = "a.mp3", Bitrate = 0 }, 128) && !LibraryChecks.IsLowBitrate(new Track { Path = "a.mp3", Bitrate = 128 }, 128),
+            "low bitrate means lossy, known and strictly below the threshold");
+        Assert(LibraryChecks.Csv(all).Contains("\"Below 320 kbps\"") && LibraryChecks.Format(new Track { Path = "x.m4a" }) == "AAC/M4A", "the report lists low-bitrate songs with their format");
         Assert(Artwork.Describe(new TagLib.IPicture[] { new TagLib.Picture { Type = TagLib.PictureType.LeafletPage }, new TagLib.Picture { Type = TagLib.PictureType.LeafletPage }, new TagLib.Picture { Type = TagLib.PictureType.Media } })
             == "1 disc picture, 2 booklet pages", "picture descriptions name each picture type");
     }

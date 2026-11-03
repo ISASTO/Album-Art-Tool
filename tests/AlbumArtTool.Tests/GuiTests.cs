@@ -332,14 +332,17 @@ internal static partial class Tests
         window.Show();
         try
         {
-            var button = ButtonStarting(window, "Check tags");
+            var button = ButtonStarting(window, "Check library");
             Assert(!button.IsEnabled, "tag checks wait for a library scan");
             await window.ScanAsync();
             Click(button); await Settle();
             var dialog = window.OwnedWindows.OfType<LibraryCheckWindow>().Single();
             Assert(dialog.Result.MissingTitles.Count == 2 && dialog.Result.MultiplePictures.Count == 2, "the tag check window opens with both checks");
             Assert(Named<TextBlock>(dialog, "Tag check summary").Text.StartsWith("2 missing a Title tag · 2 with several embedded pictures (1 with several covers)"), "the summary counts each finding");
-            Assert(dialog.Rows.Count(r => r.Header) == 2 && dialog.Rows.Count(r => r.Path != null) == 4, "results are grouped under the two checks");
+            Assert(dialog.Rows.Count(r => r.Header) == 3 && dialog.Rows.Count(r => r.Path != null) == 4 + dialog.Result.LowBitrate.Count, "results are grouped under the three checks");
+            var threshold = Named<ComboBox>(dialog, "Low bitrate threshold");
+            threshold.SelectedIndex = Array.IndexOf(LibraryChecks.BitrateChoices, 320);
+            Assert(dialog.Result.LowBitrateLimit == 320 && dialog.Result.LowBitrate.Count == 4, "changing the threshold rechecks low-bitrate songs");
             ProcessStartInfo opened = null; window.StartExplorer = info => opened = info;
             var show = ButtonStarting(dialog, "Show selected file");
             Assert(!show.IsEnabled, "a song must be selected before it can be shown");

@@ -16,7 +16,7 @@ namespace AlbumArtTool
     {
         private readonly Button artistsTab = Kit.Button("Track artists", "tab");
         private readonly Button findDuplicates = Kit.Button("Find duplicates…");
-        private readonly Button checkTags = Kit.Button("Check tags…");
+        private readonly Button checkTags = Kit.Button("Check library…");
         private LibraryCheckWindow checkWindow;
         private readonly Button manageLibrary = Kit.Button("Manage library…", "primary");
         private LibraryManagerWindow managerWindow;
@@ -52,7 +52,7 @@ namespace AlbumArtTool
             albumSort.SelectionChanged += (s, e) => { if (!busy && !changingAlbumView) RefreshAlbums(); };
             findDuplicates.Click += async (s, e) => await FindDuplicatesAsync();
             checkTags.Click += (s, e) => CheckTags();
-            checkTags.Tip("List songs missing a Title tag and songs with more than one embedded picture.");
+            checkTags.Tip("List songs missing a Title tag, songs with more than one embedded picture, and low-bitrate songs.");
             manageLibrary.Click += (s, e) => ShowLibraryManager();
             var showLabel = Kit.Label("SHOW", cls: "caption"); var sortLabel = Kit.Label("SORT BY", cls: "caption");
             showLabel.Margin = sortLabel.Margin = new Thickness(8, 0, 0, 0);
