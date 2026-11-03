@@ -52,7 +52,7 @@ namespace AlbumArtTool.Core
                 if (bytes.Length > 0 && bytes.Length <= MaxImageBytes)
                     try { var size = ReadInfo(bytes); area = (long)size.Width * size.Height; } catch (Exception e) when (IsImageError(e)) { }
                 // Undecodable pictures only win when nothing else can be shown.
-                int rank = (area < 0 ? 3 : 0) + (pictures[i].Type == PictureType.FrontCover ? 0 : pictures[i].Type == PictureType.Other ? 1 : 2) * 4;
+                int rank = (area < 0 ? 3 : 0) + (pictures[i].Type == PictureType.FrontCover ? 0 : pictures[i].Type == PictureType.Other ? 1 : 2);
                 if (rank < bestRank || rank == bestRank && area > bestArea) { best = i; bestRank = rank; bestArea = area; }
             }
             return best;
