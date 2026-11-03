@@ -217,7 +217,7 @@ namespace AlbumArtTool
         {
             if (checkWindow != null) { checkWindow.Check(); checkWindow.Activate(); return checkWindow; }
             if (busy || library.Albums.Count == 0) return null;
-            var window = checkWindow = new LibraryCheckWindow(() => library.Albums.ToArray(), info => StartExplorer(info), () => ShowLibraryManager().PreviewTitleFill(), () => ShowLibraryManager().PreviewSinglePicture());
+            var window = checkWindow = new LibraryCheckWindow(() => library.Albums.ToArray(), info => StartExplorer(info), () => ShowLibraryManager().PreviewTitleFill(), () => ShowLibraryManager().PreviewArtworkFix());
             window.Closed += (s, e) => { if (checkWindow == window) checkWindow = null; };
             window.Show(this);
             return window;

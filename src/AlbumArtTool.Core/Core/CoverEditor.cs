@@ -11,6 +11,8 @@ namespace AlbumArtTool.Core
         {
             // Decode before touching any audio file.
             using (Artwork.Decode(jpeg)) { }
+            // Embedded covers follow the library standard: one front cover, a quality-88 JPEG of at most 600 px.
+            byte[] embedded = Artwork.EmbedCover(jpeg);
             var result = new EditResult();
             var targets = album.Tracks.Where(t => !onlyMissing || !t.HasCover).ToList();
             string backupDirectory = BackupSettings.NewFolder(album.Folder);
@@ -26,16 +28,19 @@ namespace AlbumArtTool.Core
                     using (var audio = TagLib.File.Create(temp, TagLib.ReadStyle.None))
                     {
                         if (onlyMissing && Artwork.GetCover(audio.Tag) != null) continue;
-                        var picture = new TagLib.Picture(new TagLib.ByteVector(jpeg))
-                        { Type = TagLib.PictureType.FrontCover, MimeType = "image/jpeg", Description = "Front cover" };
-                        // Preserve back covers, booklets, disc images and other explicitly typed artwork.
-                        audio.Tag.Pictures = new TagLib.IPicture[] { picture }.Concat(audio.Tag.Pictures.Where(p => !Artwork.IsCover(p))).ToArray();
+                        var picture = new TagLib.Picture(new TagLib.ByteVector(embedded))
+                        { Type = TagLib.PictureType.FrontCover, MimeType = "image/jpeg", Description = "" };
+                        // Exactly one embedded picture: the front cover. Other picture slots are cleared.
+                        audio.Tag.Pictures = new TagLib.IPicture[] { picture };
+                        Management.TagCompaction.RebuildId3v2(audio);
                         audio.Save();
                     }
+                    // Drop the padding left where removed or larger pictures were, so the file really shrinks.
+                    Management.TagCompaction.Compact(temp);
                     using (var check = TagLib.File.Create(temp, TagLib.ReadStyle.None))
                     {
                         byte[] stored = Artwork.GetCover(check.Tag);
-                        if (stored == null || !stored.AsSpan().SequenceEqual(jpeg)) throw new IOException("The format did not retain the new cover. Original file kept.");
+                        if (stored == null || check.Tag.Pictures.Length != 1 || !stored.AsSpan().SequenceEqual(embedded)) throw new IOException("The format did not retain the new cover. Original file kept.");
                     }
                     if (!track.Stamp.Matches(track.Path)) throw new IOException("File changed during the edit. Original file kept.");
                     string hash = Hash(temp);

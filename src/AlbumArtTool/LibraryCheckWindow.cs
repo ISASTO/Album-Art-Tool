@@ -23,7 +23,7 @@ namespace AlbumArtTool
         private readonly Func<Album[]> currentAlbums;
         private readonly Action<ProcessStartInfo> openFolder;
         private readonly Func<Task> fillTitles, fixPictures;
-        private readonly Button fill = Kit.Button("Fill titles from filenames…"), onePicture = Kit.Button("Keep one picture per song…");
+        private readonly Button fill = Kit.Button("Fill titles from filenames…"), onePicture = Kit.Button("Fix embedded pictures…");
         private readonly ListBox list = new ListBox { Classes = { "grid" } };
         private readonly TextBlock summary = Kit.Label("", Kit.Body);
         private readonly ComboBox threshold = new ComboBox { Width = 130, HorizontalAlignment = HorizontalAlignment.Right };
@@ -57,7 +57,7 @@ namespace AlbumArtTool
             show.IsEnabled = false; show.Click += (s, e) => ShowSelected();
             fill.Named("Fill titles from filenames").Tip("Opens Manage library with only \"Fill missing Title tags from filenames\" selected and previews the changes. Nothing is written until you apply them.");
             fill.Click += async (s, e) => { if (this.fillTitles != null) await this.fillTitles(); };
-            onePicture.Named("Keep one picture per song").Tip("Opens Manage library with only \"Keep one embedded picture per song\" selected and previews the changes. Nothing is written until you apply them.");
+            onePicture.Named("Fix embedded pictures").Tip("Opens Manage library with only \"Standardize embedded artwork\" selected (one " + Artwork.EmbedSide + " px JPEG front cover per song) and previews the changes. Nothing is written until you apply them.");
             onePicture.Click += async (s, e) => { if (this.fixPictures != null) await this.fixPictures(); };
             foreach (var b in new[] { refresh, save, fill, onePicture, show }) b.Margin = new Thickness(3, 6, 3, 0);
             var buttons = Kit.Grid("130,140,*,215,215,160", "*").Add(refresh.Cell(0, 0), save.Cell(0, 1), fill.Cell(0, 3), onePicture.Cell(0, 4), show.Cell(0, 5));

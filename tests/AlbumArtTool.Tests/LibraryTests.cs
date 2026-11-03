@@ -185,7 +185,7 @@ internal static partial class Tests
             {
                 Assert(file.Tag.Track == row.MergedTrack && file.Tag.TrackCount == 4 && file.Tag.Disc == 1 && file.Tag.DiscCount == 1, extension + " merged track/disc tags persist");
                 Assert(file.Tag.Album == "A multi-disc album" && file.Tag.Title.EndsWith("(Live)") && !file.Tag.Title.Contains("feat") && file.Tag.FirstPerformer == "Example artist", extension + " removes feature credits while preserving version and artist");
-                Assert(file.Tag.Year == 2024 && file.Tag.Comment == "Keep this comment" && file.Tag.Genres.SequenceEqual(new[] { "Test genre" }) && Artwork.GetCover(file.Tag).SequenceEqual(Cover), extension + " preserves unrelated tags and exact embedded artwork");
+                Assert(file.Tag.Year == 2024 && file.Tag.Comment == "Keep this comment" && file.Tag.Genres.SequenceEqual(new[] { "Test genre" }) && Artwork.GetCover(file.Tag).SequenceEqual(Artwork.EmbedCover(Cover)), extension + " preserves unrelated tags and exact embedded artwork");
             }
             Assert(AudioHash(row.Target) == audio[row.Source] && !Path.GetFileName(row.Target).Contains("feat"), extension + " keeps decoded audio intact and cleans the filename");
         }

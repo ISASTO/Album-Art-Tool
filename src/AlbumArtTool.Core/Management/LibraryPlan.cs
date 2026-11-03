@@ -17,7 +17,7 @@ namespace AlbumArtTool.Management
         public bool ConvertOtherLossy { get; set; }
         public bool Square { get; set; }
         public bool Shrink { get; set; }
-        public bool SinglePicture { get; set; }
+        public bool Id3v23 { get; set; }
         public bool Organize { get; set; }
         public bool RenameFromTitle { get; set; }
         public bool CombineDiscs { get; set; }
@@ -39,8 +39,10 @@ namespace AlbumArtTool.Management
         public bool Convert { get; set; }
         public bool Square { get; set; }
         public bool Shrink { get; set; }
-        /// <summary>Keep only the best embedded picture (see Artwork.BestPictureIndex) and drop the rest.</summary>
+        /// <summary>Keep only the best embedded picture (see Artwork.BestPictureIndex), as the front cover, and drop the rest.</summary>
         public bool SinglePicture { get; set; }
+        /// <summary>Rewrite the ID3v2 tag as version 2.3 with UTF-16 text.</summary>
+        public bool Id3v23 { get; set; }
         public bool Archive { get; set; }
         public bool Selected { get; set; } = true;
         public string NewTitle { get; set; }
@@ -54,13 +56,13 @@ namespace AlbumArtTool.Management
         public uint MergedTrack { get; set; }
         public uint MergedTrackCount { get; set; }
         // Shrinking artwork rewrites only the picture data, through the same verified tag edit.
-        internal bool ChangesTags => MergeDiscs || NewTitle != null || Shrink || SinglePicture;
+        internal bool ChangesTags => MergeDiscs || NewTitle != null || Shrink || SinglePicture || Id3v23;
         internal FileStamp Stamp;
         internal bool Move => !string.IsNullOrEmpty(Target) && !Source.Equals(Target, StringComparison.OrdinalIgnoreCase);
         internal bool Rename => !string.IsNullOrEmpty(Target) && !Path.GetFileNameWithoutExtension(Source).Equals(Path.GetFileNameWithoutExtension(Target), StringComparison.Ordinal);
         internal bool HasWork => Archive || Convert || Square || Move || Rename || ChangesTags;
         internal string Description => Archive ? Keeper != null ? "Remove duplicate (backed up)" : "Archive old backup" :
-            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, SinglePicture ? "One picture" : null, Shrink ? "Shrink art" : null, MergeDiscs ? "Combine discs · track " + MergedTrack : null, NewTitle != null ? TitleFromName ? "Title from filename" : "Clean title" : null, Rename ? "Rename" : null,
+            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, SinglePicture ? "One front cover" : null, Shrink ? "Resize art" : null, Id3v23 ? "ID3v2.3" : null, MergeDiscs ? "Combine discs · track " + MergedTrack : null, NewTitle != null ? TitleFromName ? "Title from filename" : "Clean title" : null, Rename ? "Rename" : null,
                 Move && !Path.GetDirectoryName(Source).Equals(Path.GetDirectoryName(Target), StringComparison.OrdinalIgnoreCase) ? "Move" : null }.Where(s => s != null));
     }
 
@@ -162,7 +164,7 @@ namespace AlbumArtTool.Management
             catch (Exception e) when (Artwork.IsImageError(e)) { return type; }
         }
 
-        /// <summary>A description such as "3000 × 3000, 6.2 MB" for pictures worth shrinking, otherwise null.</summary>
+        /// <summary>A description such as "3000 × 3000 PNG, 6.2 MB" for pictures that are not yet a standard embedded cover, otherwise null.</summary>
         internal string Oversized(byte[] bytes)
         {
             string key = bytes.Length + ":" + System.Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(bytes));
@@ -171,13 +173,12 @@ namespace AlbumArtTool.Management
             try
             {
                 string result = null;
-                if (Artwork.IsOversized(bytes))
+                if (!Artwork.IsValid(bytes)) throw new InvalidDataException("The embedded image could not be decoded.");
+                if (!ReferenceEquals(Artwork.Standardize(bytes), bytes))
                 {
-                    if (!Artwork.IsValid(bytes)) throw new InvalidDataException("The embedded image could not be decoded.");
                     var size = Artwork.ReadInfo(bytes);
-                    // Skip pictures that would not get smaller (already efficient JPEGs near the limit).
-                    if (!ReferenceEquals(Artwork.Shrink(bytes), bytes))
-                        result = size.Width + " × " + size.Height + ", " + (bytes.Length / 1048576.0).ToString("0.0") + " MB";
+                    string kind = Artwork.IsJpeg(bytes) ? "JPEG" : bytes.Length > 3 && bytes[0] == 0x89 && bytes[1] == 'P' ? "PNG" : "image";
+                    result = size.Width + " × " + size.Height + " " + kind + ", " + (bytes.Length >= 1048576 ? (bytes.Length / 1048576.0).ToString("0.0") + " MB" : (bytes.Length / 1024) + " KB");
                 }
                 large[key] = result; return result;
             }
@@ -219,25 +220,34 @@ namespace AlbumArtTool.Management
                 try
                 {
                     if (!track.Stamp.Matches(track.Path)) throw new IOException("The file changed during preview. Preview again.");
-                    if (options.Square || options.Shrink || options.SinglePicture && track.PictureCount > 1)
+                    if (options.Square || options.Shrink || options.Id3v23)
                         using (var file = TagLib.File.Create(track.Path, TagLib.ReadStyle.None))
                         {
                             var pictures = file.Tag.Pictures;
-                            if (options.SinglePicture && pictures.Length > 1)
+                            // The artwork standard: exactly one embedded picture, in the front-cover slot.
+                            if (options.Shrink && pictures.Length > 0 && (pictures.Length > 1 || pictures[0].Type != TagLib.PictureType.FrontCover))
                             {
                                 int keep = Artwork.BestPictureIndex(pictures);
                                 row.SinglePicture = true;
                                 string kept = shapes.Describe(pictures[keep]);
-                                AddReason(row, "Several embedded pictures (" + Artwork.Describe(pictures) + ") → keeps only the " + kept + ".");
-                                // Cropping and shrinking then only concern the picture that stays.
+                                AddReason(row, pictures.Length > 1 ? "Several embedded pictures (" + Artwork.Describe(pictures) + ") → keeps only the " + kept + ", as the front cover."
+                                    : "Embedded " + kept + " → moved to the front-cover slot.");
+                                // Cropping and resizing then only concern the picture that stays.
                                 pictures = new[] { pictures[keep] };
                             }
                             if (options.Square) row.Square = pictures.Any(p => !shapes.IsSquare(p.Data.Data));
                             if (options.Shrink)
                             {
                                 var large = pictures.Select(p => shapes.Oversized(p.Data.Data)).Where(d => d != null).ToArray();
-                                row.Shrink = large.Length > 0;
-                                if (row.Shrink) AddReason(row, "Large artwork (" + string.Join("; ", large) + ") → JPEG, at most " + Artwork.SensibleSide + " px.");
+                                // Cropping re-encodes the picture anyway, so it is brought to the standard too.
+                                row.Shrink = large.Length > 0 || row.Square;
+                                if (large.Length > 0) AddReason(row, "Artwork (" + string.Join("; ", large) + ") → JPEG, at most " + Artwork.EmbedSide + " × " + Artwork.EmbedSide + ", quality " + Artwork.EmbedQuality + ".");
+                            }
+                            if (options.Id3v23)
+                            {
+                                string current = Id3Standard.Describe(file);
+                                row.Id3v23 = current != null;
+                                if (row.Id3v23) AddReason(row, "Tags: " + current + " → ID3v2.3, UTF-16.");
                             }
                         }
                     if (options.Organize)
@@ -326,7 +336,7 @@ namespace AlbumArtTool.Management
                         {
                             var row = actions[copy.Path];
                             if (row.Archive) continue;
-                            row.Archive = true; row.Convert = row.Square = row.Shrink = row.SinglePicture = false; row.Target = null; row.Keeper = keep.Path; row.KeeperHash = keepHash;
+                            row.Archive = true; row.Convert = row.Square = row.Shrink = row.SinglePicture = row.Id3v23 = false; row.Target = null; row.Keeper = keep.Path; row.KeeperHash = keepHash;
                             row.ExpectedHash = HashOf(copy.Path); row.Reason = "Confirmed file/audio copy of " + keep.Path;
                         }
                     }

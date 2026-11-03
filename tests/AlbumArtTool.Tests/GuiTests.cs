@@ -220,7 +220,7 @@ internal static partial class Tests
                 using (var audio = TagLib.File.Create(track)) Assert(Size(Artwork.GetCover(audio.Tag)).Width == 600, "folder-cover shortcut embeds the full image, not the scan thumbnail");
             Assert(File.ReadAllBytes(sourceCover).SequenceEqual(Cover), "queued checkbox settings do not change when the user changes options on another album");
             using (var audio = TagLib.File.Create(Path.Combine(paths[1], "one.mp3")))
-                Assert(Artwork.GetCover(audio.Tag).SequenceEqual(Artwork.Normalize(File.ReadAllBytes(localImage))), "queued local cover remains bound to its original album and image");
+                Assert(Artwork.GetCover(audio.Tag).SequenceEqual(Artwork.EmbedCover(Artwork.Normalize(File.ReadAllBytes(localImage)))), "queued local cover remains bound to its original album and image");
             Assert(ScanAlbum(paths[2]).MissingCount == 0 && ScanAlbum(paths[3]).MissingCount == 1, "online work updates its captured target and leaves unqueued albums alone");
             Assert(ButtonStarting(window, "Undo last change").IsEnabled, "Undo becomes available when the queue finishes");
 
@@ -361,12 +361,12 @@ internal static partial class Tests
             Assert(Named<CheckBox>(manager, "Fill missing Title tags from filenames").IsChecked == true && Named<CheckBox>(manager, "Convert lossless / over 320 kbps to MP3 320").IsChecked == false,
                 "the manager opens with just the title fill selected");
             manager.Close(); await Settle();
-            Click(ButtonStarting(dialog, "Keep one picture per song"));
+            Click(ButtonStarting(dialog, "Fix embedded pictures"));
             manager = null;
             for (int i = 0; i < 300 && (manager == null || manager.IsWorking || manager.CurrentPlan == null); i++)
             { await Settle(30); manager = window.OwnedWindows.OfType<LibraryManagerWindow>().SingleOrDefault(); }
             var fixes = manager.CurrentPlan.Actions.Where(a => a.HasWork).ToArray();
-            Assert(fixes.Length == dialog.Result.MultiplePictures.Count && fixes.All(a => a.SinglePicture && a.NewTitle == null && !a.Convert && !a.Move),
+            Assert(fixes.Count(a => a.SinglePicture) == dialog.Result.MultiplePictures.Count && fixes.All(a => (a.SinglePicture || a.Shrink) && a.NewTitle == null && !a.Convert && !a.Move),
                 "the picture button previews keeping one picture for exactly the songs with several");
             manager.Close(); await Settle();
             SetFilenameTitle(Path.Combine(root, "03 - no title.mp3"), "Now titled");

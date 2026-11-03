@@ -216,24 +216,24 @@ namespace AlbumArtTool.Management
         private static void EditTags(string path, bool square, LibraryAction row)
         {
             byte[][] expected = null;
-            bool shrink = row?.Shrink == true, single = row?.SinglePicture == true, pictureEdit = square || shrink || single, compact = shrink || single;
+            bool shrink = row?.Shrink == true, single = row?.SinglePicture == true, id3 = row?.Id3v23 == true, pictureEdit = square || shrink || single, compact = shrink || single;
             using (var file = TagLib.File.Create(path, TagLib.ReadStyle.None))
             {
                 if (pictureEdit)
                 {
                     var pictures = file.Tag.Pictures;
-                    if (single && pictures.Length > 1)
+                    if (single && pictures.Length > 0)
                     {
+                        // One embedded picture, in the front-cover slot; every other slot is cleared.
                         var keep = pictures[Artwork.BestPictureIndex(pictures)];
-                        // An unlabeled picture becomes the front cover so every player shows it.
-                        if (keep.Type == TagLib.PictureType.Other) keep.Type = TagLib.PictureType.FrontCover;
+                        keep.Type = TagLib.PictureType.FrontCover;
                         pictures = new[] { keep };
                     }
                     foreach (var picture in pictures)
                     {
                         byte[] bytes = picture.Data.Data, edited = square ? Artwork.Square(bytes) : bytes;
-                        // Crop first at native resolution, then re-encode an oversized result.
-                        if (shrink && Artwork.IsOversized(edited)) edited = Artwork.Shrink(edited);
+                        // Crop first at native resolution, then bring the result to the embedded standard (JPEG, 600 px, quality 88).
+                        if (shrink) edited = Artwork.Standardize(edited);
                         if (ReferenceEquals(bytes, edited)) continue;
                         picture.Data = new TagLib.ByteVector(edited);
                         picture.MimeType = Artwork.MimeType(edited);
@@ -263,6 +263,8 @@ namespace AlbumArtTool.Management
                     if (artists.Length == 0) artists = new[] { row.MergedArtist }; else artists[0] = row.MergedArtist;
                     file.Tag.AlbumArtists = artists;
                 }
+                // Last, so frames added by the edits above are converted too.
+                if (id3) Id3Standard.Apply(file);
                 file.Save();
             }
             if (compact) TagCompaction.Compact(path);
@@ -272,7 +274,9 @@ namespace AlbumArtTool.Management
                 {
                     var pictures = file.Tag.Pictures;
                     if (pictures.Length != expected.Length || pictures.Where((p, i) => !p.Data.Data.AsSpan().SequenceEqual(expected[i])).Any()) throw new IOException("The format did not retain all edited pictures. Original kept.");
+                    if (single && pictures.Length == 1 && pictures[0].Type != TagLib.PictureType.FrontCover && !(file is TagLib.Mpeg4.File)) throw new IOException("The format did not keep the picture in the front-cover slot. Original kept.");
                 }
+                if (id3 && !Id3Standard.Verify(file)) throw new IOException("The tag could not be saved as ID3v2.3 with UTF-16 text. Original kept.");
                 if (row?.NewTitle != null && file.Tag.Title != row.NewTitle) throw new IOException("The format did not retain the new song title. Original kept.");
                 if (row?.MergeDiscs == true && (file.Tag.Album != row.MergedAlbum || file.Tag.Track != row.MergedTrack || file.Tag.TrackCount != row.MergedTrackCount ||
                     file.Tag.Disc != 1 || file.Tag.DiscCount != 1 || file.Tag.FirstAlbumArtist != row.MergedArtist)) throw new IOException("The format did not retain the combined album and track numbering. Original kept.");
