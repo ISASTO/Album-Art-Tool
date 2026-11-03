@@ -445,7 +445,9 @@ internal static partial class Tests
             var tag = (TagLib.Id3v2.Tag)file.GetTag(TagLib.TagTypes.Id3v2, false);
             Assert(file.Tag.Title == longTitle && tag.GetFrames<TagLib.Id3v2.TextInformationFrame>(TagLib.ByteVector.FromString("TIT2", TagLib.StringType.Latin1)).Count() == 1 &&
                 tag.GetFrames<TagLib.Id3v2.AttachedPictureFrame>().Count() == 1 && Size(file.Tag.Pictures[0].Data.Data) == (600, 600),
-                "resizing artwork keeps one full-length title and one 600 px cover in the ID3v2 tag");
+                "resizing artwork keeps one full-length title and one 600 px cover in the ID3v2 tag: title=" + file.Tag.Title + " TIT2=" +
+                tag.GetFrames<TagLib.Id3v2.TextInformationFrame>(TagLib.ByteVector.FromString("TIT2", TagLib.StringType.Latin1)).Count() + " APIC=" + tag.GetFrames<TagLib.Id3v2.AttachedPictureFrame>().Count() +
+                " size=" + Size(file.Tag.Pictures[0].Data.Data) + " frames=" + string.Join(",", tag.Select(f => f.FrameId.ToString())) + " plan=" + string.Join(";", artPlan.Actions.Select(a => a.Description + ": " + a.Reason)));
         }
 
         // Everything together: artwork standard + ID3v2.3.
