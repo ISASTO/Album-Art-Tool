@@ -220,7 +220,7 @@ internal static partial class Tests
                 using (var audio = TagLib.File.Create(track)) Assert(Size(Artwork.GetCover(audio.Tag)).Width == 600, "folder-cover shortcut embeds the full image, not the scan thumbnail");
             Assert(File.ReadAllBytes(sourceCover).SequenceEqual(Cover), "queued checkbox settings do not change when the user changes options on another album");
             using (var audio = TagLib.File.Create(Path.Combine(paths[1], "one.mp3")))
-                Assert(Artwork.GetCover(audio.Tag).SequenceEqual(Artwork.Normalize(File.ReadAllBytes(localImage))), "queued local cover remains bound to its original album and image");
+                Assert(Artwork.GetCover(audio.Tag).SequenceEqual(Artwork.EmbedCover(Artwork.Normalize(File.ReadAllBytes(localImage)))), "queued local cover remains bound to its original album and image");
             Assert(ScanAlbum(paths[2]).MissingCount == 0 && ScanAlbum(paths[3]).MissingCount == 1, "online work updates its captured target and leaves unqueued albums alone");
             Assert(ButtonStarting(window, "Undo last change").IsEnabled, "Undo becomes available when the queue finishes");
 
@@ -349,6 +349,26 @@ internal static partial class Tests
             int index = dialog.Rows.ToList().FindIndex(r => r.Path != null && r.Path.EndsWith("05 - two covers.mp3"));
             dialog.Select(index); Click(show);
             Assert(opened.FileName == "explorer.exe" && opened.Arguments == "/select," + UpdateInstaller.QuoteArgument(dialog.Rows[index].Path), "the selected song is highlighted in File Explorer");
+            var fill = ButtonStarting(dialog, "Fill titles from filenames");
+            Assert(fill.IsEnabled, "songs missing titles can be filled from their filenames");
+            Click(fill);
+            LibraryManagerWindow manager = null;
+            for (int i = 0; i < 300 && (manager == null || manager.IsWorking || manager.CurrentPlan == null); i++)
+            { await Settle(30); manager = window.OwnedWindows.OfType<LibraryManagerWindow>().SingleOrDefault(); }
+            var filled = manager.CurrentPlan.Actions.Where(a => a.TitleFromName).OrderBy(a => a.NewTitle).Select(a => a.NewTitle).ToArray();
+            Assert(filled.SequenceEqual(new[] { "blank", "no title" }) && manager.CurrentPlan.Actions.Where(a => a.HasWork).All(a => a.TitleFromName && !a.Convert && !a.Square && !a.Archive && !a.Move),
+                "the fill button previews only filename titles for the songs missing one");
+            Assert(Named<CheckBox>(manager, "Fill missing Title tags from filenames").IsChecked == true && Controls(manager.OptionsPanel).OfType<CheckBox>().Count(c => c.IsChecked == true) == 1,
+                "the manager opens with just the title fill selected");
+            manager.Close(); await Settle();
+            Click(ButtonStarting(dialog, "Fix embedded pictures"));
+            manager = null;
+            for (int i = 0; i < 300 && (manager == null || manager.IsWorking || manager.CurrentPlan == null); i++)
+            { await Settle(30); manager = window.OwnedWindows.OfType<LibraryManagerWindow>().SingleOrDefault(); }
+            var fixes = manager.CurrentPlan.Actions.Where(a => a.HasWork).ToArray();
+            Assert(fixes.Count(a => a.SinglePicture) == dialog.Result.MultiplePictures.Count && fixes.All(a => (a.SinglePicture || a.Shrink) && a.NewTitle == null && !a.Convert && !a.Move),
+                "the picture button previews keeping one picture for exactly the songs with several");
+            manager.Close(); await Settle();
             SetFilenameTitle(Path.Combine(root, "03 - no title.mp3"), "Now titled");
             await window.ScanAsync();
             Click(ButtonStarting(dialog, "Check again"));
@@ -438,7 +458,7 @@ internal static partial class Tests
             var checks = Controls(form.OptionsPanel).OfType<CheckBox>().ToArray();
             for (int n = 1; n <= 8; n++) reporter.Report(new ProgressInfo { Completed = n * 300, Total = 6589, Message = n * 300 + "/6589 tracks scanned · Artist/Album " + n });
             await Settle(60);
-            Assert(checks.Length == 10 && checks.All(c => !c.IsEnabled), "options are locked while work runs");
+            Assert(checks.Length == 12 && checks.All(c => !c.IsEnabled), "options are locked while work runs");
             Assert(Named<TextBlock>(form, "Library management status").Text.StartsWith("2400/6589") && Named<ListBox>(form, "Planned library changes").IsEnabled,
                 "progress updates the status while the preview stays scrollable");
             form.SetWorkingForTest(false);

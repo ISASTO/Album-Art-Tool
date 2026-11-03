@@ -22,6 +22,8 @@ namespace AlbumArtTool
     {
         private readonly Func<Album[]> currentAlbums;
         private readonly Action<ProcessStartInfo> openFolder;
+        private readonly Func<Task> fillTitles, fixPictures;
+        private readonly Button fill = Kit.Button("Fill titles from filenames…"), onePicture = Kit.Button("Fix embedded pictures…");
         private readonly ListBox list = new ListBox { Classes = { "grid" } };
         private readonly TextBlock summary = Kit.Label("", Kit.Body);
         private readonly ComboBox threshold = new ComboBox { Width = 130, HorizontalAlignment = HorizontalAlignment.Right };
@@ -35,10 +37,10 @@ namespace AlbumArtTool
             internal bool Header;
         }
 
-        internal LibraryCheckWindow(Func<Album[]> albums, Action<ProcessStartInfo> openFolder)
+        internal LibraryCheckWindow(Func<Album[]> albums, Action<ProcessStartInfo> openFolder, Func<Task> fillTitles = null, Func<Task> fixPictures = null)
         {
-            currentAlbums = albums; this.openFolder = openFolder;
-            Title = "Check library"; Width = 960; Height = 570; MinWidth = 720; MinHeight = 420;
+            currentAlbums = albums; this.openFolder = openFolder; this.fillTitles = fillTitles; this.fixPictures = fixPictures;
+            Title = "Check library"; Width = 980; Height = 570; MinWidth = 900; MinHeight = 420;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             var help = Kit.Label("Songs without a Title tag show their filename in players. Songs with several embedded pictures can show the wrong cover or carry extra artwork. Low-bitrate lossy songs may be worth downloading again. Results use the last library scan; nothing is changed.", Kit.Body, cls: "muted");
             help.TextWrapping = TextWrapping.Wrap; help.TextTrimming = TextTrimming.None;
@@ -53,8 +55,12 @@ namespace AlbumArtTool
             refresh.Click += (s, e) => Check();
             save.Click += async (s, e) => await SaveAsync();
             show.IsEnabled = false; show.Click += (s, e) => ShowSelected();
-            foreach (var b in new[] { refresh, save, show }) b.Margin = new Thickness(3, 6, 3, 0);
-            var buttons = Kit.Grid("165,180,*,165", "*").Add(refresh.Cell(0, 0), save.Cell(0, 1), show.Cell(0, 3));
+            fill.Named("Fill titles from filenames").Tip("Opens Manage library with only \"Fill missing Title tags from filenames\" selected and previews the changes. Nothing is written until you apply them.");
+            fill.Click += async (s, e) => { if (this.fillTitles != null) await this.fillTitles(); };
+            onePicture.Named("Fix embedded pictures").Tip("Opens Manage library with only \"Standardize embedded artwork\" selected (one " + Artwork.EmbedSide + " px JPEG front cover per song) and previews the changes. Nothing is written until you apply them.");
+            onePicture.Click += async (s, e) => { if (this.fixPictures != null) await this.fixPictures(); };
+            foreach (var b in new[] { refresh, save, fill, onePicture, show }) b.Margin = new Thickness(3, 6, 3, 0);
+            var buttons = Kit.Grid("130,140,*,215,215,160", "*").Add(refresh.Cell(0, 0), save.Cell(0, 1), fill.Cell(0, 3), onePicture.Cell(0, 4), show.Cell(0, 5));
             var card = Kit.Frost(Kit.Inset(list), new Thickness(10)); card.Margin = new Thickness(0, 2, 0, 0);
             var top = Kit.Grid("*,Auto,Auto", "*").Add(summary.Cell(0, 0), Kit.Label("Low bitrate:", Kit.Small, cls: "muted").Cell(0, 1), threshold.Cell(0, 2));
             threshold.Margin = new Thickness(8, 0, 0, 0);
@@ -92,7 +98,7 @@ namespace AlbumArtTool
             rows.Add(new Row { Header = true, Text = "Songs missing a Title tag", Detail = Count(Result.MissingTitles.Count) });
             if (Result.MissingTitles.Count == 0) rows.Add(new Row { Text = "Every song has a Title tag." });
             foreach (var t in Result.MissingTitles)
-                rows.Add(new Row { Text = t.Path, Detail = Describe(t), Path = t.Path, Tip = t.Path + "\nShown as: " + Path.GetFileNameWithoutExtension(t.Path) });
+                rows.Add(new Row { Text = t.Path, Detail = Describe(t), Path = t.Path, Tip = t.Path + "\nShown as: " + Path.GetFileNameWithoutExtension(t.Path) + "\nFilled title would be: " + LibraryChecks.SuggestedTitle(t.Path) });
             rows.Add(new Row { Header = true, Text = "Songs with more than one embedded picture", Detail = Count(Result.MultiplePictures.Count) });
             if (Result.MultiplePictures.Count == 0) rows.Add(new Row { Text = "No song has more than one embedded picture." });
             foreach (var t in Result.MultiplePictures)
@@ -106,6 +112,8 @@ namespace AlbumArtTool
             Rows = rows; list.ItemsSource = rows; show.IsEnabled = false;
             summary.Text = Result.MissingTitles.Count + " missing a Title tag · " + Result.MultiplePictures.Count + " with several embedded pictures (" +
                 Result.MultiplePictures.Count(t => t.CoverPictures > 1) + " with several covers) · " + Result.LowBitrate.Count + " below " + limit + " kbps · " + Result.TracksChecked + " songs checked";
+            fill.IsEnabled = fillTitles != null && Result.MissingTitles.Count > 0;
+            onePicture.IsEnabled = fixPictures != null && Result.MultiplePictures.Count > 0;
             save.IsEnabled = Result.MissingTitles.Count + Result.MultiplePictures.Count + Result.LowBitrate.Count > 0;
         }
 

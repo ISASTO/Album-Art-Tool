@@ -101,7 +101,8 @@ internal static partial class Tests
         result = Editor.Apply(ScanAlbum(root), MakeCover(SKColors.BlueViolet), false, false);
         Assert(result.TracksWritten == 2, "replacement updates every track");
         using (var file = TagLib.File.Create(first))
-            Assert(file.Tag.Pictures.Count(p => p.Type == TagLib.PictureType.BackCover) == 1, "back-cover artwork preserved");
+            Assert(file.Tag.Pictures.Length == 1 && file.Tag.Pictures[0].Type == TagLib.PictureType.FrontCover && Artwork.IsJpeg(file.Tag.Pictures[0].Data.Data) &&
+                Size(file.Tag.Pictures[0].Data.Data) == (600, 600), "a new cover leaves exactly one 600 px JPEG front cover; other pictures are removed");
     }
 
     private static void MixedAlbums()

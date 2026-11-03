@@ -37,6 +37,27 @@ namespace AlbumArtTool.Core
         }
 
         /// <summary>A short description such as "2 front covers, 1 back cover".</summary>
+        /// <summary>
+        /// The picture to keep when a song should have only one: a front cover before an unlabeled picture before anything else,
+        /// then the largest decodable image, then tag order. -1 when there are no pictures.
+        /// </summary>
+        public static int BestPictureIndex(IPicture[] pictures)
+        {
+            if (pictures == null || pictures.Length == 0) return -1;
+            int best = -1, bestRank = int.MaxValue; long bestArea = -1;
+            for (int i = 0; i < pictures.Length; i++)
+            {
+                byte[] bytes = pictures[i].Data?.Data ?? Array.Empty<byte>();
+                long area = -1;
+                if (bytes.Length > 0 && bytes.Length <= MaxImageBytes)
+                    try { var size = ReadInfo(bytes); area = (long)size.Width * size.Height; } catch (Exception e) when (IsImageError(e)) { }
+                // Undecodable pictures only win when nothing else can be shown.
+                int rank = (area < 0 ? 3 : 0) + (pictures[i].Type == PictureType.FrontCover ? 0 : pictures[i].Type == PictureType.Other ? 1 : 2);
+                if (rank < bestRank || rank == bestRank && area > bestArea) { best = i; bestRank = rank; bestArea = area; }
+            }
+            return best;
+        }
+
         public static string Describe(IPicture[] pictures)
         {
             if (pictures == null || pictures.Length == 0) return "";
@@ -100,7 +121,7 @@ namespace AlbumArtTool.Core
         }
 
         /// <summary>Scales down (never up) to fit maxSide, flattens transparency onto white and re-encodes.</summary>
-        public static byte[] Normalize(byte[] bytes, int maxSide = 1600, ImageKind format = ImageKind.Jpeg)
+        public static byte[] Normalize(byte[] bytes, int maxSide = 1600, ImageKind format = ImageKind.Jpeg, int quality = 92)
         {
             var loaded = Load(bytes, maxSide);
             using (var source = loaded.Bitmap)
@@ -115,7 +136,7 @@ namespace AlbumArtTool.Core
                         canvas.Clear(SKColors.White);
                         canvas.DrawBitmap(source, new SKRect(0, 0, width, height), paint);
                     }
-                    return Encode(target, format);
+                    return Encode(target, format, quality);
                 }
             }
         }
@@ -141,24 +162,28 @@ namespace AlbumArtTool.Core
             }
         }
 
-        /// <summary>Longest side for embedded artwork, and the size above which a picture is worth re-encoding.</summary>
-        public const int SensibleSide = 1600;
-        public const int LargeBytes = 1024 * 1024;
+        /// <summary>The embedded-artwork standard: one front cover, a JPEG of at most 600 × 600 at quality 88.</summary>
+        public const int EmbedSide = 600;
+        public const int EmbedQuality = 88;
 
-        /// <summary>True for embedded pictures larger than 1600 px or 1 MB.</summary>
-        public static bool IsOversized(byte[] bytes)
+        public static bool IsJpeg(byte[] bytes) => bytes.Length > 2 && bytes[0] == 0xff && bytes[1] == 0xd8;
+
+        /// <summary>
+        /// The picture as a standard embedded cover: larger or non-JPEG images become a quality-88 JPEG of at most 600 px
+        /// (aspect kept, never enlarged). A JPEG already within 600 px is re-encoded only when quality 88 makes it at least
+        /// 10% smaller (i.e. it was saved at a higher quality); otherwise the original bytes are returned.
+        /// </summary>
+        public static byte[] Standardize(byte[] bytes)
         {
             var size = ReadInfo(bytes);
-            return Math.Max(size.Width, size.Height) > SensibleSide || bytes.Length > LargeBytes;
+            bool fits = Math.Max(size.Width, size.Height) <= EmbedSide && IsJpeg(bytes);
+            byte[] encoded = Normalize(bytes, EmbedSide, ImageKind.Jpeg, EmbedQuality);
+            if (!fits) return encoded;
+            return encoded.Length < bytes.Length * 0.9 ? encoded : bytes;
         }
 
-        /// <summary>Re-encodes as a JPEG of at most 1600 px (aspect kept, never enlarged).
-        /// Returns the original bytes when that would not make the picture smaller.</summary>
-        public static byte[] Shrink(byte[] bytes)
-        {
-            byte[] smaller = Normalize(bytes, SensibleSide, ImageKind.Jpeg);
-            return smaller.Length < bytes.Length ? smaller : bytes;
-        }
+        /// <summary>Always a quality-88 JPEG of at most 600 px, for covers chosen in the app.</summary>
+        public static byte[] EmbedCover(byte[] bytes) => Normalize(bytes, EmbedSide, ImageKind.Jpeg, EmbedQuality);
 
         public static byte[] Thumbnail(byte[] bytes) => Normalize(bytes, 128, ImageKind.Png);
 
@@ -262,7 +287,7 @@ namespace AlbumArtTool.Core
             return oriented;
         }
 
-        private static byte[] Encode(SKBitmap bitmap, ImageKind kind)
+        private static byte[] Encode(SKBitmap bitmap, ImageKind kind, int quality = 92)
         {
             switch (kind)
             {
@@ -270,7 +295,7 @@ namespace AlbumArtTool.Core
                 case ImageKind.Gif: return EncodeGif(bitmap);
             }
             using (var image = SKImage.FromBitmap(bitmap))
-            using (var data = image.Encode(kind == ImageKind.Png ? SKEncodedImageFormat.Png : SKEncodedImageFormat.Jpeg, kind == ImageKind.Png ? 100 : 92))
+            using (var data = image.Encode(kind == ImageKind.Png ? SKEncodedImageFormat.Png : SKEncodedImageFormat.Jpeg, kind == ImageKind.Png ? 100 : quality))
             {
                 if (data == null) throw new InvalidDataException("The image could not be encoded.");
                 return data.ToArray();

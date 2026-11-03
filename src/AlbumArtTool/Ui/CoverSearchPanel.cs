@@ -196,7 +196,7 @@ namespace AlbumArtTool.Ui
                 Background = Brushes.Transparent, BorderThickness = new Thickness(0), HorizontalAlignment = HorizontalAlignment.Left, FontSize = Kit.Tiny }.Tip(candidate.PageUrl);
             origin.Brush(Button.ForegroundProperty, "Accent");
             resolution = Kit.Label(candidate.Resolution, Kit.Tiny).Named("Full-size cover resolution")
-                .Tip("Dimensions of the full-size image at the source. Embedded artwork is limited to 1600 pixels on the longest side.");
+                .Tip("Dimensions of the full-size image at the source. Embedded artwork is stored as one JPEG front cover of at most 600 × 600 (cover.jpg files keep up to 1600 px).");
             use = Kit.Button("Apply this cover", "card"); use.Height = 24;
             title.Cursor = artist.Cursor = new Cursor(StandardCursorType.Hand);
             image.PointerPressed += (s, e) => Apply?.Invoke();
