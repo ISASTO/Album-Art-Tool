@@ -17,7 +17,7 @@ namespace AlbumArtTool.Ui
 {
     // Light/dark appearance. Every brush is a theme resource, so switching only changes the
     // requested theme variant: no control is recolored by hand and nothing is repainted twice.
-    internal static partial class Theme
+    internal static partial class Appearance
     {
         internal static event Action Changed;
         internal static bool IsDark => Application.Current?.ActualThemeVariant != ThemeVariant.Light;

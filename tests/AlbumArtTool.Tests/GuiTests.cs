@@ -123,16 +123,16 @@ internal static partial class Tests
 
     private static async Task ThemeGui(MainWindow window)
     {
-        bool dark = Theme.IsDark;
-        var surface = Theme.Brush("Surface");
-        Assert(Theme.SetDark(!dark, animate: true), "appearance preference is saved");
-        Assert(Theme.IsDark == !dark && !ReferenceEquals(surface, Theme.Brush("Surface")), "switching appearance swaps every themed brush");
+        bool dark = Appearance.IsDark;
+        var surface = Appearance.Brush("Surface");
+        Assert(Appearance.SetDark(!dark, animate: true), "appearance preference is saved");
+        Assert(Appearance.IsDark == !dark && !ReferenceEquals(surface, Appearance.Brush("Surface")), "switching appearance swaps every themed brush");
         Assert(AppSettings.ReadDark() == !dark, "the saved appearance is read back on the next start");
         Assert(window.HasStagedCover && window.IsVisible, "switching appearance keeps open windows and a staged cover");
-        await Until(() => Theme.TransitionsRunning == 0, "the appearance wipe finishes and removes its overlay", 2000);
+        await Until(() => Appearance.TransitionsRunning == 0, "the appearance wipe finishes and removes its overlay", 2000);
         Shot(window, dark ? "light-mode.png" : "dark-mode.png");
-        Theme.SetDark(dark);
-        Assert(Theme.IsDark == dark && AppSettings.ReadDark() == dark, "switching back restores the original appearance");
+        Appearance.SetDark(dark);
+        Assert(Appearance.IsDark == dark && AppSettings.ReadDark() == dark, "switching back restores the original appearance");
     }
 
     private static async Task ScanningGui(MainWindow window)

@@ -207,8 +207,8 @@ namespace AlbumArtTool
         internal async Task PreviewAsync()
         {
             if (IsWorking || !Ready()) return;
-            var options = new LibraryOptions { Root = root, BackupRoot = backup.Text, EncoderPath = encoder, Convert = convert.Checked(), ConvertOtherLossy = compatibility.Checked(),
-                Square = square.Checked(), Duplicates = duplicates.Checked(), Organize = organize.Checked(), ArchiveOldBackups = archive.Checked(), RenameFromTitle = rename.Checked(), CombineDiscs = combine.Checked(), RemoveFeaturedTitles = cleanTitles.Checked() };
+            var options = new LibraryOptions { Root = root, BackupRoot = backup.Text, EncoderPath = encoder, Convert = convert.On(), ConvertOtherLossy = compatibility.On(),
+                Square = square.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On() };
             source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
             SetWorking(true); exclusive(true); SetRows(new List<FileRow>()); plan = null; undoJournal = null;
             try

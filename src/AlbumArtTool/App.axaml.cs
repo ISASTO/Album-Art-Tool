@@ -19,7 +19,7 @@ namespace AlbumArtTool
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
-            Theme.Initialize(this);
+            Appearance.Initialize(this);
         }
 
         public override void OnFrameworkInitializationCompleted()

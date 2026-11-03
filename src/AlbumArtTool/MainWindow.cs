@@ -76,12 +76,12 @@ namespace AlbumArtTool
             coverFrame.Named("Album cover preview and image drop target");
             Kit.Prepare(this, BuildLayout());
             appearance.Named("Toggle light and dark mode");
-            Theme.Changed += UpdateAppearance;
+            Appearance.Changed += UpdateAppearance;
             UpdateAppearance();
             appearance.Click += (s, e) =>
             {
                 ToolTip.SetIsOpen(appearance, false);
-                if (!Theme.SetDark(!Theme.IsDark, animate: true)) appearance.Tip("Appearance changed, but the preference could not be saved on this PC.");
+                if (!Appearance.SetDark(!Appearance.IsDark, animate: true)) appearance.Tip("Appearance changed, but the preference could not be saved on this PC.");
             };
             albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? (currentJob.Artist == null ? "Applying cover…" : "Updating artists…") : "Queued") :
                 showingArtists ? (album.ArtistChangeCount > 0 ? album.ArtistChangeCount + (album.ArtistChangeCount == 1 ? " track with artist changes" : " tracks with artist changes") : "No artist changes suggested") : null;
@@ -202,9 +202,9 @@ namespace AlbumArtTool
 
         private void UpdateAppearance()
         {
-            appearance.Content = Theme.IsDark ? "Light mode" : "Dark mode";
-            Avalonia.Automation.AutomationProperties.SetHelpText(appearance, (Theme.IsDark ? "Dark" : "Light") + " mode is active. Switch appearance without interrupting your work.");
-            appearance.Tip("Switch to " + (Theme.IsDark ? "light" : "dark") + " mode. Your choice is remembered on this PC.");
+            appearance.Content = Appearance.IsDark ? "Light mode" : "Dark mode";
+            Avalonia.Automation.AutomationProperties.SetHelpText(appearance, (Appearance.IsDark ? "Dark" : "Light") + " mode is active. Switch appearance without interrupting your work.");
+            appearance.Tip("Switch to " + (Appearance.IsDark ? "light" : "dark") + " mode. Your choice is remembered on this PC.");
         }
 
         private void SwitchTab(bool missing)
@@ -345,11 +345,11 @@ namespace AlbumArtTool
         private void UpdateApplyButton()
         {
             var album = albums.SelectedAlbum;
-            int count = album == null ? 0 : onlyMissing.Checked() ? album.MissingCount : album.Tracks.Count;
+            int count = album == null ? 0 : onlyMissing.On() ? album.MissingCount : album.Tracks.Count;
             bool queued = album != null && queuedAlbums.Contains(album.Key);
             apply.Content = queued ? "Cover queued" : count > 0 ? "Apply cover to " + count + (count == 1 ? " track" : " tracks") : "Apply cover";
             bool hasImage = pending != null || album?.PreviewTrack != null || album?.FolderCovers.Count > 0;
-            apply.IsEnabled = !busy && !maintenanceRunning && !queued && hasImage && album != null && (count > 0 || (folderCover.IsEnabled && folderCover.Checked()));
+            apply.IsEnabled = !busy && !maintenanceRunning && !queued && hasImage && album != null && (count > 0 || (folderCover.IsEnabled && folderCover.On()));
             apply.Tip(queued ? "This album is already in the queue. You can work on another album." :
                 pending != null ? "Add the chosen cover to the work queue." : "Apply the displayed cover using the full-size image already in your album.");
         }
@@ -518,7 +518,7 @@ namespace AlbumArtTool
 
         private void Shutdown()
         {
-            Theme.Changed -= UpdateAppearance;
+            Appearance.Changed -= UpdateAppearance;
             var source = cancellation; cancellation = null;
             source?.Cancel(); source?.Dispose();
             var image = cover.Source as Bitmap; cover.Source = null; image?.Dispose();

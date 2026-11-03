@@ -41,7 +41,7 @@ namespace AlbumArtTool
             if (busy || maintenanceRunning || queuedAlbums.Contains(album.Key)) return Task.CompletedTask;
             // Freeze this album, image source and options before the user moves to another row.
             var job = new CoverJob { Album = album, Source = source, LoadImage = loadImage,
-                OnlyMissing = onlyMissing.Checked(), FolderCover = folderCover.IsEnabled && folderCover.Checked() };
+                OnlyMissing = onlyMissing.On(), FolderCover = folderCover.IsEnabled && folderCover.On() };
             return EnqueueJob(job);
         }
 

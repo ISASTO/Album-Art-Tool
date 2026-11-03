@@ -34,7 +34,7 @@ namespace AlbumArtTool.Ui
         }
 
         internal static CheckBox Check(string text, bool value) => new CheckBox { Content = text, IsChecked = value, VerticalAlignment = VerticalAlignment.Center };
-        internal static bool Checked(this CheckBox box) => box.IsChecked == true;
+        internal static bool On(this CheckBox box) => box.IsChecked == true;
 
         internal static Grid Grid(string columns, string rows)
         {
@@ -85,8 +85,8 @@ namespace AlbumArtTool.Ui
             host.Children.Add(new Border { IsHitTestVisible = false }.Brush(Border.BackgroundProperty, "GlowB"));
             host.Children.Add(content);
             window.Content = host;
-            window.Opened += (s, e) => Theme.ApplyNativeFrame(window);
-            Theme.Track(window);
+            window.Opened += (s, e) => Appearance.ApplyNativeFrame(window);
+            Appearance.Track(window);
         }
     }
 }

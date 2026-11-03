@@ -54,8 +54,8 @@ namespace AlbumArtTool.Ui
             query.KeyDown += (s, e) => { if (e.Key == Key.Enter) { e.Handled = true; CurrentSearch = SearchAsync(true); } };
             automatic.IsCheckedChanged += (s, e) =>
             {
-                if (automatic.Checked() && active) CurrentSearch = SearchAsync(false);
-                else if (!automatic.Checked()) { Cancel(); summary.Text = "Automatic search off. Click Search for a one-time lookup."; }
+                if (automatic.On() && active) CurrentSearch = SearchAsync(false);
+                else if (!automatic.On()) { Cancel(); summary.Text = "Automatic search off. Click Search for a one-time lookup."; }
             };
             bandcamp.Click += (s, e) => OpenPage("https://bandcamp.com/search?q=" + Uri.EscapeDataString(query.Text ?? "") + "&item_type=a");
             bandcamp.Tip("Open the same album search on Bandcamp in your browser.");
@@ -73,7 +73,7 @@ namespace AlbumArtTool.Ui
                 query.Text = album == null ? "" : CoverQuery.DefaultText(album.Title, album.Artist);
                 summary.Text = album == null ? "Select an album to find cover art." : "Ready to find covers.";
             }
-            if (this.active && automatic.Checked() && !hasResults)
+            if (this.active && automatic.On() && !hasResults)
                 CurrentSearch = SearchAsync(false, true);
         }
 
