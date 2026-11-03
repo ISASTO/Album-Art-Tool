@@ -75,6 +75,7 @@ namespace AlbumArtTool.Management
                 if (extension == ".flac") RemoveFlacPadding(path);
                 else if (extension == ".wav") RemoveRiffJunk(path);
                 else if (extension == ".m4a" || extension == ".m4b" || extension == ".mp4" || extension == ".aac") RemoveMp4Free(path);
+                else if (extension == ".wma" || extension == ".asf") RemoveAsfPadding(path);
             }
             finally { try { File.Delete(path + ".compact"); } catch { } }
         }
@@ -103,6 +104,44 @@ namespace AlbumArtTool.Management
                     long body = 4 + keep.Sum(k => k.Length);
                     output.Write(head, 0, 4); output.Write(BitConverter.GetBytes((uint)body), 0, 4); output.Write(head, 8, 4);
                     foreach (var (offset, length) in keep) Copy(input, output, offset, length);
+                }
+            }
+            File.Move(path + ".compact", path, true);
+        }
+
+        private static readonly Guid AsfHeader = new Guid("75B22630-668E-11CF-A6D9-00AA0062CE6C");
+        private static readonly Guid AsfPadding = new Guid("1806D474-CADF-4509-A4BA-9AABCB96AAE8");
+
+        // ASF/WMA: drop Padding Objects from the header. Audio packets are addressed by number,
+        // not byte offset, so only the header's size and object count change.
+        internal static void RemoveAsfPadding(string path)
+        {
+            using (var input = File.OpenRead(path))
+            {
+                var head = new byte[30];
+                if (input.Read(head, 0, 30) != 30 || new Guid(head.AsSpan(0, 16)) != AsfHeader) return;
+                long headerSize = BitConverter.ToInt64(head, 16); uint count = BitConverter.ToUInt32(head, 24);
+                if (headerSize < 30 || headerSize > input.Length || headerSize > 256L * 1024 * 1024) return;
+                var children = new List<(long Offset, long Size)>(); long removed = 0; uint kept = 0;
+                long position = 30;
+                for (uint i = 0; i < count; i++)
+                {
+                    if (position + 24 > headerSize) return;
+                    var object_ = new byte[24]; input.Position = position; input.Read(object_, 0, 24);
+                    long size = BitConverter.ToInt64(object_, 16);
+                    if (size < 24 || position + size > headerSize) return;
+                    if (new Guid(object_.AsSpan(0, 16)) == AsfPadding) removed += size; else { children.Add((position, size)); kept++; }
+                    position += size;
+                }
+                if (removed < 8192 || position != headerSize) return;
+                using (var output = new FileStream(path + ".compact", FileMode.CreateNew, FileAccess.Write))
+                {
+                    var newHead = (byte[])head.Clone();
+                    BitConverter.GetBytes(headerSize - removed).CopyTo(newHead, 16);
+                    BitConverter.GetBytes(kept).CopyTo(newHead, 24);
+                    output.Write(newHead, 0, 30);
+                    foreach (var (offset, size) in children) Copy(input, output, offset, size);
+                    Copy(input, output, headerSize, input.Length - headerSize);
                 }
             }
             File.Move(path + ".compact", path, true);

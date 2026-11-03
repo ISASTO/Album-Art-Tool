@@ -336,6 +336,6 @@ internal static partial class Tests
             "low bitrate means lossy, known and strictly below the threshold");
         Assert(LibraryChecks.Csv(all).Contains("\"Below 320 kbps\"") && LibraryChecks.Format(new Track { Path = "x.m4a" }) == "AAC/M4A", "the report lists low-bitrate songs with their format");
         Assert(Artwork.Describe(new TagLib.IPicture[] { new TagLib.Picture { Type = TagLib.PictureType.LeafletPage }, new TagLib.Picture { Type = TagLib.PictureType.LeafletPage }, new TagLib.Picture { Type = TagLib.PictureType.Media } })
-            == "1 disc picture, 2 booklet pages", "picture descriptions name each picture type");
+            == "2 booklet pages, 1 disc picture", "picture descriptions name each picture type");
     }
 }
