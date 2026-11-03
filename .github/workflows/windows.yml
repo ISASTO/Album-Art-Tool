@@ -112,6 +112,11 @@ jobs:
           if (-not (Test-Path $exe) -or -not (Test-Path (Join-Path $dir 'unins000.exe'))) { throw 'Installed files are missing.' }
           $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
           Write-Host "Installed $($info.ProductName) $($info.FileVersion)"
+          # The native build reads and writes tags in all nine formats and reports a damaged file.
+          $report = "$env:RUNNER_TEMP\self-test.txt"
+          $t = Start-Process $exe -ArgumentList '--self-test', ('"' + "$PWD\tests\AlbumArtTool.Tests\fixtures" + '"'), ('"' + $report + '"') -PassThru -Wait
+          Write-Host "Native self-test: $(Get-Content $report -Raw)"
+          if ($t.ExitCode -ne 0) { throw "Native self-test failed with $($t.ExitCode)" }
           $music = New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\empty-music"
           function Measure-Startup($path) {
             $clock = [Diagnostics.Stopwatch]::StartNew()

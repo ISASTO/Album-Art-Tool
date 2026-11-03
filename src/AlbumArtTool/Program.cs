@@ -13,6 +13,7 @@ namespace AlbumArtTool
         [STAThread]
         private static int Main(string[] args)
         {
+            if (args.Length == 3 && args[0] == "--self-test") return SelfTest.Run(args[1], args[2]);
             using (var running = new Mutex(false, RunningMutex))
             {
                 App.Arguments = args;
