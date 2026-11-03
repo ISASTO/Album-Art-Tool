@@ -255,7 +255,7 @@ internal static partial class Tests
             string missingHash = CoverEditor.Hash(missing), titledHash = CoverEditor.Hash(titled), bareHash = CoverEditor.Hash(bare);
             var options = Options(root, backups); options.EncoderPath = null; options.TitleFromFilename = true;
             var plan = LibraryPlanner.Build(options, CancellationToken.None);
-            Assert(plan.Actions.Count == 2 && plan.Actions.Single(a => a.Source == bare).NewTitle == "Bare", extension + " a file with no tags at all is filled too");
+            Assert(plan.Actions.Count(a => a.HasWork) == 2 && plan.Actions.Single(a => a.Source == bare).NewTitle == "Bare", extension + " a file with no tags at all is filled too");
             var row = plan.Actions.Single(a => a.Source == missing);
             Assert(row.Source == missing && row.TitleFromName && row.NewTitle == "Rêverie – 星 (feat. Guest)" && !row.Move && row.Description == "Title from filename",
                 extension + " only the song without a Title tag gets its filename as the title, and the file keeps its name");
