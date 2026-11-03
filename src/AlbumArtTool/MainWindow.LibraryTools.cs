@@ -16,6 +16,8 @@ namespace AlbumArtTool
     {
         private readonly Button artistsTab = Kit.Button("Track artists", "tab");
         private readonly Button findDuplicates = Kit.Button("Find duplicates…");
+        private readonly Button checkTags = Kit.Button("Check library…");
+        private LibraryCheckWindow checkWindow;
         private readonly Button manageLibrary = Kit.Button("Manage library…", "primary");
         private LibraryManagerWindow managerWindow;
         private bool maintenanceRunning;
@@ -49,6 +51,8 @@ namespace AlbumArtTool
             albumFilter.SelectionChanged += (s, e) => { if (!busy && !changingAlbumView) RefreshAlbums(); };
             albumSort.SelectionChanged += (s, e) => { if (!busy && !changingAlbumView) RefreshAlbums(); };
             findDuplicates.Click += async (s, e) => await FindDuplicatesAsync();
+            checkTags.Click += (s, e) => CheckTags();
+            checkTags.Tip("List songs missing a Title tag, songs with more than one embedded picture, and low-bitrate songs.");
             manageLibrary.Click += (s, e) => ShowLibraryManager();
             var showLabel = Kit.Label("SHOW", cls: "caption"); var sortLabel = Kit.Label("SORT BY", cls: "caption");
             showLabel.Margin = sortLabel.Margin = new Thickness(8, 0, 0, 0);
@@ -193,6 +197,7 @@ namespace AlbumArtTool
         {
             artistsTab.IsEnabled = albumFilter.IsEnabled = albumSort.IsEnabled = !busy;
             findDuplicates.IsEnabled = !busy && !maintenanceRunning && hasScanned && library.Albums.Count > 0;
+            checkTags.IsEnabled = !busy && hasScanned && library.Albums.Count > 0;
             if (showingArtists) UpdateArtistPreview();
         }
 
@@ -205,6 +210,16 @@ namespace AlbumArtTool
                 async root => { lastEdit = null; folder.Text = root; await ScanAsync(); });
             managerWindow.Closed += (s, e) => managerWindow = null;
             managerWindow.Show(this);
+        }
+
+        internal LibraryCheckWindow CheckTags()
+        {
+            if (checkWindow != null) { checkWindow.Check(); checkWindow.Activate(); return checkWindow; }
+            if (busy || library.Albums.Count == 0) return null;
+            var window = checkWindow = new LibraryCheckWindow(() => library.Albums.ToArray(), info => StartExplorer(info));
+            window.Closed += (s, e) => { if (checkWindow == window) checkWindow = null; };
+            window.Show(this);
+            return window;
         }
 
         internal async Task FindDuplicatesAsync()

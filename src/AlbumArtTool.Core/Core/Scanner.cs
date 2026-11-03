@@ -139,7 +139,8 @@ namespace AlbumArtTool.Core
                             target = new Album { Key = folder + "\u001f" + key, Folder = folder, Title = title, Artist = albumArtist, TaggedArtist = albumArtist };
                             albums.Add(key, target);
                         }
-                        byte[] cover = Artwork.GetCover(tag, artwork);
+                        var pictures = tag.Pictures ?? Array.Empty<TagLib.IPicture>();
+                        byte[] cover = Artwork.GetCover(pictures, artwork);
                         var codecs = file.Properties.Codecs.Where(c => c != null).Select(c => c.Description).ToArray();
                         string trackTitle = tag.Title;
                         target.Tracks.Add(new Track
@@ -152,7 +153,8 @@ namespace AlbumArtTool.Core
                             Duration = file.Properties.Duration, HasTitleTag = !string.IsNullOrWhiteSpace(trackTitle),
                             AudioStart = file.InvariantStartPosition, AudioEnd = file.InvariantEndPosition,
                             SampleRate = file.Properties.AudioSampleRate, Channels = file.Properties.AudioChannels,
-                            HasCover = cover != null, Stamp = stamp
+                            HasCover = cover != null, Stamp = stamp, PictureCount = pictures.Length,
+                            CoverPictures = pictures.Count(Artwork.IsCover), PictureSummary = Artwork.Describe(pictures)
                         });
                         if (target.Thumbnail == null && cover != null)
                         { target.Thumbnail = Artwork.Thumbnail(cover); target.PreviewTrack = path; }

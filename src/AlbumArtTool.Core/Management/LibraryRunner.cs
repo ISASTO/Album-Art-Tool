@@ -216,19 +216,23 @@ namespace AlbumArtTool.Management
         private static void EditTags(string path, bool square, LibraryAction row)
         {
             byte[][] expected = null;
+            bool shrink = row?.Shrink == true, pictureEdit = square || shrink;
             using (var file = TagLib.File.Create(path, TagLib.ReadStyle.None))
             {
-                if (square)
+                if (pictureEdit)
                 {
                     var pictures = file.Tag.Pictures;
                     foreach (var picture in pictures)
                     {
-                        byte[] bytes = picture.Data.Data; byte[] cropped = Artwork.Square(bytes);
-                        if (ReferenceEquals(bytes, cropped)) continue;
-                        picture.Data = new TagLib.ByteVector(cropped);
-                        picture.MimeType = Artwork.MimeType(cropped);
+                        byte[] bytes = picture.Data.Data, edited = square ? Artwork.Square(bytes) : bytes;
+                        // Crop first at native resolution, then re-encode an oversized result.
+                        if (shrink && Artwork.IsOversized(edited)) edited = Artwork.Shrink(edited);
+                        if (ReferenceEquals(bytes, edited)) continue;
+                        picture.Data = new TagLib.ByteVector(edited);
+                        picture.MimeType = Artwork.MimeType(edited);
                     }
                     expected = pictures.Select(p => p.Data.Data).ToArray(); file.Tag.Pictures = pictures;
+                    if (shrink) TagCompaction.RebuildId3v2(file);
                 }
                 if (row?.NewTitle != null) file.Tag.Title = row.NewTitle;
                 if (row?.MergeDiscs == true)
@@ -241,12 +245,13 @@ namespace AlbumArtTool.Management
                 }
                 file.Save();
             }
+            if (shrink) TagCompaction.Compact(path);
             using (var file = TagLib.File.Create(path, TagLib.ReadStyle.None))
             {
-                if (square)
+                if (pictureEdit)
                 {
                     var pictures = file.Tag.Pictures;
-                    if (pictures.Length != expected.Length || pictures.Where((p, i) => !p.Data.Data.AsSpan().SequenceEqual(expected[i])).Any()) throw new IOException("The format did not retain all cropped pictures. Original kept.");
+                    if (pictures.Length != expected.Length || pictures.Where((p, i) => !p.Data.Data.AsSpan().SequenceEqual(expected[i])).Any()) throw new IOException("The format did not retain all edited pictures. Original kept.");
                 }
                 if (row?.NewTitle != null && file.Tag.Title != row.NewTitle) throw new IOException("The format did not retain the cleaned song title. Original kept.");
                 if (row?.MergeDiscs == true && (file.Tag.Album != row.MergedAlbum || file.Tag.Track != row.MergedTrack || file.Tag.TrackCount != row.MergedTrackCount ||

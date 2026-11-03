@@ -154,7 +154,7 @@ namespace AlbumArtTool
         private Control BuildLayout()
         {
             var header = Kit.Grid("*,108,150,178,122", "*").Add(BrandTitle().Cell(0, 0), appearance.Cell(0, 1), undo.Cell(0, 2), queueButton.Cell(0, 3), getUpdates.Cell(0, 4));
-            var pathRow = Kit.Grid("*,124,78,132,145", "*").Add(folder.Cell(0, 0), browse.Cell(0, 1), scan.Cell(0, 2), findDuplicates.Cell(0, 3), manageLibrary.Cell(0, 4));
+            var pathRow = Kit.Grid("*,124,78,122,132,145", "*").Add(folder.Cell(0, 0), browse.Cell(0, 1), scan.Cell(0, 2), checkTags.Cell(0, 3), findDuplicates.Cell(0, 4), manageLibrary.Cell(0, 5));
             foreach (var tab in new[] { missingTab, existingTab, artistsTab }) Avalonia.Automation.AutomationProperties.SetControlTypeOverride(tab, Avalonia.Automation.Peers.AutomationControlType.TabItem);
             var searchRow = Kit.Grid("55,*", "*").Add(Kit.Label("Search", Kit.Small).Cell(0, 0), search.Cell(0, 1));
             var tabs = Kit.Grid("238,263,165,*,226", "*").Add(missingTab.Cell(0, 0), existingTab.Cell(0, 1), artistsTab.Cell(0, 2), searchRow.Cell(0, 4));
