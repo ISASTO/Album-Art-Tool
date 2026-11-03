@@ -360,7 +360,15 @@ internal static partial class Tests
                 "the fill button previews only filename titles for the songs missing one");
             Assert(Named<CheckBox>(manager, "Fill missing Title tags from filenames").IsChecked == true && Named<CheckBox>(manager, "Convert lossless / over 320 kbps to MP3 320").IsChecked == false,
                 "the manager opens with just the title fill selected");
-            manager.Close();
+            manager.Close(); await Settle();
+            Click(ButtonStarting(dialog, "Keep one picture per song"));
+            manager = null;
+            for (int i = 0; i < 300 && (manager == null || manager.IsWorking || manager.CurrentPlan == null); i++)
+            { await Settle(30); manager = window.OwnedWindows.OfType<LibraryManagerWindow>().SingleOrDefault(); }
+            var fixes = manager.CurrentPlan.Actions.Where(a => a.HasWork).ToArray();
+            Assert(fixes.Length == dialog.Result.MultiplePictures.Count && fixes.All(a => a.SinglePicture && a.NewTitle == null && !a.Convert && !a.Move),
+                "the picture button previews keeping one picture for exactly the songs with several");
+            manager.Close(); await Settle();
             SetFilenameTitle(Path.Combine(root, "03 - no title.mp3"), "Now titled");
             await window.ScanAsync();
             Click(ButtonStarting(dialog, "Check again"));
@@ -450,7 +458,7 @@ internal static partial class Tests
             var checks = Controls(form.OptionsPanel).OfType<CheckBox>().ToArray();
             for (int n = 1; n <= 8; n++) reporter.Report(new ProgressInfo { Completed = n * 300, Total = 6589, Message = n * 300 + "/6589 tracks scanned · Artist/Album " + n });
             await Settle(60);
-            Assert(checks.Length == 11 && checks.All(c => !c.IsEnabled), "options are locked while work runs");
+            Assert(checks.Length == 12 && checks.All(c => !c.IsEnabled), "options are locked while work runs");
             Assert(Named<TextBlock>(form, "Library management status").Text.StartsWith("2400/6589") && Named<ListBox>(form, "Planned library changes").IsEnabled,
                 "progress updates the status while the preview stays scrollable");
             form.SetWorkingForTest(false);

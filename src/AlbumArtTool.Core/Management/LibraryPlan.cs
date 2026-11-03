@@ -17,6 +17,7 @@ namespace AlbumArtTool.Management
         public bool ConvertOtherLossy { get; set; }
         public bool Square { get; set; }
         public bool Shrink { get; set; }
+        public bool SinglePicture { get; set; }
         public bool Organize { get; set; }
         public bool RenameFromTitle { get; set; }
         public bool CombineDiscs { get; set; }
@@ -38,6 +39,8 @@ namespace AlbumArtTool.Management
         public bool Convert { get; set; }
         public bool Square { get; set; }
         public bool Shrink { get; set; }
+        /// <summary>Keep only the best embedded picture (see Artwork.BestPictureIndex) and drop the rest.</summary>
+        public bool SinglePicture { get; set; }
         public bool Archive { get; set; }
         public bool Selected { get; set; } = true;
         public string NewTitle { get; set; }
@@ -51,13 +54,13 @@ namespace AlbumArtTool.Management
         public uint MergedTrack { get; set; }
         public uint MergedTrackCount { get; set; }
         // Shrinking artwork rewrites only the picture data, through the same verified tag edit.
-        internal bool ChangesTags => MergeDiscs || NewTitle != null || Shrink;
+        internal bool ChangesTags => MergeDiscs || NewTitle != null || Shrink || SinglePicture;
         internal FileStamp Stamp;
         internal bool Move => !string.IsNullOrEmpty(Target) && !Source.Equals(Target, StringComparison.OrdinalIgnoreCase);
         internal bool Rename => !string.IsNullOrEmpty(Target) && !Path.GetFileNameWithoutExtension(Source).Equals(Path.GetFileNameWithoutExtension(Target), StringComparison.Ordinal);
         internal bool HasWork => Archive || Convert || Square || Move || Rename || ChangesTags;
         internal string Description => Archive ? Keeper != null ? "Remove duplicate (backed up)" : "Archive old backup" :
-            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, Shrink ? "Shrink art" : null, MergeDiscs ? "Combine discs · track " + MergedTrack : null, NewTitle != null ? TitleFromName ? "Title from filename" : "Clean title" : null, Rename ? "Rename" : null,
+            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, SinglePicture ? "One picture" : null, Shrink ? "Shrink art" : null, MergeDiscs ? "Combine discs · track " + MergedTrack : null, NewTitle != null ? TitleFromName ? "Title from filename" : "Clean title" : null, Rename ? "Rename" : null,
                 Move && !Path.GetDirectoryName(Source).Equals(Path.GetDirectoryName(Target), StringComparison.OrdinalIgnoreCase) ? "Move" : null }.Where(s => s != null));
     }
 
@@ -151,6 +154,14 @@ namespace AlbumArtTool.Management
         }
 
         private readonly Dictionary<string, string> large = new Dictionary<string, string>();
+        /// <summary>"front cover (1400 × 1400)" for the picture kept by the single-picture fix.</summary>
+        internal string Describe(TagLib.IPicture picture)
+        {
+            string type = Artwork.Describe(new[] { picture }).Substring(2);
+            try { var size = Artwork.ReadInfo(picture.Data.Data); return type + " (" + size.Width + " × " + size.Height + ")"; }
+            catch (Exception e) when (Artwork.IsImageError(e)) { return type; }
+        }
+
         /// <summary>A description such as "3000 × 3000, 6.2 MB" for pictures worth shrinking, otherwise null.</summary>
         internal string Oversized(byte[] bytes)
         {
@@ -208,10 +219,19 @@ namespace AlbumArtTool.Management
                 try
                 {
                     if (!track.Stamp.Matches(track.Path)) throw new IOException("The file changed during preview. Preview again.");
-                    if (options.Square || options.Shrink)
+                    if (options.Square || options.Shrink || options.SinglePicture && track.PictureCount > 1)
                         using (var file = TagLib.File.Create(track.Path, TagLib.ReadStyle.None))
                         {
                             var pictures = file.Tag.Pictures;
+                            if (options.SinglePicture && pictures.Length > 1)
+                            {
+                                int keep = Artwork.BestPictureIndex(pictures);
+                                row.SinglePicture = true;
+                                string kept = shapes.Describe(pictures[keep]);
+                                AddReason(row, "Several embedded pictures (" + Artwork.Describe(pictures) + ") → keeps only the " + kept + ".");
+                                // Cropping and shrinking then only concern the picture that stays.
+                                pictures = new[] { pictures[keep] };
+                            }
                             if (options.Square) row.Square = pictures.Any(p => !shapes.IsSquare(p.Data.Data));
                             if (options.Shrink)
                             {
@@ -306,7 +326,7 @@ namespace AlbumArtTool.Management
                         {
                             var row = actions[copy.Path];
                             if (row.Archive) continue;
-                            row.Archive = true; row.Convert = row.Square = row.Shrink = false; row.Target = null; row.Keeper = keep.Path; row.KeeperHash = keepHash;
+                            row.Archive = true; row.Convert = row.Square = row.Shrink = row.SinglePicture = false; row.Target = null; row.Keeper = keep.Path; row.KeeperHash = keepHash;
                             row.ExpectedHash = HashOf(copy.Path); row.Reason = "Confirmed file/audio copy of " + keep.Path;
                         }
                     }

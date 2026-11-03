@@ -216,12 +216,19 @@ namespace AlbumArtTool.Management
         private static void EditTags(string path, bool square, LibraryAction row)
         {
             byte[][] expected = null;
-            bool shrink = row?.Shrink == true, pictureEdit = square || shrink;
+            bool shrink = row?.Shrink == true, single = row?.SinglePicture == true, pictureEdit = square || shrink || single, compact = shrink || single;
             using (var file = TagLib.File.Create(path, TagLib.ReadStyle.None))
             {
                 if (pictureEdit)
                 {
                     var pictures = file.Tag.Pictures;
+                    if (single && pictures.Length > 1)
+                    {
+                        var keep = pictures[Artwork.BestPictureIndex(pictures)];
+                        // An unlabeled picture becomes the front cover so every player shows it.
+                        if (keep.Type == TagLib.PictureType.Other) keep.Type = TagLib.PictureType.FrontCover;
+                        pictures = new[] { keep };
+                    }
                     foreach (var picture in pictures)
                     {
                         byte[] bytes = picture.Data.Data, edited = square ? Artwork.Square(bytes) : bytes;
@@ -232,7 +239,7 @@ namespace AlbumArtTool.Management
                         picture.MimeType = Artwork.MimeType(edited);
                     }
                     expected = pictures.Select(p => p.Data.Data).ToArray(); file.Tag.Pictures = pictures;
-                    if (shrink) TagCompaction.RebuildId3v2(file);
+                    if (compact) TagCompaction.RebuildId3v2(file);
                 }
                 if (row?.NewTitle != null)
                 {
@@ -258,7 +265,7 @@ namespace AlbumArtTool.Management
                 }
                 file.Save();
             }
-            if (shrink) TagCompaction.Compact(path);
+            if (compact) TagCompaction.Compact(path);
             using (var file = TagLib.File.Create(path, TagLib.ReadStyle.None))
             {
                 if (pictureEdit)

@@ -37,6 +37,27 @@ namespace AlbumArtTool.Core
         }
 
         /// <summary>A short description such as "2 front covers, 1 back cover".</summary>
+        /// <summary>
+        /// The picture to keep when a song should have only one: a front cover before an unlabeled picture before anything else,
+        /// then the largest decodable image, then tag order. -1 when there are no pictures.
+        /// </summary>
+        public static int BestPictureIndex(IPicture[] pictures)
+        {
+            if (pictures == null || pictures.Length == 0) return -1;
+            int best = -1, bestRank = int.MaxValue; long bestArea = -1;
+            for (int i = 0; i < pictures.Length; i++)
+            {
+                byte[] bytes = pictures[i].Data?.Data ?? Array.Empty<byte>();
+                long area = -1;
+                if (bytes.Length > 0 && bytes.Length <= MaxImageBytes)
+                    try { var size = ReadInfo(bytes); area = (long)size.Width * size.Height; } catch (Exception e) when (IsImageError(e)) { }
+                // Undecodable pictures only win when nothing else can be shown.
+                int rank = (area < 0 ? 3 : 0) + (pictures[i].Type == PictureType.FrontCover ? 0 : pictures[i].Type == PictureType.Other ? 1 : 2) * 4;
+                if (rank < bestRank || rank == bestRank && area > bestArea) { best = i; bestRank = rank; bestArea = area; }
+            }
+            return best;
+        }
+
         public static string Describe(IPicture[] pictures)
         {
             if (pictures == null || pictures.Length == 0) return "";

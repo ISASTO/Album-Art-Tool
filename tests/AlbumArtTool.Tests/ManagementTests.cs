@@ -43,7 +43,7 @@ internal static partial class Tests
         Assert(LibraryPaths.ShouldConvert(new Track { Path = "x.m4a", Bitrate = 128 }, new LibraryOptions { Convert = true, ConvertOtherLossy = true }), "explicit compatibility mode converts other non-MP3 audio");
         Assert(LibraryPaths.Component("AC/DC: Live?") == "AC_DC- Live_" && LibraryPaths.Component("CON") == "_CON", "Windows folder names are sanitized without creating extra directory levels");
         foreach (string fixture in Fixtures()) SquareRoundTrip(fixture);
-        ManagementCombined(); ManagementConflicts(); ManagementStaleAndCancel(); ManagementRecovery(); ManagementUnknownDuplicates(); JournalCompatibility(); ShrinkTests();
+        ManagementCombined(); ManagementConflicts(); ManagementStaleAndCancel(); ManagementRecovery(); ManagementUnknownDuplicates(); JournalCompatibility(); ShrinkTests(); SinglePictureTests();
         FilenameTests();
     }
 
@@ -243,6 +243,46 @@ internal static partial class Tests
         using (var file = TagLib.File.Create(normal)) { file.Tag.Pictures = new[] { new TagLib.Picture(new TagLib.ByteVector(Cover)) { Type = TagLib.PictureType.FrontCover } }; file.Save(); }
         options = Options(plain, NewFolder("shrink-nothing-backups")); options.Shrink = true;
         Assert(LibraryPlanner.Build(options, CancellationToken.None).Actions.All(a => !a.HasWork), "normal-sized artwork is not re-encoded");
+    }
+
+    private static void SinglePictureTests()
+    {
+        byte[] small = MakeCover(SkiaSharp.SKColors.Gray, 300), keeper = NoisyArt(900, 900), back = NoisyArt(1800, 1200);
+        TagLib.IPicture P(byte[] data, TagLib.PictureType type) => new TagLib.Picture(new TagLib.ByteVector(data)) { Type = type, MimeType = data[0] == 0x89 ? "image/png" : "image/jpeg" };
+        Assert(Artwork.BestPictureIndex(new[] { P(small, TagLib.PictureType.FrontCover), P(back, TagLib.PictureType.BackCover), P(keeper, TagLib.PictureType.FrontCover) }) == 2,
+            "the largest front cover is kept over a smaller one and a bigger back cover");
+        Assert(Artwork.BestPictureIndex(new[] { P(back, TagLib.PictureType.BackCover), P(small, TagLib.PictureType.Other) }) == 1 &&
+            Artwork.BestPictureIndex(new[] { P(new byte[] { 1, 2, 3 }, TagLib.PictureType.FrontCover), P(small, TagLib.PictureType.Media) }) == 1 &&
+            Artwork.BestPictureIndex(new TagLib.IPicture[0]) == -1, "unlabeled pictures beat other kinds and broken images lose to any readable picture");
+        foreach (string fixture in Fixtures())
+        {
+            string extension = Path.GetExtension(fixture), name = extension.Substring(1);
+            string root = NewFolder("one-picture-" + name), path = CopyTrack(root, "one" + extension), single = CopyTrack(root, "two" + extension);
+            using (var file = TagLib.File.Create(path))
+            { file.Tag.Pictures = new[] { P(small, TagLib.PictureType.FrontCover), P(back, TagLib.PictureType.BackCover), P(keeper, TagLib.PictureType.FrontCover) }; file.Save(); }
+            using (var file = TagLib.File.Create(single)) { file.Tag.Pictures = new[] { P(small, TagLib.PictureType.FrontCover) }; file.Save(); }
+            string original = CoverEditor.Hash(path), singleHash = CoverEditor.Hash(single); long before = new FileInfo(path).Length;
+            var options = Options(root, NewFolder("one-picture-backup-" + name)); options.EncoderPath = null; options.SinglePicture = true;
+            var plan = LibraryPlanner.Build(options, CancellationToken.None);
+            var row = plan.Actions.Single(a => a.HasWork);
+            Assert(row.Source == path && row.SinglePicture && row.Description == "One picture" && row.Reason.Contains("keeps only the front cover (900 × 900)"), extension + " only the song with several pictures is fixed, and the preview names the kept picture");
+            Assert(LibraryRunner.Run(plan, CancellationToken.None).Issues.Count == 0, extension + " keeping one picture applies cleanly");
+            using (var file = TagLib.File.Create(path))
+                Assert(file.Tag.Pictures.Length == 1 && file.Tag.Pictures[0].Data.Data.AsSpan().SequenceEqual(keeper), extension + " exactly the best cover remains, byte for byte");
+            long after = new FileInfo(path).Length;
+            Console.WriteLine("ONE PICTURE " + extension + ": " + before + " -> " + after + " bytes");
+            Assert(after < before - back.Length / 2, extension + " removing the extra pictures makes the file smaller");
+            Assert(CoverEditor.Hash(single) == singleHash, extension + " songs with one picture are untouched");
+            Assert(LibraryRunner.Undo(LibraryJournal.Last(), CancellationToken.None) == 1 && CoverEditor.Hash(path) == original, extension + " Undo restores every original picture exactly");
+        }
+        // An unlabeled keeper becomes the front cover; combined with shrinking, only the kept picture is re-encoded.
+        string mixed = NewFolder("one-picture-shrink"), song = CopyTrack(mixed, "song.mp3");
+        using (var file = TagLib.File.Create(song)) { file.Tag.Pictures = new[] { P(back, TagLib.PictureType.BackCover), P(NoisyArt(2000, 2000), TagLib.PictureType.Other) }; file.Save(); }
+        var both = Options(mixed, NewFolder("one-picture-shrink-backups")); both.EncoderPath = null; both.SinglePicture = both.Shrink = true;
+        var combined = LibraryPlanner.Build(both, CancellationToken.None);
+        Assert(combined.Actions.Single().Description == "One picture + Shrink art" && LibraryRunner.Run(combined, CancellationToken.None).Issues.Count == 0, "one picture and shrinking apply together");
+        using (var file = TagLib.File.Create(song))
+            Assert(file.Tag.Pictures.Length == 1 && file.Tag.Pictures[0].Type == TagLib.PictureType.FrontCover && Size(file.Tag.Pictures[0].Data.Data) == (1600, 1600), "the unlabeled keeper becomes a 1600 px JPEG front cover");
     }
 
     private static void ShrinkRoundTrip(string fixture, byte[] large, byte[] small)
