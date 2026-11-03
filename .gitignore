@@ -6,3 +6,4 @@ TestResults/
 *.user
 *.tmp
 .album-art-backups/
+release/

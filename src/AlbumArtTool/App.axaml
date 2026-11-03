@@ -1,0 +1,388 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AlbumArtTool.App"
+             RequestedThemeVariant="Dark">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="Canvas" Color="#13171F"/>
+          <SolidColorBrush x:Key="Surface" Color="#202633"/>
+          <SolidColorBrush x:Key="Input" Color="#191F29"/>
+          <SolidColorBrush x:Key="Inset" Color="#1B212C"/>
+          <SolidColorBrush x:Key="InsetBorder" Color="#293343"/>
+          <SolidColorBrush x:Key="InsetHeader" Color="#202631"/>
+          <SolidColorBrush x:Key="InsetAlternate" Color="#1F2530"/>
+          <SolidColorBrush x:Key="Ink" Color="#EDF2FA"/>
+          <SolidColorBrush x:Key="Muted" Color="#ACB8CD"/>
+          <SolidColorBrush x:Key="Accent" Color="#96B9FF"/>
+          <SolidColorBrush x:Key="Selection" Color="#293C5D"/>
+          <SolidColorBrush x:Key="Border" Color="#3B485E"/>
+          <SolidColorBrush x:Key="Positive" Color="#8AD9B8"/>
+          <SolidColorBrush x:Key="Warning" Color="#EFC88F"/>
+          <SolidColorBrush x:Key="Primary" Color="#3266D6"/>
+          <SolidColorBrush x:Key="PrimaryHover" Color="#3F6FD8"/>
+          <SolidColorBrush x:Key="PrimaryPressed" Color="#1F4AB0"/>
+          <SolidColorBrush x:Key="Alternate" Color="#232A38"/>
+          <SolidColorBrush x:Key="SelectedBorder" Color="#436094"/>
+          <SolidColorBrush x:Key="BadgeAccent" Color="#2F394D"/>
+          <SolidColorBrush x:Key="BadgeWarning" Color="#3B3B3F"/>
+          <SolidColorBrush x:Key="BadgePositive" Color="#2E3D44"/>
+          <SolidColorBrush x:Key="ProgressTrack" Color="#3B485E"/>
+          <SolidColorBrush x:Key="Shadow" Color="#0D25375D"/>
+          <LinearGradientBrush x:Key="CanvasBrush" StartPoint="0%,0%" EndPoint="100%,70%">
+            <GradientStop Color="#171F2D" Offset="0"/>
+            <GradientStop Color="#171822" Offset="1"/>
+          </LinearGradientBrush>
+          <RadialGradientBrush x:Key="GlowA" Center="25%,17%" GradientOrigin="25%,17%" Radius="0.55">
+            <GradientStop Color="#0C97BBFA" Offset="0"/>
+            <GradientStop Color="#0097BBFA" Offset="1"/>
+          </RadialGradientBrush>
+          <RadialGradientBrush x:Key="GlowB" Center="100%,50%" GradientOrigin="100%,50%" Radius="0.55">
+            <GradientStop Color="#09B5A6EE" Offset="0"/>
+            <GradientStop Color="#00B5A6EE" Offset="1"/>
+          </RadialGradientBrush>
+          <LinearGradientBrush x:Key="FrostBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Color="#262E3D" Offset="0"/>
+            <GradientStop Color="#202633" Offset="1"/>
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="CoverPlaceholder" StartPoint="0%,0%" EndPoint="100%,100%">
+            <GradientStop Color="#2F4263" Offset="0"/>
+            <GradientStop Color="#352E4F" Offset="1"/>
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="ProgressFill" StartPoint="0%,0%" EndPoint="100%,0%">
+            <GradientStop Color="#96B9FF" Offset="0"/>
+            <GradientStop Color="#769AFF" Offset="1"/>
+          </LinearGradientBrush>
+
+          <SolidColorBrush x:Key="TextControlBackground" Color="#191F29"/>
+          <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#1C2330"/>
+          <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#191F29"/>
+          <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#191F29"/>
+          <SolidColorBrush x:Key="TextControlForeground" Color="#EDF2FA"/>
+          <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#EDF2FA"/>
+          <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#EDF2FA"/>
+          <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#ACB8CD"/>
+          <SolidColorBrush x:Key="TextControlBorderBrush" Color="#3B485E"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#4A5A75"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#96B9FF"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#3B485E"/>
+          <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#ACB8CD"/>
+          <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#3266D6"/>
+          <SolidColorBrush x:Key="ComboBoxBackground" Color="#191F29"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#212B3F"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#293C5D"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#191F29"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#3B485E"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#4A5A75"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#96B9FF"/>
+          <SolidColorBrush x:Key="ComboBoxForeground" Color="#EDF2FA"/>
+          <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#ACB8CD"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#202633"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#3B485E"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#ACB8CD"/>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="Canvas" Color="#F1F4FA"/>
+          <SolidColorBrush x:Key="Surface" Color="#FDFEFF"/>
+          <SolidColorBrush x:Key="Input" Color="#F6F8FC"/>
+          <SolidColorBrush x:Key="Inset" Color="#F1F4F9"/>
+          <SolidColorBrush x:Key="InsetBorder" Color="#E8ECF4"/>
+          <SolidColorBrush x:Key="InsetHeader" Color="#ECEFF5"/>
+          <SolidColorBrush x:Key="InsetAlternate" Color="#EDF0F6"/>
+          <SolidColorBrush x:Key="Ink" Color="#1E2433"/>
+          <SolidColorBrush x:Key="Muted" Color="#657085"/>
+          <SolidColorBrush x:Key="Accent" Color="#3267EB"/>
+          <SolidColorBrush x:Key="Selection" Color="#E7EEFF"/>
+          <SolidColorBrush x:Key="Border" Color="#DCE2ED"/>
+          <SolidColorBrush x:Key="Positive" Color="#287E68"/>
+          <SolidColorBrush x:Key="Warning" Color="#9B6624"/>
+          <SolidColorBrush x:Key="Primary" Color="#3267EB"/>
+          <SolidColorBrush x:Key="PrimaryHover" Color="#2A5ADF"/>
+          <SolidColorBrush x:Key="PrimaryPressed" Color="#1B45B8"/>
+          <SolidColorBrush x:Key="Alternate" Color="#F9FBFE"/>
+          <SolidColorBrush x:Key="SelectedBorder" Color="#D3DFFB"/>
+          <SolidColorBrush x:Key="BadgeAccent" Color="#EDF2FD"/>
+          <SolidColorBrush x:Key="BadgeWarning" Color="#F5F2EE"/>
+          <SolidColorBrush x:Key="BadgePositive" Color="#ECF4F3"/>
+          <SolidColorBrush x:Key="ProgressTrack" Color="#DDE4F3"/>
+          <SolidColorBrush x:Key="Shadow" Color="#0D25375D"/>
+          <LinearGradientBrush x:Key="CanvasBrush" StartPoint="0%,0%" EndPoint="100%,70%">
+            <GradientStop Color="#EBF1FC" Offset="0"/>
+            <GradientStop Color="#F6F4FA" Offset="1"/>
+          </LinearGradientBrush>
+          <RadialGradientBrush x:Key="GlowA" Center="25%,17%" GradientOrigin="25%,17%" Radius="0.55">
+            <GradientStop Color="#1E97BBFA" Offset="0"/>
+            <GradientStop Color="#0097BBFA" Offset="1"/>
+          </RadialGradientBrush>
+          <RadialGradientBrush x:Key="GlowB" Center="100%,50%" GradientOrigin="100%,50%" Radius="0.55">
+            <GradientStop Color="#16B5A6EE" Offset="0"/>
+            <GradientStop Color="#00B5A6EE" Offset="1"/>
+          </RadialGradientBrush>
+          <LinearGradientBrush x:Key="FrostBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Color="#FEFFFF" Offset="0"/>
+            <GradientStop Color="#F7F9FD" Offset="1"/>
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="CoverPlaceholder" StartPoint="0%,0%" EndPoint="100%,100%">
+            <GradientStop Color="#E0EBFD" Offset="0"/>
+            <GradientStop Color="#E7E1F7" Offset="1"/>
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="ProgressFill" StartPoint="0%,0%" EndPoint="100%,0%">
+            <GradientStop Color="#3267EB" Offset="0"/>
+            <GradientStop Color="#769AFF" Offset="1"/>
+          </LinearGradientBrush>
+
+          <SolidColorBrush x:Key="TextControlBackground" Color="#F6F8FC"/>
+          <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#F1F4FB"/>
+          <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFFFFF"/>
+          <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#F6F8FC"/>
+          <SolidColorBrush x:Key="TextControlForeground" Color="#1E2433"/>
+          <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#1E2433"/>
+          <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#1E2433"/>
+          <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#657085"/>
+          <SolidColorBrush x:Key="TextControlBorderBrush" Color="#DCE2ED"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#C3CDDF"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#3267EB"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#DCE2ED"/>
+          <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#657085"/>
+          <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#3267EB"/>
+          <SolidColorBrush x:Key="ComboBoxBackground" Color="#F6F8FC"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#EEF2FD"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#E7EEFF"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#F6F8FC"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#DCE2ED"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#C3CDDF"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#3267EB"/>
+          <SolidColorBrush x:Key="ComboBoxForeground" Color="#1E2433"/>
+          <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#657085"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#FDFEFF"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#DCE2ED"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#657085"/>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Dark" Accent="#3266D6" RegionColor="#13171F"
+                               AltHigh="#13171F" AltLow="#13171F" AltMedium="#13171F" AltMediumHigh="#13171F" AltMediumLow="#13171F"
+                               BaseHigh="#EDF2FA" BaseLow="#3B485E" BaseMedium="#ACB8CD" BaseMediumHigh="#D5DDEB" BaseMediumLow="#7D8BA3"
+                               ChromeAltLow="#D5DDEB" ChromeBlackHigh="#000000" ChromeBlackLow="#D5DDEB" ChromeBlackMedium="#000000" ChromeBlackMediumLow="#000000"
+                               ChromeDisabledHigh="#3B485E" ChromeDisabledLow="#7D8BA3" ChromeGray="#ACB8CD" ChromeHigh="#3B485E"
+                               ChromeLow="#191F29" ChromeMedium="#202633" ChromeMediumLow="#232A38" ChromeWhite="#FFFFFF"
+                               ListLow="#232E44" ListMedium="#293C5D" ErrorText="#FF9B9B"/>
+        <ColorPaletteResources x:Key="Light" Accent="#3267EB" RegionColor="#F1F4FA"
+                               AltHigh="#FDFEFF" AltLow="#FDFEFF" AltMedium="#FDFEFF" AltMediumHigh="#FDFEFF" AltMediumLow="#FDFEFF"
+                               BaseHigh="#1E2433" BaseLow="#DCE2ED" BaseMedium="#657085" BaseMediumHigh="#3B4458" BaseMediumLow="#8590A5"
+                               ChromeAltLow="#3B4458" ChromeBlackHigh="#000000" ChromeBlackLow="#DCE2ED" ChromeBlackMedium="#3B4458" ChromeBlackMediumLow="#8590A5"
+                               ChromeDisabledHigh="#DCE2ED" ChromeDisabledLow="#8590A5" ChromeGray="#657085" ChromeHigh="#DCE2ED"
+                               ChromeLow="#F6F8FC" ChromeMedium="#F1F4FA" ChromeMediumLow="#F6F8FC" ChromeWhite="#FFFFFF"
+                               ListLow="#EEF2FD" ListMedium="#E7EEFF" ErrorText="#B42318"/>
+      </FluentTheme.Palettes>
+    </FluentTheme>
+
+    <Style Selector="Window">
+      <Setter Property="FontFamily" Value="Segoe UI, Segoe UI Variable Text, Inter, Arial, sans-serif"/>
+      <Setter Property="FontSize" Value="13.33"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="Background" Value="{DynamicResource CanvasBrush}"/>
+    </Style>
+
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource Muted}"/></Style>
+    <Style Selector="TextBlock.accent"><Setter Property="Foreground" Value="{DynamicResource Accent}"/></Style>
+    <Style Selector="TextBlock.caption"><Setter Property="FontSize" Value="10.4"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="{DynamicResource Muted}"/></Style>
+
+    <!-- Panels -->
+    <Style Selector="Border.frost">
+      <Setter Property="Background" Value="{DynamicResource FrostBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="18"/>
+      <Setter Property="BoxShadow" Value="0 2 0 0 #0D25375D"/>
+    </Style>
+    <Style Selector="Border.inset">
+      <Setter Property="Background" Value="{DynamicResource Inset}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource InsetBorder}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="Padding" Value="6"/>
+      <Setter Property="ClipToBounds" Value="True"/>
+    </Style>
+
+    <!-- Buttons -->
+    <Style Selector="Button">
+      <Setter Property="Background" Value="{DynamicResource Surface}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="9"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Padding" Value="8,2"/>
+      <Setter Property="Margin" Value="3"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="VerticalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Transitions">
+        <Transitions><BrushTransition Property="Background" Duration="0:0:0.12"/></Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource SelectedBorder}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+    </Style>
+    <Style Selector="Button.chrome">
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource Primary}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Primary}"/>
+      <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource PrimaryHover}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource PrimaryHover}"/>
+      <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource PrimaryPressed}"/>
+      <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="Button.tab">
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.tab.selected">
+      <Setter Property="Background" Value="{DynamicResource Surface}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource SelectedBorder}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+    <Style Selector="Button.tab.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="Button.card">
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="FontSize" Value="11.3"/>
+      <Setter Property="Margin" Value="0"/>
+    </Style>
+
+    <!-- Inputs -->
+    <Style Selector="TextBox">
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="9,4"/>
+      <Setter Property="Margin" Value="3,6,6,3"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="MinHeight" Value="28"/>
+    </Style>
+    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+      <Setter Property="BorderThickness" Value="1.4"/>
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="CornerRadius" Value="7"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="Margin" Value="3,0,4,6"/>
+      <Setter Property="MinHeight" Value="26"/>
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="MinHeight" Value="24"/>
+    </Style>
+    <Style Selector="CheckBox:disabled /template/ ContentPresenter#ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+    </Style>
+
+    <!-- Progress -->
+    <Style Selector="ProgressBar">
+      <Setter Property="MinHeight" Value="7"/>
+      <Setter Property="Height" Value="7"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Background" Value="{DynamicResource ProgressTrack}"/>
+      <Setter Property="Foreground" Value="{DynamicResource ProgressFill}"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Lists: rows draw their own rounded selection; plain lists use alternating rows. -->
+    <Style Selector="ListBox">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+    </Style>
+    <Style Selector="ListBox.albums ListBoxItem">
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.albums ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.albums ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.albums ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.albums ListBoxItem Border.tile">
+      <Setter Property="Background" Value="{DynamicResource Surface}"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.albums ListBoxItem:pointerover Border.tile">
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+    </Style>
+    <Style Selector="ListBox.albums ListBoxItem:selected Border.tile">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource SelectedBorder}"/>
+    </Style>
+    <Style Selector="ListBox.albums ListBoxItem:focus-visible Border.tile">
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+    </Style>
+
+    <Style Selector="ListBox.grid ListBoxItem">
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="ListBox.grid ListBoxItem:nth-child(2n)">
+      <Setter Property="Background" Value="{DynamicResource InsetAlternate}"/>
+    </Style>
+    <Style Selector="ListBox.grid ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+    </Style>
+    <Style Selector="ListBox.grid ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+    </Style>
+    <Style Selector="ListBox.grid ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+    </Style>
+    <Style Selector="ListBox.grid TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="ListBox.grid TextBlock.muted">
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+    </Style>
+    <Style Selector="ListBox:disabled ListBoxItem TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+    </Style>
+  </Application.Styles>
+</Application>

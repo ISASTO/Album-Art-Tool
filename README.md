@@ -2,7 +2,7 @@
 
 One Windows app for album artwork, artist cleanup, MP3 conversion, duplicate removal, square embedded covers, and recursive music organization.
 
-**[Download the Windows app](https://github.com/ISASTO/Album-Art-Tool/releases/latest)** · Single portable EXE.
+**[Download the Windows installer](https://github.com/ISASTO/Album-Art-Tool/releases/latest)** · `AlbumArtTool-Setup.exe` · Windows 10/11, 64-bit.
 
 ![Album Art Tool on Windows, showing online artwork suggestions](docs/screenshot.png)
 
@@ -12,14 +12,14 @@ One Windows app for album artwork, artist cleanup, MP3 conversion, duplicate rem
 
 The app starts in **dark mode**. Click **Light mode** in the header to switch, or **Dark mode** to switch back. Your choice is remembered on this PC and updates open tool windows without interrupting work or discarding a staged cover.
 
-Switching themes uses a 180 ms gradient wipe in a separate, non-activating window above the native controls. The live controls finish repainting before that window is removed. Rendered light and dark appearances are reused when the visible content is unchanged, with a 32 MB snapshot cache limit; artwork, text, selection, scrolling and progress changes refresh those snapshots. Frosted materials are also cached at their display size and copied without scaling for transparent child controls, reducing repaint work during resizing. Long track lists resolve their colors while drawing instead of recoloring every row during a toggle. Windows reduced-motion preferences are respected.
+Switching themes is instant: every color is a theme resource, so the whole interface changes in one repaint, with a short gradient wipe (skipped when Windows reduced-motion is on). Open tool windows and staged covers are kept.
 
-Both themes use rounded artwork and controls, readable text, subtle hover transitions, and frosted-style panels. The dropdowns keep native keyboard navigation with clean rounded borders. Windows 11 adds native window corners and matching title-bar colors where supported; older Windows versions use the same painted interface. No additional UI framework or runtime is required.
+The interface is GPU-rendered (Avalonia) and the app is compiled ahead of time to native code, so it starts quickly and stays responsive with large libraries: the album list is virtualized, thumbnails are decoded only for visible rows, and folders are scanned in parallel. Windows 11 adds native window corners and matching title-bar colors.
 
 ## Use it
 
-1. Download **AlbumArtTool.exe** from Releases. Put it in the top folder of your music collection and double-click it. You can also keep it elsewhere and use **Choose folder**.
-2. The app automatically scans that folder and every subfolder.
+1. Download and run **AlbumArtTool-Setup.exe** from Releases. It installs for your Windows account only (no administrator prompt) with a Start menu entry and an uninstaller in **Settings → Apps**. Prefer no installer? `AlbumArtTool-Portable.zip` contains the same app: unzip it anywhere and it opens the folder it is in, like earlier versions.
+2. Open **Music Library Manager** and use **Choose folder** to pick the top folder of your music collection. The app scans that folder and every subfolder, and reopens it next time.
 3. **Add missing album art** shows albums where one or more tracks lack an embedded front cover. **Change existing album art** shows albums with embedded or folder artwork. Both artwork tabs open on **All albums in this tab**, without inheriting the track-artist cleanup filter.
 4. Select an album. Online suggestions automatically search its **album title + artist name** and display cover choices inside the app.
 5. **Click a cover or its Apply this cover button to add it to the work queue.** Continue selecting other albums while covers download and save in the background. Backups and Undo work for online changes too.
@@ -30,11 +30,11 @@ If an album already has a folder cover, **Apply cover to X tracks** is enabled i
 
 The **Queue** button shows active and waiting albums, recent results, and **Clear waiting jobs**. Albums in the list are marked **Queued** or **Applying cover…**. Jobs run one at a time; each keeps the album, image, and checkbox settings you chose when adding it. A failed job does not block later albums. You can browse both tabs, search, stage images and queue more work throughout. Folder switching, rescanning and Undo are available when the queue finishes. To close with work pending, clear waiting jobs and let the current update finish.
 
-No installer, accounts, API keys or background service. Online suggestions use the internet; uncheck **Online suggestions** to work offline. Windows 10 (1903 or newer) and Windows 11 use the .NET Framework 4.8 runtime already included with Windows. The EXE embeds its only third-party library, TagLibSharp. The ZIP includes the same EXE and license notices.
+No accounts, API keys or background service. Online suggestions use the internet; uncheck **Online suggestions** to work offline. The app is self-contained: no .NET runtime or other prerequisite needs to be installed.
 
 Scanning first counts supported music files using directory listings, without reading audio tags. It then shows a filling progress bar, a percentage, and an exact counter such as **2751/3867 tracks scanned**. Files that fail to open still count as checked and appear in Details. The initial counting phase can also be stopped. Disabled options keep readable text in both themes.
 
-Unchanged folders reuse their scanned tags and artwork during the current app session. File listings, sizes and modification times are checked each time; new, deleted or modified tracks and folder covers trigger a fresh folder scan. **Shift-click Rescan** to force every file to be read again. Identical embedded covers are validated once per scan rather than decoded once for every track. Backups calculate source checksums while copying, then still verify the saved backup and recheck the source before replacement. The biggest repeat-scan benefit is avoiding audio-file opens; first-scan and write speeds still depend on the source and backup drives.
+Folders are read several at a time. Unchanged folders reuse their scanned tags and artwork, and that cache is saved on this PC, so reopening the app on an unchanged library does not reopen every music file. File listings, sizes and modification times are checked each time; new, deleted or modified tracks and folder covers trigger a fresh folder scan. **Shift-click Rescan** (or Shift+F5) to force every file to be read again. Identical embedded covers are validated once per scan rather than decoded once for every track. Backups calculate source checksums while copying, then still verify the saved backup and recheck the source before replacement. The biggest repeat-scan benefit is avoiding audio-file opens; first-scan and write speeds still depend on the source and backup drives.
 
 [Scan progress preview](docs/scanning.png) · [Background queue preview](docs/queue.png)
 
@@ -79,7 +79,7 @@ The suggestion uses a specific tagged album artist first, or a consistent lead a
 
 Artist jobs share the artwork queue, freeze the selected album/name at enqueue time, and use the same full-file backups, stale-file protection and **Undo last change**. Already-correct tracks are skipped. Failed writes are listed in Details. Artist cleanup does not rename or move files/folders. The cleanup filter removes an album once its artist fields match.
 
-Use **Open album folder** below the artist preview to open the selected album in File Explorer. Select a track row and click **Show selected track** to open its folder with that song highlighted. Scrollbars use independent rounded thumbs that match both themes, with wheel scrolling, page clicks, keyboard navigation and dragging. Windows scrollbars cannot flash through on hover. Track rows repaint as you scroll and switch albums, without waiting for the pointer to leave the list. Large album lists remain virtual.
+Use **Open album folder** below the artist preview to open the selected album in File Explorer. Select a track row and click **Show selected track** to open its folder with that song highlighted. Large album lists are virtualized.
 
 [Track artist cleanup preview](docs/track-artists.png)
 
@@ -99,13 +99,11 @@ The first pass uses small audio samples and file sizes to find candidates; full 
 
 ## App updates
 
-Click **Get updates** in the header. The app checks this repository's latest published stable release, downloads a newer EXE with progress, verifies GitHub's SHA-256 checksum and the EXE's version, then restarts in the same music folder. If you are already current, it reports your installed version. Checks only happen when you click the button; there is no background update service or account requirement.
+Click **Get updates** in the header. The app checks this repository's latest published stable release, downloads the newer installer with progress, verifies GitHub's SHA-256 checksum and the installer's product name and version, then closes and runs it. The installer waits for the app to exit, replaces the installed files (rolling back if anything fails) and reopens the app in the same music folder. If you are already current, it reports your installed version. Checks only happen when you click the button; there is no background update service or account requirement.
 
 You can keep working during the download. Installation waits for scans, library management/encoder setup, Undo, and every queued artwork job to finish. If you have a staged cover, apply it or press Esc to discard it before the update can restart. The update window has a Cancel button until installation starts. As with any restart, the in-memory artwork/artist queue history and its Undo session end; the bulk library journal and original backups remain available for Preview Undo.
 
-A temporary copy of the current app waits for the running EXE to exit, verifies the download again, replaces it while retaining a rollback copy, and starts the new version. The rollback copy is removed only after the new window confirms startup. If launch fails, the previous EXE is restored and reopened. If startup cannot be confirmed while the new process is still running, it is left running and the backup location is reported. Read-only folders, locked files, network errors, and invalid downloads produce an error without installing an unverified EXE. Automatic replacement requires a writable application folder and a filesystem that supports file replacement.
-
-**Install v1.3.0 manually once to get the button** if you are upgrading from an earlier release. After that, use **Get updates** for future releases. No music files are sent to GitHub.
+**Upgrading from v2.x (portable EXE):** click **Get updates** in the old version as usual. It downloads an `AlbumArtTool.exe` bridge, which installs the new version and reopens your music folder. Afterwards, the old portable EXE simply opens the installed app, so existing shortcuts keep working. Settings, the backup folder, FFmpeg setup and the last library Undo journal carry over. No music files are sent to GitHub.
 
 [Update window preview](docs/updates.png)
 
@@ -157,26 +155,33 @@ Files changed since the scan, read-only files, and files locked against replacem
 
 ## Build and test
 
-On Windows, install the .NET 8 SDK, then run:
+Install the .NET 10 SDK. The core library and the full test suite (including headless checks of every window) also build and run on Linux and macOS.
 
 ```powershell
-dotnet build src/AlbumArtTool/AlbumArtTool.csproj -c Release
+# Run from source
+dotnet run --project src/AlbumArtTool
+
+# Native Windows build (ahead-of-time compiled)
+dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r win-x64 -o dist/app
+
+# Installer (Inno Setup 6)
+ISCC.exe /DAppVersion=3.0.0 /DSourceDir=dist\app /DOutputDir=dist installer\AlbumArtTool.iss
 ```
 
-The portable executable is `src/AlbumArtTool/bin/Release/net48/AlbumArtTool.exe`. It can be copied on its own. To run the integration suite, install FFmpeg and point `ALBUMART_FFMPEG` at its executable:
+To run the integration suite, install FFmpeg and point `ALBUMART_FFMPEG` at its executable. Screenshots of each window are saved to the folder you pass:
 
 ```powershell
-dotnet build tests/AlbumArtTool.Tests.csproj -c Release
+dotnet build tests/AlbumArtTool.Tests/AlbumArtTool.Tests.csproj -c Release
 $env:ALBUMART_FFMPEG = 'C:\path\to\ffmpeg.exe'
-tests/bin/Release/net48/AlbumArtTool.Tests.exe TestResults
+dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll TestResults
 ```
 
-GUI checks cover the real theme button with Windows animations enabled, full-window resize timing, separate layout/painting profiles, forced native repaint isolation, focus preservation and transition cleanup during resize/close, large-library theme frame times, reuse of both rendered appearances, fresh snapshots after artwork/selection/scroll/progress changes, gradient color accuracy, saved dark/light preferences, switching open windows without losing staged work, native dropdown keyboard navigation, false-positive artist cleanup, and album selection without an empty intermediate detail pane. Tests also exercise provider parsing and ranking, unavailable sources, search caching, cancellation, bounded image-header checks, redirect validation, source resolutions, counted scan progress, direct folder-cover application, and the responsive work queue. Queue checks cover captured targets/options, preserved staged images, duplicate clicks, failures and clearing waiting work. Library-tool tests cover artist inference, mixed compilations and band names, nine audio-format artist edits with decoded-audio and artwork preservation, exact Undo, shared queue behavior, eligible-album filters, confirmed file/audio/album copies, partial albums, possible matches, cancellation and read-only duplicate scans. Updater checks additionally verify release versions and checksums, rejected download redirects, cancellation, rollback, a real separate-process EXE replacement/restart, the reopened music-folder path, and scan/queue/staged-cover interlocks. A separate live GitHub check downloads the latest published EXE and verifies it without installing it. A separate live-service check reports source availability and downloads a real high-resolution cover; public-site outages do not fail the deterministic integration suite.
+Options: `--benchmark` times cold, cached and post-restart scans of a synthetic 720-track library; `--live-search`, `--live-update` and `--live-encoder` exercise the real online services. The tests use a private data folder (`ALBUMART_DATA`), never your real settings or backups.
 
-Management tests cover metadata-based filename cleanup in nine formats, Unicode and Windows filename rules, conflicts, capitalization, missing titles, later edits, persistent Undo, the combined preview/apply/Undo workflow, native-resolution image crops in nine formats, MP3 320 validation, preservation of lower-bitrate audio, nested/duplicated artist and year folders, loose/missing tags, sidecar files, conflict preservation, old-backup migration, stale inputs, cancellation, incremental-journal crash recovery and GUI behavior. A separate live step verifies the real encoder download, digest, license extraction and startup. Tests verify audio decoding hashes before/after edits, existing metadata, exact backup restoration, partial albums, corrupt files, stale scans, read-only files, folder images, preserved back covers, cancellation, GUI tab behavior and cover previews. CI additionally opens the isolated EXE with no adjacent DLLs to check the portable dependency loader. Test audio fixtures are short synthesized tones, generated by `tests/generate_fixtures.py`; they contain no copyrighted music. Python is test-only and is not required by the app. FFmpeg is also used by the optional conversion workflow; it can be downloaded inside the app or supplied separately, and is not embedded in the GUI EXE.
+The suite covers real round trips in nine audio formats (decoded-audio hashes, preserved metadata and back covers, byte-exact Undo), scanning (parallel progress, cancellation, corrupt files, stale scans, read-only files, folder art, the saved scan cache), artist cleanup, duplicate detection, every library-management operation together with persistent Undo and crash recovery, journals written by v2.x, online source parsing and safety checks, and update verification. Headless GUI checks drive the main window, queue, track-artist tab, duplicate window, library manager, theme switching and the update handoff. CI also installs and uninstalls the real installer, measures startup next to v2.5.2, and upgrades a real v2.5.2 portable copy through its own built-in updater. Test audio fixtures are short synthesized tones generated by `tests/AlbumArtTool.Tests/generate_fixtures.py`; they contain no copyrighted music.
 
-Push a `v*` tag, or include `[release]` in a commit message on `main`, to build, test and publish a downloadable release. For a main-branch release, the version comes from the app's project file. A release is published only after the Windows checks pass; existing releases are never replaced automatically.
+Push a `v*` tag, or include `[release]` in a commit message on `main`, to build, test and publish a release (installer, v2.x update bridge, portable ZIP and checksums). The version comes from `Directory.Build.props`. A release is published only after the Windows and Linux checks pass; existing releases are never replaced automatically.
 
 ## License
 
-The GUI app is MIT licensed. FFmpeg is a separate optional program with its own licenses; automatic setup retains its upstream notices and source URL in the encoder cache. The embedded TagLibSharp library is LGPL-2.1-or-later; see `THIRD-PARTY-NOTICES.txt` and `licenses/`. A compatible external `TagLibSharp.dll` next to the EXE takes precedence over the embedded copy, so the library can be replaced independently. Its upstream source and this app's build instructions are available for rebuilding.
+The GUI app is MIT licensed. FFmpeg is a separate optional program with its own licenses; automatic setup retains its upstream notices and source URL in the encoder cache. TagLibSharp is LGPL-2.1-or-later and Avalonia/SkiaSharp are MIT; see `THIRD-PARTY-NOTICES.txt` and `licenses/`. The native build links TagLibSharp into the app, so the complete source and build instructions above are provided to let you rebuild the app with a modified TagLibSharp, as the LGPL permits.

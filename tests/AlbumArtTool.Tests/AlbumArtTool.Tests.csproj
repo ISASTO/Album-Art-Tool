@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Console test runner: real codec round trips, library management, online parsing,
+       updates and headless GUI checks of every window. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>AlbumArtTool.Tests</AssemblyName>
+    <RootNamespace>AlbumArtTool.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/AlbumArtTool/AlbumArtTool.csproj" />
+    <ProjectReference Include="../../src/AlbumArtTool.Core/AlbumArtTool.Core.csproj" />
+    <PackageReference Include="Avalonia.Headless" Version="11.3.*" />
+    <None Include="fixtures/*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
