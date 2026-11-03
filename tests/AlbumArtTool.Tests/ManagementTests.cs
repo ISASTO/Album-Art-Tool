@@ -273,8 +273,10 @@ internal static partial class Tests
             string original = CoverEditor.Hash(path), singleHash = CoverEditor.Hash(single), metadata = Metadata(path), audio = AudioHash(path); long before = new FileInfo(path).Length;
             var options = Options(root, NewFolder("one-picture-backup-" + name)); options.EncoderPath = null; options.Shrink = true;
             var plan = LibraryPlanner.Build(options, CancellationToken.None);
-            var row = plan.Actions.Single(a => a.HasWork);
-            Assert(row.Source == path && row.SinglePicture && row.Shrink && row.Description == "One front cover + Resize art" && row.Reason.Contains("keeps only the"), extension + " only the song with several pictures is fixed, and the preview names the kept picture");
+            var work = plan.Actions.Where(a => a.HasWork).ToArray();
+            string detail = string.Join(" | ", work.Select(a => Path.GetFileName(a.Source) + ": " + a.Description + " — " + a.Reason)) + " | issues: " + string.Join(";", plan.Issues);
+            var row = work.FirstOrDefault(a => a.Source == path);
+            Assert(work.Length == 1 && row != null && row.SinglePicture && row.Shrink && row.Description == "One front cover + Resize art" && row.Reason.Contains("keeps only the"), extension + " only the song with several pictures is fixed, and the preview names the kept picture: " + detail);
             Assert(LibraryRunner.Run(plan, CancellationToken.None).Issues.Count == 0, extension + " the artwork standard applies cleanly");
             using (var file = TagLib.File.Create(path))
                 Assert(file.Tag.Pictures.Length == 1 && file.Tag.Pictures[0].Type == TagLib.PictureType.FrontCover && file.Tag.Pictures[0].Data.Data.AsSpan().SequenceEqual(expected) &&
