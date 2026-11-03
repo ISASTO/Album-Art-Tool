@@ -448,7 +448,7 @@ internal static partial class Tests
             form.SetRowChecked(0, true); Assert(form.CheckedCount == 2, "selecting a merge row selects the complete album");
             Shot(form, "album-cleanup-options.png");
             await form.ApplyAsync();
-            using (var file = TagLib.File.Create(Path.Combine(album, "01 - One.mp3")))
+            using (var file = TagLib.File.Create(Path.Combine(album, "one.mp3")))
                 Assert(file.Tag.Title == "One" && file.Tag.TrackCount == 2 && file.Tag.DiscCount == 1, "the manager applies its previewed title and disc tags");
         }
         finally { form.Close(); }
