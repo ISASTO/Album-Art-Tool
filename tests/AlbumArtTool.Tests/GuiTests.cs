@@ -459,6 +459,9 @@ internal static partial class Tests
             for (int n = 1; n <= 8; n++) reporter.Report(new ProgressInfo { Completed = n * 300, Total = 6589, Message = n * 300 + "/6589 tracks scanned · Artist/Album " + n });
             await Settle(60);
             Assert(checks.Length == 12 && checks.All(c => !c.IsEnabled), "options are locked while work runs");
+            var tipped = Controls(form).Where(c => c is CheckBox || c is Button || c is TextBox).ToArray();
+            Assert(tipped.Length >= 21 && tipped.All(c => ToolTip.GetTip(c) is string tip && tip.Length >= 40),
+                "every option, button and field in Manage library has detailed mouse-over text: " + string.Join(", ", tipped.Where(c => !(ToolTip.GetTip(c) is string t && t.Length >= 40)).Select(c => c.GetType().Name + " " + (c as ContentControl)?.Content)));
             Assert(Named<TextBlock>(form, "Library management status").Text.StartsWith("2400/6589") && Named<ListBox>(form, "Planned library changes").IsEnabled,
                 "progress updates the status while the preview stays scrollable");
             form.SetWorkingForTest(false);

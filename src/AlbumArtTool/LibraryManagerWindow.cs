@@ -68,15 +68,10 @@ namespace AlbumArtTool
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             var path = Kit.Label("Music folder: " + root, Kit.Body);
             rename.Named("Rename song files from Title tags"); combine.Named("Combine multi-disc albums"); cleanTitles.Named("Remove featured artists from titles");
-            cleanTitles.Tip("Cleans feat. / ft. / featuring credits from Title tags and filenames.");
             shrink.Named("Standardize embedded artwork");
             titleFromName.Named("Fill missing Title tags from filenames");
             id3v23.Named("Standardize MP3 tags to ID3v2.3");
-            id3v23.Tip("Rewrites MP3 tags (and ID3 tags in AIFF/WAV files) as ID3v2.3 with UTF-16 text, the version every player reads. Tag contents are unchanged; files already in that form are left alone.");
-            titleFromName.Tip("Songs without a Title tag get their filename as the title, without the extension or a leading track number (\"01 - Song.mp3\" → \"Song\"). Songs that already have a title are left alone.");
-            shrink.Tip("One embedded picture per song, in the front-cover slot: when a song has several, the best cover is kept (a front cover first, then an unlabeled picture, then the largest image) and the rest are removed. " +
-                "Pictures larger than " + Artwork.EmbedSide + " × " + Artwork.EmbedSide + ", non-JPEG pictures, and JPEGs saved above quality " + Artwork.EmbedQuality + " become JPEGs of at most " + Artwork.EmbedSide +
-                " px at quality " + Artwork.EmbedQuality + ". Smaller pictures are never enlarged. Audio and other tags are unchanged.");
+            AddTips();
             var options = Kit.Grid("*,*", "*,*,*,*,*,*").Add(convert.Cell(0, 0), square.Cell(0, 1), duplicates.Cell(1, 0), organize.Cell(1, 1),
                 archive.Cell(2, 0), compatibility.Cell(2, 1), rename.Cell(3, 0), combine.Cell(3, 1), cleanTitles.Cell(4, 0), shrink.Cell(4, 1), titleFromName.Cell(5, 0), id3v23.Cell(5, 1)).Named("Library management options");
             optionsPanel = options;
@@ -124,6 +119,64 @@ namespace AlbumArtTool
             openBackup.Click += (s, e) => { try { Directory.CreateDirectory(backup.Text); using (Process.Start(new ProcessStartInfo(backup.Text) { UseShellExecute = true })) { } } catch (Exception ex) { state.Text = ex.Message; } };
             Closing += (s, e) => { if (IsWorking) { e.Cancel = true; state.Text = "Task is running. Click Stop; the current file is kept safe before stopping."; } };
             encoder = Management.Encoder.Find(); UpdateEncoder(); SetWorking(false);
+        }
+
+        // Mouse-over help for every control. Nothing runs until Preview changes, so each tip says what the preview will propose.
+        private void AddTips()
+        {
+            const string safe = "\n\nNothing changes until you click Preview changes, review the list, and Apply. Originals are backed up to the PC backup folder and Undo restores them exactly.";
+            convert.Tip("Re-encodes lossless files (FLAC, WAV, AIFF, ALAC, WavPack…) and any audio above 320 kbps as MP3 320 kbps CBR.\n\n" +
+                "Existing MP3s at or below 320 kbps and lower-bitrate lossy files are left alone, so nothing is encoded twice. Tags and embedded artwork are carried over; " +
+                "each new MP3's bitrate and duration are verified and the whole file is decoded before it replaces the original. Files with a video track are skipped. Needs FFmpeg." + safe);
+            compatibility.Tip("Also converts other non-MP3 lossy audio (AAC/M4A, Ogg Vorbis, Opus, WMA) to MP3 320, for players that only handle MP3.\n\n" +
+                "This is another lossy encode: it cannot improve a low-bitrate source and loses a little quality. Only use it when compatibility matters more. Needs FFmpeg and \"Convert lossless\"." + safe);
+            square.Tip("Center-crops every non-square embedded picture to a square at its full resolution (1800 × 1000 becomes 1000 × 1000). Nothing is stretched or enlarged.\n\n" +
+                "Square pictures keep their original bytes. JPEGs stay JPEG; other images are saved as PNG. Folder images (cover.jpg) are not cropped. " +
+                "With \"Standardize embedded artwork\" also selected, the crop happens first and the result is then resized to 600 px." + safe);
+            duplicates.Tip("Removes extra copies of the same song on the same album. Only confirmed matches count: identical file or audio contents with the same album and title.\n\n" +
+                "Copies on different albums, different recordings, and songs that only share a name are kept. The copy with artwork is preferred, and names like \"(1)\" or \"copy\" are removed first. " +
+                "The preview names the copy that stays. Removed copies go to the PC backup folder, not the recycle bin." + safe);
+            organize.Tip("Moves every song into Music folder \\ Artist \\ Album, using the Album Artist (or Artist) and Album tags, from any depth of subfolders.\n\n" +
+                "Year, Downloads and doubled artist folders disappear. Disc subfolders are kept for multi-disc releases and Various Artists albums stay together. " +
+                "Booklets, cover.jpg, cue sheets and lyrics move with their album. Songs without usable artist/album tags stay where they are. Empty old folders are removed." + safe);
+            archive.Tip("Moves leftover backups from older versions of this tool (.album-art-backups, .before-square-crop, .covercrop-tmp- files) out of the music folder and into the PC backup folder.\n\n" +
+                "Some music players index those hidden folders as extra songs, which shows up as duplicates." + safe);
+            rename.Tip("Renames each song file to its Title tag: \"01 - World Eater.mp3\" becomes \"World Eater.mp3\". Works in every subfolder, on its own or with the other options.\n\n" +
+                "The extension is kept. Characters Windows can't use are replaced and very long titles are shortened. A name clash keeps both files with \" (2)\". " +
+                "Songs without a Title tag keep their filename (combine with \"Fill missing Title tags\" to give them one first). Only the name changes; audio and tags are untouched." + safe);
+            combine.Tip("Merges albums split into Disc 1 / CD2 folders, \"(Disc 2)\" album names or disc tags into one album folder.\n\n" +
+                "Tracks are renumbered 1, 2, 3… across all discs, the track total is set, disc tags become 1 of 1, and \"(Disc N)\" is removed from the album name. " +
+                "Filenames are not changed; a clash between discs gets \" (2)\". Each merge is selected or cleared as a whole album in the preview." + safe);
+            cleanTitles.Tip("Removes feat. / ft. / featuring credits from Title tags and filenames: \"Song (feat. Guest)\" becomes \"Song\". Brackets, capitalization and trailing credits are all handled.\n\n" +
+                "Version labels such as (Live), (Remix) or (2014 Remaster) stay. Artist tags are not changed. A title is never emptied." + safe);
+            shrink.Tip("Brings every song's embedded artwork to one standard: exactly one picture, in the front-cover slot (ID3 type 3), as a JPEG of at most " +
+                Artwork.EmbedSide + " × " + Artwork.EmbedSide + " at quality " + Artwork.EmbedQuality + ".\n\n" +
+                "When a song has several pictures, the best cover is kept (a front cover first, then an unlabeled picture, then the largest image) and back covers, booklet pages and duplicates are removed. " +
+                "Larger or non-JPEG pictures are re-encoded; smaller pictures are never enlarged; pictures already in that form are left byte for byte. Leftover tag padding is removed, so files really get smaller. " +
+                "Audio and other tags are unchanged." + safe);
+            titleFromName.Tip("Gives songs without a Title tag their filename as the title, without the extension or a leading track number: \"01 - Song.mp3\" → \"Song\".\n\n" +
+                "Songs that already have a title are left alone and files keep their names. Files with no tags at all get one. " +
+                "Combined with \"Remove featured artists\" the new title is cleaned too." + safe);
+            id3v23.Tip("Rewrites MP3 tags as ID3v2.3 with UTF-16 text, the version every player and Windows reads, keeping accented and non-Latin characters intact.\n\n" +
+                "Tag contents are unchanged. ID3v2.4 dates are written as their v2.3 fields (TYER, TDAT, TIME, TORY). An MP3 with only an old ID3v1/APE tag gets an ID3v2.3 tag with the same fields. " +
+                "ID3 tags in AIFF and WAV files are converted too. Files already in that form are left alone." + safe);
+            encoderState.Tip("FFmpeg converts audio to MP3. It is only needed for the conversion options; every other option works without it.");
+            download.Tip("Downloads a Windows build of FFmpeg (about 170 MB, once) from BtbN/FFmpeg-Builds on GitHub into this PC's app cache.\n\n" +
+                "The download's SHA-256 checksum is verified before anything is extracted or run. License notices are included.");
+            chooseEncoder.Tip("Use an ffmpeg.exe you already have instead of downloading one. The location is remembered.");
+            backup.Tip("Where originals, removed duplicates and Undo information are saved. It must be on your PC, outside the music folder, so your player never indexes the backups.\n\n" +
+                "Each run gets its own folder with journal.json (used by Undo) and a readable report.csv. The preview checks there is enough free space first.");
+            chooseBackup.Tip("Pick a different backup folder on your PC (outside the music folder).");
+            openBackup.Tip("Opens the backup folder in File Explorer, where each run's originals, journal.json and report.csv are kept.");
+            preview.Tip("Scans the music folder and lists every change the selected options would make, with source, destination and the reason for each.\n\n" +
+                "Nothing is moved, converted or rewritten during the preview. Uncheck any rows you don't want, then click Apply selected changes.");
+            apply.Tip("Carries out the checked rows of the current preview (or, after Preview Undo, restores the checked files).\n\n" +
+                "Each change is written to a temporary copy and verified before it replaces the original, and every finished step is recorded as it goes, so stopping part-way never leaves a half-written song. " +
+                "The library is rescanned when it finishes.");
+            undo.Tip("Lists the changes made by the last library run, even after restarting the app. Check the ones to reverse, then click Undo selected changes.\n\n" +
+                "Originals are restored byte for byte. Files you edited after the run are not overwritten.");
+            stop.Tip("Stops the current preview or run after the file in progress is finished safely. Completed changes stay recorded and can still be undone.");
+            progress.Tip("Progress of the current preview, run or Undo.");
         }
 
         // Used by the Check library window: select just one option and preview it.
