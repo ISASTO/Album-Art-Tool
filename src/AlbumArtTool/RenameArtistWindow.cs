@@ -36,7 +36,7 @@ namespace AlbumArtTool
         private readonly Button preview = Kit.Button("Preview changes", "primary"), cancel = Kit.Button("Cancel"), clear = Kit.Button("Clear selection", "link");
         internal Action<string[], string, bool> Start;
 
-        internal RenameArtistWindow(IEnumerable<Album> albums, IEnumerable<string> preselected = null)
+        internal RenameArtistWindow(IEnumerable<Album> albums, IEnumerable<string> preselected = null, string folderName = null)
         {
             library = albums.ToArray();
             Title = "Rename artists"; Width = 600; SizeToContent = SizeToContent.Height; CanResize = false; ShowInTaskbar = false;
@@ -70,7 +70,7 @@ namespace AlbumArtTool
             to.Named("New artist name").Tip("The name every ticked artist becomes, in every matching Artist (and Album Artist) tag.");
             albumArtists.Named("Also change Album Artist tags").Tip("Also rename them where they are the album artist, so players list those albums under the one name.");
             summary.Named("Rename summary"); summary.TextWrapping = TextWrapping.Wrap; summary.TextTrimming = TextTrimming.None;
-            var warning = Kit.Label("This is a big change: it rewrites the artist tags of every matching song in your library. Organize lists each change before anything is written, " +
+            var warning = Kit.Label("This is a big change: it rewrites the artist tags of every matching song in " + (folderName ?? "your library") + ". Organize lists each change before anything is written, " +
                 "originals are backed up, and Organize › Preview Undo restores them.", Kit.Small);
             warning.TextWrapping = TextWrapping.Wrap; warning.TextTrimming = TextTrimming.None; warning.Named("Rename warning");
             var warningIcon = Kit.Glyph(Icons.Warning, 18); warningIcon.Margin = new Thickness(0, 0, 10, 0); warningIcon.VerticalAlignment = VerticalAlignment.Top;
@@ -92,7 +92,7 @@ namespace AlbumArtTool
             var intro = Kit.Label("Tick every name to change (for example all the names one artist released under) and type the one name they should become.", Kit.Small, cls: "muted");
             intro.TextWrapping = TextWrapping.Wrap; intro.TextTrimming = TextTrimming.None;
             var layout = new StackPanel { Margin = new Thickness(22, 18, 22, 16), Spacing = 4 };
-            layout.Children.Add(Kit.Label("Rename artists everywhere", 17.33, true));
+            layout.Children.Add(Kit.Label(folderName == null ? "Rename artists everywhere" : "Rename artists in " + folderName, 17.33, true).Named("Rename title"));
             layout.Children.Add(intro);
             layout.Children.Add(Kit.Label("Artists", Kit.Small, cls: "muted").Also(l => l.Margin = new Thickness(0, 10, 0, 0))); layout.Children.Add(find);
             layout.Children.Add(Kit.Inset(list).Also(b => b.Padding = new Thickness(2))); layout.Children.Add(pickedRow);
