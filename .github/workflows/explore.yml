@@ -1,0 +1,46 @@
+name: explore
+on: { push: { branches: [ytm-explore2] } }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - shell: bash
+        run: |
+          cat > probe.py <<'PY'
+          import json, urllib.request
+          CTX={"client":{"clientName":"WEB_REMIX","clientVersion":"1.20251015.01.00","hl":"en","gl":"US"}}
+          def call(ep, body):
+              body=dict(body); body["context"]=CTX
+              req=urllib.request.Request("https://music.youtube.com/youtubei/v1/"+ep+"?prettyPrint=false", data=json.dumps(body).encode(), headers={"Content-Type":"application/json","Origin":"https://music.youtube.com","User-Agent":"Mozilla/5.0"})
+              return json.load(urllib.request.urlopen(req))
+          def walk(o,key,out):
+              if isinstance(o,dict):
+                  for k,v in o.items():
+                      if k==key: out.append(v)
+                      else: walk(v,key,out)
+              elif isinstance(o,list):
+                  for v in o: walk(v,key,out)
+              return out
+          def runs(t): return [(r.get("text"), r.get("navigationEndpoint",{}).get("browseEndpoint",{}).get("browseId")) for r in (t or {}).get("runs",[])]
+          for q in ["Ashnikko Daisy","Ashnikko Toxic","Camera Obscura French Navy","Kanye West Jail"]:
+              d=call("search",{"query":q,"params":"EgWKAQIIAWoMEA4QChADEAQQCRAF"})
+              items=walk(d,"musicResponsiveListItemRenderer",[])
+              print("== SONGS",q,len(items))
+              for it in items[:4]:
+                  fc=[runs(c["musicResponsiveListItemFlexColumnRenderer"]["text"]) for c in it.get("flexColumns",[])]
+                  we=walk(it,"watchEndpoint",[])
+                  vt=[w.get("watchEndpointMusicSupportedConfigs",{}).get("watchEndpointMusicConfig",{}).get("musicVideoType") for w in we][:1]
+                  print("   ", json.dumps(fc)[:600], "pid", it.get("playlistItemData"), "vt", vt, "fixed", [runs(c["musicResponsiveListItemFixedColumnRenderer"]["text"]) for c in it.get("fixedColumns",[])])
+          # Ashnikko DEMIDEVIL album page
+          d=call("search",{"query":"Ashnikko DEMIDEVIL","params":"EgWKAQIYAWoMEA4QChADEAQQCRAF"})
+          it=walk(d,"musicResponsiveListItemRenderer",[])[0]
+          bid=it["navigationEndpoint"]["browseEndpoint"]["browseId"]; print("ALBUM", bid)
+          a=call("browse",{"browseId":bid})
+          for t in walk(a.get("contents"),"musicResponsiveListItemRenderer",[])[:4]:
+              fc=[runs(c["musicResponsiveListItemFlexColumnRenderer"]["text"]) for c in t.get("flexColumns",[])]
+              vt=[w.get("watchEndpointMusicSupportedConfigs",{}).get("watchEndpointMusicConfig",{}).get("musicVideoType") for w in walk(t,"watchEndpoint",[])][:1]
+              print("   ", fc[0], vt, [runs(c["musicResponsiveListItemFixedColumnRenderer"]["text"]) for c in t.get("fixedColumns",[])], t.get("playlistItemData"))
+          PY
+          python probe.py
