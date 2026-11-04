@@ -128,15 +128,16 @@ internal static partial class Tests
         var album = new YtmAlbum { BrowseId = "MPREb_a", Title = "First album", Artist = "Test Artist", Year = "2020", TrackCount = 3, ThumbnailUrl = "https://lh3.googleusercontent.com/a=w544-h544" };
         album.Tracks = new List<YtmTrack> { new YtmTrack { Index = 1, Title = "One", VideoId = "v1aaaaaaaaa", Duration = TimeSpan.FromSeconds(3) }, new YtmTrack { Index = 2, Title = "Two", VideoId = "v2aaaaaaaaa", Duration = TimeSpan.FromSeconds(3), VideoOnly = true },
             new YtmTrack { Index = 3, Title = "Three", VideoId = "v3aaaaaaaaa", Duration = TimeSpan.FromSeconds(3) } };
+        queue.Limit = () => 2;
         var group = queue.Add(album.BrowseId, album.Title, "Album", album.ThumbnailUrl, null);
         Assert(queue.Contains("MPREb_a") && group.Status == "Finding the songs…", "an added album shows at once, while its songs are looked up");
         queue.Ready(group, album.Tracks.Select(t => new DownloadItem { Album = album, Track = t }));
         var single = queue.Add("MPREb_a#v2aaaaaaaaa", "Two", "", album.ThumbnailUrl, null);
         queue.Ready(single, new[] { new DownloadItem { Album = album, Track = album.Tracks[1], FromVideo = true } });
-        Assert(queue.IsRunning && queue.Waiting == 3, "downloads start as soon as songs are added");
+        Assert(queue.IsRunning && queue.Waiting == 3 && queue.Active == 2, "downloads start as soon as songs are added, two at a time here");
         queue.Completion.GetAwaiter().GetResult();
         Assert(group.Done == 2 && group.Skipped == 1 && group.Status == "2 songs ready · 1 music video only, skipped" && single.Done == 1, "a ticked music-video-only song is downloaded; otherwise it is skipped: " + group.Status + " / " + string.Join(", ", group.Items.Select(i => i.Error)));
-        Assert(requested.Take(2).SequenceEqual(new[] { album.Tracks[0].Url, album.Tracks[2].Url }) && AddMusic.Waiting(queueFolder).Count == 3 &&
+        Assert(queue.MostAtOnce == 2 && !queue.IsRunning && requested.Take(2).OrderBy(u => u).SequenceEqual(new[] { album.Tracks[0].Url, album.Tracks[2].Url }.OrderBy(u => u)) && AddMusic.Waiting(queueFolder).Count == 3 &&
             File.Exists(Path.Combine(queueFolder, "Test Artist", "First album", "03 - Three.mp3")), "songs download in order into New music \\ Artist \\ Album");
         using (var file = TagLib.File.Create(Path.Combine(queueFolder, "Test Artist", "First album", "01 - One.mp3")))
             Assert(file.Tag.Title == "One" && file.Tag.TrackCount == 3 && file.Tag.Pictures.Length == 1, "queued songs get their album's tags and cover");

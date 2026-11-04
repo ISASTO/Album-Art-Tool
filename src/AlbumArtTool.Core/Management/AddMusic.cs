@@ -27,6 +27,15 @@ namespace AlbumArtTool.Management
     {
         internal static string SettingFile => Path.Combine(BackupSettings.AppData, "new-music-folder.txt");
         internal static string DefaultFolder => Path.Combine(BackupSettings.AppData, "New music");
+        internal static string ParallelFile => Path.Combine(BackupSettings.AppData, "parallel-downloads.txt");
+        internal const int DefaultParallel = 5, MaxParallel = 10;
+
+        /// <summary>How many songs download at the same time (1–10, 5 unless changed). Kept on this PC across updates.</summary>
+        internal static int Parallel
+        {
+            get => int.TryParse(AppSettings.Read(ParallelFile), NumberStyles.Integer, CultureInfo.InvariantCulture, out int n) ? Math.Clamp(n, 1, MaxParallel) : DefaultParallel;
+            set => AppSettings.Write(ParallelFile, Math.Clamp(value, 1, MaxParallel).ToString(CultureInfo.InvariantCulture));
+        }
 
         /// <summary>Where downloads go before they join the library. Always on this PC, outside the music folder.</summary>
         internal static string Folder
@@ -51,12 +60,12 @@ namespace AlbumArtTool.Management
         }
 
         /// <summary>New music \ Album artist \ Album \ "01 - Title.mp3" (a name already taken gets " (2)").</summary>
-        internal static string TargetPath(string folder, NewTrack track)
+        internal static string TargetPath(string folder, NewTrack track, Func<string, bool> reserved = null)
         {
             string directory = Path.Combine(folder, SafeName(track.AlbumArtist, "Unknown artist"), SafeName(track.Album, "Unknown album"));
             string name = (track.Number > 0 ? track.Number.ToString("00", CultureInfo.InvariantCulture) + " - " : "") + SafeName(track.Title, "Track");
             string path = Path.Combine(directory, name + ".mp3");
-            for (int n = 2; File.Exists(path); n++) path = Path.Combine(directory, name + " (" + n + ").mp3");
+            for (int n = 2; File.Exists(path) || reserved != null && reserved(path); n++) path = Path.Combine(directory, name + " (" + n + ").mp3");
             return path;
         }
 
@@ -169,8 +178,9 @@ namespace AlbumArtTool.Management
                 if (Problem != null) return Problem;
                 if (Preparing) return "Finding the songs…";
                 int songs = Items.Count(i => i.State != "Skipped");
-                var active = Items.FirstOrDefault(i => i.State == "Downloading" || i.State == "Saving");
-                if (active != null) return (active.State == "Saving" ? "Saving " : "Downloading ") + active.Track.Title + " · " + Done + " of " + songs;
+                var busy = Items.Where(i => i.State == "Downloading" || i.State == "Saving").ToList();
+                if (busy.Count == 1) return (busy[0].State == "Saving" ? "Saving " : "Downloading ") + busy[0].Track.Title + " · " + Done + " of " + songs;
+                if (busy.Count > 1) return "Downloading " + busy.Count + " songs · " + Done + " of " + songs + " ready";
                 if (!Finished) return Done > 0 ? Done + " of " + songs + " ready · waiting" : "Waiting";
                 if (Cancelled) return "Cancelled";
                 var parts = new List<string> { Done + (Done == 1 ? " song ready" : " songs ready") };
@@ -188,14 +198,22 @@ namespace AlbumArtTool.Management
         private readonly Func<string> folder, ffmpeg;
         private readonly Func<string, string, CancellationToken, Action<double>, string> download;
         private readonly Func<string, CancellationToken, Task<byte[]>> coverLoader;
-        private readonly Dictionary<string, byte[]> covers = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Task<byte[]>> covers = new Dictionary<string, Task<byte[]>>(StringComparer.Ordinal);
         private readonly SynchronizationContext context;
-        private CancellationTokenSource current;
-        private Task worker = Task.CompletedTask;
+        private readonly Dictionary<DownloadItem, CancellationTokenSource> active = new Dictionary<DownloadItem, CancellationTokenSource>();
+        private readonly HashSet<string> reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly object gate = new object();
+        private TaskCompletionSource<bool> idle = Done();
+        private static TaskCompletionSource<bool> Done() { var done = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously); done.SetResult(true); return done; }
         internal readonly List<DownloadGroup> Groups = new List<DownloadGroup>();
         internal event Action Changed;
-        internal bool IsRunning { get; private set; }
-        internal Task Completion => worker;
+        /// <summary>How many songs may download at once (read for every new download, so a change applies straight away).</summary>
+        internal Func<int> Limit = () => AddMusic.Parallel;
+        internal bool IsRunning { get { lock (gate) return active.Count > 0; } }
+        internal int Active { get { lock (gate) return active.Count; } }
+        internal int MostAtOnce { get; private set; }
+        /// <summary>Completes when nothing is downloading or waiting.</summary>
+        internal Task Completion { get { lock (gate) return idle.Task; } }
         internal int Waiting => Groups.Sum(g => g.Items.Count(i => !i.Finished)) + Groups.Count(g => g.Preparing);
 
         internal DownloadQueue(Func<string> folder, Func<string> ffmpeg, Func<string, string, CancellationToken, Action<double>, string> download, Func<string, CancellationToken, Task<byte[]>> cover)
@@ -226,46 +244,46 @@ namespace AlbumArtTool.Management
 
         internal void Fail(DownloadGroup group, string problem) { group.Preparing = false; group.Problem = problem; group.Raise(); Changed?.Invoke(); }
 
+        // Starts waiting songs, oldest first, until the limit is reached.
         private void Start()
         {
-            if (IsRunning) return;
-            IsRunning = true;
-            worker = RunAsync();
+            var started = new List<(DownloadGroup, DownloadItem, CancellationToken)>();
+            lock (gate)
+            {
+                int limit = Math.Clamp(Limit(), 1, AddMusic.MaxParallel);
+                while (active.Count < limit)
+                {
+                    var next = Groups.AsEnumerable().Reverse().SelectMany(g => g.Items.Select(i => (Group: g, Item: i))).FirstOrDefault(p => p.Item.State == "Waiting");
+                    if (next.Item == null) break;
+                    var cancel = new CancellationTokenSource();
+                    active[next.Item] = cancel;
+                    next.Item.State = "Downloading"; next.Item.Progress = 0;
+                    if (idle.Task.IsCompleted) idle = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                    started.Add((next.Group, next.Item, cancel.Token));
+                }
+                MostAtOnce = Math.Max(MostAtOnce, active.Count);
+            }
+            foreach (var (group, item, token) in started) { group.Raise(); _ = RunOneAsync(group, item, token); }
+            if (started.Count > 0) Changed?.Invoke();
         }
 
-        private async Task RunAsync()
+        private async Task RunOneAsync(DownloadGroup group, DownloadItem item, CancellationToken token)
         {
             await Task.Yield();
-            try
-            {
-                while (true)
-                {
-                    // Oldest first: groups are listed newest first.
-                    var item = Groups.AsEnumerable().Reverse().SelectMany(g => g.Items.Select(i => (Group: g, Item: i))).FirstOrDefault(p => p.Item.State == "Waiting");
-                    if (item.Item == null) break;
-                    await RunOneAsync(item.Group, item.Item);
-                }
-            }
-            finally { IsRunning = false; Changed?.Invoke(); }
-        }
-
-        private async Task RunOneAsync(DownloadGroup group, DownloadItem item)
-        {
-            current?.Dispose(); current = new CancellationTokenSource(); var token = current.Token;
-            item.State = "Downloading"; item.Progress = 0; group.Raise();
             string stage = Path.Combine(Path.GetTempPath(), "AlbumArtTool-add-" + Guid.NewGuid().ToString("N"));
+            string target = null;
             try
             {
                 var info = AddMusic.Describe(item.Album, item.Track);
                 byte[] cover = await CoverAsync(item.Album?.ThumbnailUrl ?? group.ThumbnailUrl, token);
                 string root = folder(), exe = ffmpeg(); var dl = download;
-                string target = await Task.Run(() =>
+                await Task.Run(() =>
                 {
                     string audio = dl(item.Track.Url, stage, token, f => Post(() => { item.Progress = f * 0.7; group.Raise(); }));
                     Post(() => { item.State = "Saving"; group.Raise(); });
-                    string path = AddMusic.TargetPath(root, info);
-                    AddMusic.Save(exe, audio, path, info, cover, token, f => Post(() => { item.Progress = 0.7 + f * 0.3; group.Raise(); }));
-                    return path;
+                    // Songs saving at the same moment never pick the same file name.
+                    lock (gate) { target = AddMusic.TargetPath(root, info, reserved.Contains); reserved.Add(target); }
+                    AddMusic.Save(exe, audio, target, info, cover, token, f => Post(() => { item.Progress = 0.7 + f * 0.3; group.Raise(); }));
                 }, token);
                 item.Path = target; item.State = "Done"; item.Progress = 1;
             }
@@ -274,19 +292,35 @@ namespace AlbumArtTool.Management
             finally
             {
                 try { if (Directory.Exists(stage)) Directory.Delete(stage, true); } catch { }
-                group.Raise(); Changed?.Invoke();
+                TaskCompletionSource<bool> finished = null;
+                lock (gate)
+                {
+                    if (active.Remove(item, out var cancel)) cancel.Dispose();
+                    if (target != null) reserved.Remove(target);
+                }
+                group.Raise();
+                Start();
+                lock (gate) if (active.Count == 0) finished = idle;
+                Changed?.Invoke();
+                finished?.TrySetResult(true);
             }
         }
 
-        private async Task<byte[]> CoverAsync(string url, CancellationToken token)
+        // One download per album cover, shared by its songs downloading at the same time.
+        private Task<byte[]> CoverAsync(string url, CancellationToken token)
         {
-            if (string.IsNullOrEmpty(url) || coverLoader == null) return null;
-            if (covers.TryGetValue(url, out var known)) return known;
-            byte[] bytes = null;
-            try { bytes = await coverLoader(AddMusic.LargeCover(url), token) ?? await coverLoader(url, token); }
-            catch (Exception e) when (!(e is OperationCanceledException)) { try { bytes = await coverLoader(url, token); } catch (Exception) when (!token.IsCancellationRequested) { } }
-            covers[url] = bytes;
-            return bytes;
+            if (string.IsNullOrEmpty(url) || coverLoader == null) return Task.FromResult<byte[]>(null);
+            lock (gate)
+            {
+                if (!covers.TryGetValue(url, out var task) || task.IsCanceled) covers[url] = task = LoadCoverAsync(url);
+                return task;
+            }
+        }
+
+        private async Task<byte[]> LoadCoverAsync(string url)
+        {
+            try { return await coverLoader(AddMusic.LargeCover(url), CancellationToken.None) ?? await coverLoader(url, CancellationToken.None); }
+            catch (Exception) { try { return await coverLoader(url, CancellationToken.None); } catch (Exception) { return null; } }
         }
 
         private void Post(Action action) { if (context != null) context.Post(_ => action(), null); else action(); }
@@ -295,7 +329,7 @@ namespace AlbumArtTool.Management
         internal void Cancel(DownloadGroup group)
         {
             foreach (var item in group.Items.Where(i => i.State == "Waiting")) item.State = "Cancelled";
-            if (group.Items.Any(i => i.State == "Downloading" || i.State == "Saving")) current?.Cancel();
+            lock (gate) foreach (var item in group.Items) if (active.TryGetValue(item, out var cancel)) cancel.Cancel();
             group.Raise(); Changed?.Invoke();
         }
 
@@ -308,6 +342,10 @@ namespace AlbumArtTool.Management
         /// <summary>Removes finished groups from the list (their songs stay in New music).</summary>
         internal void ClearFinished() { Groups.RemoveAll(g => g.Finished || g.Problem != null); Changed?.Invoke(); }
 
-        internal void Stop() { foreach (var group in Groups) foreach (var item in group.Items.Where(i => i.State == "Waiting")) item.State = "Cancelled"; current?.Cancel(); }
+        internal void Stop()
+        {
+            foreach (var group in Groups) foreach (var item in group.Items.Where(i => i.State == "Waiting")) item.State = "Cancelled";
+            lock (gate) foreach (var cancel in active.Values) cancel.Cancel();
+        }
     }
 }
