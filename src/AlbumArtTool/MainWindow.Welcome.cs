@@ -90,7 +90,7 @@ namespace AlbumArtTool
         internal Window ShowShortcuts()
         {
             if (shortcutsWindow != null) { shortcutsWindow.Activate(); return shortcutsWindow; }
-            var window = shortcutsWindow = new Window { Title = "Keyboard shortcuts", Width = 560, SizeToContent = SizeToContent.Height, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false };
+            var window = shortcutsWindow = new Window { Title = "Keyboard shortcuts", Width = 660, SizeToContent = SizeToContent.Height, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false };
             var rows = Kit.Grid("170,*", string.Join(",", System.Linq.Enumerable.Repeat("32", Shortcuts.Length)));
             for (int i = 0; i < Shortcuts.Length; i++)
             {
