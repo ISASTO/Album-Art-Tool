@@ -201,7 +201,15 @@ internal static partial class Tests
             Assert(window.Badge(MainWindow.Page.AddMusic) == "", "the sidebar count clears when downloads finish");
             Shot(window, "add-music-queue.png");
             Click(Named<Button>(page, "Tidy up in Organize"));
-            Assert(window.CurrentPage == MainWindow.Page.Organize && window.Organize.Root == AddMusic.Folder, "Tidy up opens Organize on New music");
+            Assert(window.CurrentPage == MainWindow.Page.Organize && window.Organize.Root == AddMusic.Folder && Named<Button>(window, "Organize New music").Classes.Contains("selected") &&
+                Named<TextBlock>(window, "Page title").Text == "Organize" && Named<TextBlock>(window, "Organize folder").Text.Length > 0, "Tidy up opens Organize on New music, and says so");
+            Shot(window, "organize-new-music.png");
+            window.Navigate(MainWindow.Page.Albums); window.Navigate(MainWindow.Page.Organize);
+            Assert(window.Organize.Root == AddMusic.Folder, "Organize stays on New music when you come back to it");
+            Click(Named<Button>(window, "Organize the music folder"));
+            Assert(window.Organize.Root == root && Named<Button>(window, "Organize the music folder").Classes.Contains("selected"), "Organize can switch to the music folder");
+            Click(Named<Button>(window, "Organize New music"));
+            Assert(window.Organize.Root == AddMusic.Folder, "and back to New music");
             window.Navigate(MainWindow.Page.AddMusic);
             await page.MergeAsync();
             await Until(() => window.Library.Albums.Any(a => a.Title == "Glitch Princess"), "the added albums appear in the library", 15000);
