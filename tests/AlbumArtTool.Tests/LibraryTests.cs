@@ -415,7 +415,7 @@ internal static partial class Tests
         Assert(LibraryChecks.IsLowBitrate(new Track { Path = "a.mp3", Bitrate = 96 }, 128) && !LibraryChecks.IsLowBitrate(new Track { Path = "a.flac", Bitrate = 96, Lossless = true }, 128) &&
             !LibraryChecks.IsLowBitrate(new Track { Path = "a.mp3", Bitrate = 0 }, 128) && !LibraryChecks.IsLowBitrate(new Track { Path = "a.mp3", Bitrate = 128 }, 128),
             "low bitrate means lossy, known and strictly below the threshold");
-        Assert(LibraryChecks.Csv(all).Contains("\"Below 320 kbps\"") && LibraryChecks.Format(new Track { Path = "x.m4a" }) == "AAC/M4A", "the report lists low-bitrate songs with their format");
+        Assert(LibraryChecks.Csv(all).Contains("\"Below 320 kbps (header)\"") && LibraryChecks.Format(new Track { Path = "x.m4a" }) == "AAC/M4A", "the report lists low-bitrate songs with their format");
         Assert(Artwork.Describe(new TagLib.IPicture[] { new TagLib.Picture { Type = TagLib.PictureType.LeafletPage }, new TagLib.Picture { Type = TagLib.PictureType.LeafletPage }, new TagLib.Picture { Type = TagLib.PictureType.Media } })
             == "2 booklet pages, 1 disc picture", "picture descriptions name each picture type");
     }
