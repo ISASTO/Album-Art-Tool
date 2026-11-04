@@ -527,7 +527,7 @@ internal static partial class Tests
             BackupSettings.Root = backups;
             var options = Controls(form.OptionsPanel).OfType<CheckBox>().ToArray();
             Assert(options.Length == 13 && options.All(c => c.IsChecked == false) && !ButtonStarting(form, "Preview changes").IsEnabled, "Organize starts with nothing selected and nothing to preview");
-            var chips = Controls(form).OfType<Button>().Where(b => b.Classes.Contains("chip")).ToArray();
+            var chips = Controls(form).OfType<Button>().Where(b => b.Classes.Contains("chip") && (b.AccessibleName() ?? "").StartsWith("Preset ")).ToArray();
             Assert(chips.Select(b => b.Text()).SequenceEqual(new[] { "Tidy tags", "Standardize artwork", "Full clean-up" }), "the built-in presets are offered");
             Click(Named<Button>(form, "Preset Tidy tags"));
             Assert(form.SelectedOptions.SequenceEqual(new[] { OrganizePresets.TitleFromName, OrganizePresets.AlbumArtistFromArtist, OrganizePresets.CleanTitles, OrganizePresets.Id3v23 }) && Named<Button>(form, "Preset Tidy tags").Classes.Contains("selected"),
