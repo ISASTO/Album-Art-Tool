@@ -82,7 +82,7 @@ namespace AlbumArtTool
             var badge = new Border { Child = badgeText, CornerRadius = new CornerRadius(9), Padding = new Thickness(7, 1), VerticalAlignment = VerticalAlignment.Center, IsVisible = false };
             badge.Brush(Border.BackgroundProperty, "BadgeAccent");
             var text = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 6, 0) };
-            var content = Kit.Grid("Auto,*,Auto", "*").Add(Kit.Icon(icon, 16).Cell(0, 0), text.Cell(0, 1), badge.Cell(0, 2));
+            var content = Kit.Grid("Auto,*,Auto", "*").Add(Kit.Glyph(icon, 16).Cell(0, 0), text.Cell(0, 1), badge.Cell(0, 2));
             var button = new Button { Content = content, Classes = { "nav" } }.Named(label).Tip(tip);
             Avalonia.Automation.AutomationProperties.SetControlTypeOverride(button, Avalonia.Automation.Peers.AutomationControlType.TabItem);
             button.Click += (s, e) => Navigate(page);
