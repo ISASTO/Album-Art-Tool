@@ -19,7 +19,8 @@ namespace AlbumArtTool
         internal Version InstalledVersion;
         internal Func<string, string, System.Diagnostics.Process> LaunchInstaller = UpdateInstaller.Launch;
         internal bool CanInstallUpdate => !busy && !writing && !queueRunning && !maintenanceRunning && (organizePage == null || !organizePage.IsWorking) && pending == null &&
-            (healthPage == null || !healthPage.IsScanning) && (youtubePage == null || !youtubePage.IsWorking) && (settingsPage == null || !settingsPage.IsWorking);
+            (healthPage == null || !healthPage.IsScanning) && (youtubePage == null || !youtubePage.IsWorking) && (settingsPage == null || !settingsPage.IsWorking) &&
+            (addMusicPage == null || !addMusicPage.Queue.IsRunning && !addMusicPage.IsWorking);
         internal Window UpdateWindow => updateWindow;
 
         internal async Task GetUpdatesAsync()

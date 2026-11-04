@@ -205,8 +205,13 @@ internal static partial class Tests
         internal readonly List<string> SongQueries = new List<string>();
         public Task<List<YtmAlbum>> SearchAlbumsAsync(string query, CancellationToken token) { Queries.Add(query); return Task.FromResult(Results(query)); }
         public Task<List<YtmTrack>> SearchSongsAsync(string query, CancellationToken token) { SongQueries.Add(query); return Task.FromResult(Songs(query)); }
-        public Task LoadAlbumAsync(YtmAlbum album, CancellationToken token) => Task.CompletedTask;
+        public Task LoadAlbumAsync(YtmAlbum album, CancellationToken token) { if (album.Tracks == null) FillAlbum?.Invoke(album); return Task.CompletedTask; }
         public Task<byte[]> ThumbnailAsync(string url, CancellationToken token) => Task.FromResult(MakeCover(SkiaSharp.SKColors.SteelBlue, 120));
+        internal Func<string, List<YtmArtist>> Artists = q => new List<YtmArtist>();
+        internal Action<YtmArtist> FillArtist = a => a.Releases ??= new List<YtmAlbum>();
+        internal Action<YtmAlbum> FillAlbum;
+        public Task<List<YtmArtist>> SearchArtistsAsync(string query, CancellationToken token) => Task.FromResult(Artists(query));
+        public Task LoadArtistAsync(YtmArtist artist, CancellationToken token) { FillArtist(artist); return Task.CompletedTask; }
         public void Dispose() { }
     }
 
@@ -301,7 +306,20 @@ internal static partial class Tests
                 { Console.Error.WriteLine("FAIL: unexpected album data for " + album); return 1; }
             }
         }
-        Console.WriteLine("PASS live YouTube Music search and album pages");
+        using (var music = new YouTubeMusic())
+            foreach (string name in new[] { "yeule", "Camera Obscura", "100 gecs" })
+            {
+                var found = await music.SearchArtistsAsync(name, CancellationToken.None);
+                var artist = found.FirstOrDefault(a => AlbumUpgrade.Similarity(a.Name, name) >= 0.9);
+                Console.WriteLine("YTM artist search " + name + ": " + string.Join(" | ", found.Take(4).Select(a => a.Name + " " + a.BrowseId + " (" + a.Subtitle + ")")));
+                if (artist == null) { Console.Error.WriteLine("FAIL: artist search did not find " + name); return 1; }
+                await music.LoadArtistAsync(artist, CancellationToken.None);
+                var albums = artist.Releases.Where(r => r.Kind == "Album").ToList();
+                Console.WriteLine("   " + artist.Name + ": " + albums.Count + " albums, " + (artist.Releases.Count - albums.Count) + " singles/EPs · " +
+                    string.Join(" | ", artist.Releases.Take(8).Select(r => r.Kind + " " + r.Title + " " + r.Year + " " + r.BrowseId)) + " · picture " + (artist.ThumbnailUrl.Length > 0));
+                if (albums.Count == 0 || artist.Releases.Any(r => !r.BrowseId.StartsWith("MPREb_") || r.Title.Length == 0)) { Console.Error.WriteLine("FAIL: no albums on the artist page of " + name); return 1; }
+            }
+        Console.WriteLine("PASS live YouTube Music search, artist and album pages");
         return 0;
     }
 

@@ -19,7 +19,7 @@ namespace AlbumArtTool
         /// <summary>Shortcuts shown by F1, in the order they are listed.</summary>
         internal static readonly (string Keys, string Action)[] Shortcuts =
         {
-            ("Ctrl+1 … Ctrl+5", "Albums, Artists, Health, Organize, Activity"),
+            ("Ctrl+1 … Ctrl+6", "Albums, Artists, Add music, Health, Organize, Activity"),
             ("Ctrl+,", "Settings"),
             ("Ctrl+F", "Search albums"),
             ("Ctrl+O", "Choose a different music folder"),

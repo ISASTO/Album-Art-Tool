@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -121,6 +122,8 @@ namespace AlbumArtTool.Ui
 
         internal static Border Frost(Control child, Thickness padding, double radius = 18) =>
             new Border { Child = child, Padding = padding, CornerRadius = new CornerRadius(radius), Classes = { "frost" } };
+
+        internal static IEnumerable<Control> Descendants(Control root) => Avalonia.LogicalTree.LogicalExtensions.GetLogicalDescendants(root).OfType<Control>();
 
         /// <summary>A small uppercase section label.</summary>
         internal static TextBlock Caption(string text) => new TextBlock { Text = text.ToUpperInvariant(), Classes = { "caption" }, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };

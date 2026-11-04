@@ -49,6 +49,8 @@ internal static partial class Tests
             Run("tag checks", LibraryCheckTests);
             Run("YouTube Music replacement", UpgradeTests);
             Run("presets and preferences", PreferenceTests);
+            Run("add music parsing", AddMusicParsingTests);
+            Run("add music saving, merging and queue", AddMusicSaveTests);
             foreach (var path in Fixtures()) Run("artist round trip " + Path.GetExtension(path), () => ArtistRoundTrip(path));
             Run("scanning", () => { PartialAlbums(); MixedAlbums(); Guards(); FolderArt(); CancelScan(); CountedScanProgress(); InvalidArt(); UntaggedMp3(); });
             if (!options.Contains("--no-gui")) Run("GUI", GuiAll);
