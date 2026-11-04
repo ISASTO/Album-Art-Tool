@@ -92,7 +92,7 @@ Click **Check library…** after a scan to list:
 
 - **Songs missing a Title tag.** Players show these by filename. Blank titles count as missing.
 - **Songs with more than one embedded picture**, with a description such as *2 front covers, 1 back cover*. Songs with several front or unlabeled covers come first, because players may show any of them.
-- **Lossy songs below a bitrate you choose** (96–320 kbps, 192 by default), lowest first, with their format — handy for finding songs to download again in better quality. Lossless files (FLAC, ALAC, WAV, AIFF…) are never listed.
+- **Albums with lossy songs below a bitrate you choose** (96–320 kbps, 192 by default), one row per album with its song count, bitrate range and format — handy for finding albums to download again in better quality. Hover over an album to see each song's bitrate. Header bitrates can be wrong (common with VBR MP3s), so every candidate is measured with ffprobe or FFmpeg: the total size of its audio packets divided by their duration. Songs whose real bitrate is high enough are dropped and counted separately. Without FFmpeg, header bitrates are shown and marked as unverified. Lossless files (FLAC, WAV, AIFF, ALAC, WavPack) are never listed. **Download FFmpeg** in Manage library now also installs ffprobe.
 
 The check uses the last library scan, so it opens instantly and never changes a file. Select a song and click **Show selected file** to highlight it in File Explorer, or **Save report…** for a CSV. Rescan and click **Check again** after fixing files. **Fill titles from filenames…** and **Fix embedded pictures…** open Manage library with just the matching option selected and preview the fix.
 
