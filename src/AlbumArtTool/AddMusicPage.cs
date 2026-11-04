@@ -346,6 +346,7 @@ namespace AlbumArtTool
                 bool queued = Queue.Contains(release.BrowseId);
                 addAll.IsEnabled = !queued && tracks.Any(t => !t.VideoOnly);
                 addAll.SetText(queued ? "Added" : "Add " + Kind(release).ToLowerInvariant());
+                Kit.SetIcon(addAll, queued ? Icons.Check : Icons.Add);
             }
             foreach (var row in rows) row.CheckedChanged += Update;
             addAll.Tip("Download every song with an audio-only version (" + tracks.Count(t => !t.VideoOnly) + ") into New music, starting now.");
