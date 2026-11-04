@@ -9,6 +9,7 @@ using AlbumArtTool;
 using AlbumArtTool.Core;
 using AlbumArtTool.Management;
 using AlbumArtTool.Online;
+using AlbumArtTool.Ui;
 
 internal static partial class Tests
 {
