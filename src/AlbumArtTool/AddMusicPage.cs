@@ -134,8 +134,6 @@ namespace AlbumArtTool
             Content = Kit.Grid("*,330", "*").Add(left.Cell(0, 0), right.Cell(0, 1));
 
             Queue.Changed += SyncQueue;
-            PreviewPlayer.Changed += OnPreviewChanged;
-            DetachedFromVisualTree += (s, e) => PreviewPlayer.Stop();
             SyncQueue(); UpdateTools();
         }
 
@@ -248,7 +246,6 @@ namespace AlbumArtTool
 
         internal async Task OpenArtistAsync(YtmArtist artist)
         {
-            PreviewPlayer.Stop();
             Artist = artist; Filter = "All";
             browseStatus.Text = "Loading " + artist.Name + "…";
             var task = music.LoadArtistAsync(artist, CancellationToken.None);
@@ -304,7 +301,6 @@ namespace AlbumArtTool
 
         internal async Task OpenReleaseAsync(YtmAlbum release)
         {
-            PreviewPlayer.Stop();
             Release = release;
             browseStatus.Text = "Loading " + release.Title + "…";
             var task = PrepareAsync(release, CancellationToken.None);
@@ -522,7 +518,7 @@ namespace AlbumArtTool
             finally { merging = false; SyncQueue(); }
         }
 
-        // ---- Thumbnails and preview ----
+        // ---- Thumbnails ----
 
         internal async Task SetThumbAsync(Image image, string url)
         {
@@ -554,13 +550,7 @@ namespace AlbumArtTool
             finally { thumbGate.Release(); loadingThumbs.Remove(url); }
         }
 
-        private void OnPreviewChanged()
-        {
-            foreach (var row in Kit.Descendants(view).OfType<TrackRow>()) row.UpdatePreview();
-            if (PreviewPlayer.Problem != null) browseStatus.Text = PreviewPlayer.Problem;
-        }
-
-        internal void Shutdown() { PreviewPlayer.Changed -= OnPreviewChanged; PreviewPlayer.Stop(); searching?.Cancel(); Queue.Stop(); }
+        internal void Shutdown() { searching?.Cancel(); Queue.Stop(); }
 
         // ---- Item views ----
 
@@ -623,14 +613,13 @@ namespace AlbumArtTool
             }
         }
 
-        // A song: tick (on release pages), number, title, artists, audio badge, length, preview and add.
+        // A song: tick (on release pages), number, title, artists, a warning when only a music video exists, length and add.
         internal sealed class TrackRow : Border
         {
             private readonly AddMusicPage page;
             internal readonly YtmAlbum Album;
             internal readonly YtmTrack Track;
             private readonly CheckBox check = new CheckBox { MinWidth = 0, Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Center };
-            internal readonly Button Preview = Kit.IconButton(Icons.Play, "", "ghost");
             private readonly Button add = Kit.IconButton(Icons.Add, "", "ghost");
             internal event Action CheckedChanged;
             internal bool Checked { get => check.IsChecked == true; set => check.IsChecked = value; }
@@ -645,28 +634,17 @@ namespace AlbumArtTool
                 var badge = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(8, 1), Margin = new Thickness(8, 0), VerticalAlignment = VerticalAlignment.Center };
                 var badgeText = new TextBlock { FontSize = 11 }; badge.Child = badgeText;
                 if (track.VideoOnly) { badgeText.Text = "Music video only"; badge.Brush(Border.BackgroundProperty, "BadgeWarning"); badgeText.Classes.Add("warning"); ToolTip.SetTip(badge, "YouTube Music has no audio-only version of this song. Its music video can have an intro, an outro or silence; tick it to download it anyway."); }
-                else if (track.ReplacedVideoId != null) { badgeText.Text = "Audio version"; badge.Brush(Border.BackgroundProperty, "BadgePositive"); badgeText.Classes.Add("positive"); ToolTip.SetTip(badge, "The album lists the music video; the artist's audio-only upload of the song is used instead."); }
                 else badge.IsVisible = false;
                 var length = Kit.Label(track.Duration > TimeSpan.Zero ? (int)track.Duration.TotalMinutes + ":" + track.Duration.Seconds.ToString("00") : "", Kit.Body, cls: "muted"); length.Margin = new Thickness(8, 0);
-                Preview.Named("Preview " + track.Title); Preview.Height = 32;
-                Preview.Click += async (s, e) => await PreviewPlayer.ToggleAsync(track);
                 add.Named("Add " + track.Title); add.Height = 32;
                 add.Click += (s, e) => { if (album == null) page.AddSong(track); else page.AddTracks(album, new List<YtmTrack> { track }); add.IsEnabled = false; Kit.SetIcon(add, Icons.Check); add.Tip("Added to the download queue."); };
                 add.Tip(track.VideoOnly ? "Add this song from its music video (it may have an intro, an outro or silence)." : "Add just this song to the download queue.");
                 check.IsVisible = selectable; check.Margin = new Thickness(0, 0, 10, 0); check.Named("Select " + track.Title);
                 check.IsCheckedChanged += (s, e) => CheckedChanged?.Invoke();
-                Child = Kit.Grid("Auto,34,*,Auto,Auto,Auto,Auto", "*").Add(check.Cell(0, 0), number.Cell(0, 1), names.Cell(0, 2), badge.Cell(0, 3), length.Cell(0, 4), Preview.Cell(0, 5), add.Cell(0, 6));
+                Child = Kit.Grid("Auto,34,*,Auto,Auto,Auto", "*").Add(check.Cell(0, 0), number.Cell(0, 1), names.Cell(0, 2), badge.Cell(0, 3), length.Cell(0, 4), add.Cell(0, 5));
                 if (!selectable) ((Grid)Child).ColumnDefinitions[1].Width = new GridLength(0);
-                ToolTip.SetTip(names, track.Title + (track.Artists.Length > 0 ? "\n" + track.Artists : "") + (track.AlbumTitle.Length > 0 ? "\n" + track.AlbumTitle : ""));
-                UpdatePreview();
-            }
-
-            internal void UpdatePreview()
-            {
-                bool loading = ReferenceEquals(PreviewPlayer.Loading, Track), playing = ReferenceEquals(PreviewPlayer.Playing, Track);
-                Kit.SetIcon(Preview, playing || loading ? Icons.Stop : Icons.Play);
-                Preview.Tip(loading ? "Loading the preview… click to cancel." : playing ? "Stop the preview." : "Play a " + PreviewPlayer.ClipSeconds + "-second preview.");
-                Classes.Set("playing", playing || loading);
+                ToolTip.SetTip(names, track.Title + (track.Artists.Length > 0 ? "\n" + track.Artists : "") + (track.AlbumTitle.Length > 0 ? "\n" + track.AlbumTitle : "") +
+                    (track.ReplacedVideoId != null ? "\nThe album lists the music video; the artist's audio-only upload is downloaded instead." : ""));
             }
         }
 

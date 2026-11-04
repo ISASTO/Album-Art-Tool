@@ -377,7 +377,6 @@
     <Style Selector="Border.release:pointerover"><Setter Property="Background" Value="{DynamicResource Input}"/></Style>
     <Style Selector="Border.track"><Setter Property="Background" Value="Transparent"/></Style>
     <Style Selector="Border.track:pointerover"><Setter Property="Background" Value="{DynamicResource Input}"/></Style>
-    <Style Selector="Border.track.playing"><Setter Property="Background" Value="{DynamicResource Selection}"/></Style>
     <Style Selector="Button.fab">
       <Setter Property="Width" Value="34"/>
       <Setter Property="Height" Value="34"/>

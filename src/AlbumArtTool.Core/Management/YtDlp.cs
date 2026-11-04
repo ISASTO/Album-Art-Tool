@@ -93,27 +93,6 @@ namespace AlbumArtTool.Management
             return file;
         }
 
-        /// <summary>The direct address of a YouTube Music track's best audio stream, for a short preview (nothing is saved).</summary>
-        internal static string StreamUrl(string exe, string url, CancellationToken token)
-        {
-            if (exe == null) throw new IOException("yt-dlp is not set up. Download it in Settings › yt-dlp.");
-            var args = Arguments(url, Path.GetTempPath(), null, FindDeno(exe), Cookies);
-            // Same format choice and sources, but print the address instead of downloading.
-            int output = args.IndexOf("-o"); args.RemoveRange(output, 2);
-            args.RemoveAll(a => a == "--no-simulate" || a == "--progress" || a == "--newline");
-            int print = args.IndexOf("--print"); args.RemoveRange(print, 2);
-            int template = args.IndexOf("--progress-template"); args.RemoveRange(template, 2);
-            args.Insert(args.Count - 1, "-g");
-            string stream = null; var errors = new StringBuilder();
-            int exit = Run(exe, args, token, line =>
-            {
-                if (stream == null && line.StartsWith("https://", StringComparison.Ordinal)) stream = line.Trim();
-                else if (line.StartsWith("ERROR:", StringComparison.Ordinal) && errors.Length < 4000) errors.AppendLine(line.Substring(6).Trim());
-            }, 60);
-            if (exit != 0 || stream == null) throw new IOException(Explain(errors.ToString()));
-            return stream;
-        }
-
         internal static string Explain(string error)
         {
             error = error.Trim();
