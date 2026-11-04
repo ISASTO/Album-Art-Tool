@@ -59,7 +59,7 @@ namespace AlbumArtTool
         private Task toolUpdate = Task.CompletedTask;
 
         private readonly ListBox albumList = new ListBox { Classes = { "albums" } };
-        private readonly ListBox candidateList = new ListBox { Background = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(0) };
+        private readonly ItemsControl candidateList = new ItemsControl();
         private readonly ListBox trackList = new ListBox { Classes = { "grid" } };
         private readonly TextBox query = new TextBox { Watermark = "Search YouTube Music" };
         private readonly TextBlock heading = Kit.Label("", 17.33, true), subheading = Kit.Label("", Kit.Body, cls: "muted"), status = Kit.Label("", Kit.Body),
@@ -120,7 +120,8 @@ namespace AlbumArtTool
             coverFrame.Brush(Border.BackgroundProperty, "CoverPlaceholder");
             heading.Named("Selected album"); subheading.Named("Selected album details");
             var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 3 }; titles.Children.Add(heading); titles.Children.Add(subheading);
-            openYtm.Classes.Add("chrome"); openYtm.Click += (s, e) => OpenChosen();
+            openYtm.Background = Brushes.Transparent; openYtm.BorderThickness = new Thickness(0); openYtm.Padding = new Thickness(6, 2, 2, 2); openYtm.VerticalAlignment = VerticalAlignment.Top;
+            openYtm.Brush(Button.ForegroundProperty, "Accent"); openYtm.Click += (s, e) => OpenChosen();
             openYtm.Tip("Open the chosen album on music.youtube.com in your browser, to check it is the right release.");
             var albumHeader = Kit.Grid("Auto,*,Auto", "Auto").Add(coverFrame.Cell(0, 0), titles.Cell(0, 1), openYtm.Cell(0, 2));
 
@@ -133,11 +134,8 @@ namespace AlbumArtTool
             candidateList.Named("YouTube Music matches");
             candidateList.ItemsPanel = new FuncTemplate<Panel>(() => new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 });
             candidateList.ItemTemplate = new FuncDataTemplate<YtmAlbum>((a, scope) => new MatchCard(this), true);
-            candidateList.SelectionChanged += async (s, e) => { if (candidateList.SelectedItem is YtmAlbum chosen && shown != null && !ReferenceEquals(chosen, shown.Chosen)) await ChooseAsync(shown, chosen); };
-            ScrollViewer.SetHorizontalScrollBarVisibility(candidateList, Avalonia.Controls.Primitives.ScrollBarVisibility.Auto);
-            ScrollViewer.SetVerticalScrollBarVisibility(candidateList, Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled);
-            candidateList.Height = 112;
-            var candidateScroll = candidateList;
+            var candidateScroll = new ScrollViewer { Content = candidateList, Height = 112, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
 
             var columns = Kit.Grid(PairRow.Columns, "28").Add(Kit.Label("", Kit.Small).Cell(0, 0), Kit.Label("Your song", Kit.Small, cls: "muted").Cell(0, 1), Kit.Label("Now", Kit.Small, cls: "muted").Cell(0, 2),
                 Kit.Label("YouTube Music", Kit.Small, cls: "muted").Cell(0, 3), Kit.Label("Length", Kit.Small, cls: "muted").Cell(0, 4));
@@ -384,7 +382,7 @@ namespace AlbumArtTool
         {
             shown = state;
             heading.Text = state.Title.Length > 0 ? state.Title : state.Low.Folder;
-            subheading.Text = state.Tracks.Count + (state.Tracks.Count == 1 ? " song" : " songs") + " · " + state.LowCount + " below " + limit + " kbps (" + state.Low.Range + ") · " + state.Low.Folder;
+            subheading.Text = state.Tracks.Count + (state.Tracks.Count == 1 ? " song" : " songs") + " · " + state.LowCount + " below " + limit + " kbps (" + state.Low.Range + ")";
             ToolTip.SetTip(subheading, state.Low.Folder);
             localCover.Source = ThumbnailCache.Get(state.Album?.Thumbnail);
             if (!query.IsFocused) query.Text = state.Query;
@@ -402,11 +400,16 @@ namespace AlbumArtTool
             if (shown == null) return;
             candidateList.ItemsSource = null;
             candidateList.ItemsSource = shown.Candidates;
-            candidateList.SelectedItem = shown.Chosen;
         }
 
         internal int Score(YtmAlbum album) => shown != null && shown.Scores.TryGetValue(album, out int score) ? score : 0;
         internal bool IsChosen(YtmAlbum album) => shown != null && ReferenceEquals(shown.Chosen, album);
+
+        internal async Task ChooseAsync(YtmAlbum album)
+        {
+            if (shown == null || IsWorking || ReferenceEquals(album, shown.Chosen)) return;
+            await ChooseAsync(shown, album);
+        }
 
         private void Pick(Func<TrackPairing, bool> rule)
         {
@@ -589,6 +592,7 @@ namespace AlbumArtTool
             {
                 this.owner = owner;
                 Width = 236; Height = 92; Padding = new Thickness(6); CornerRadius = new CornerRadius(12); BorderThickness = new Thickness(1); Cursor = new Cursor(StandardCursorType.Hand);
+                PointerPressed += async (s, e) => { if (DataContext is YtmAlbum album) await owner.ChooseAsync(album); };
                 Classes.Add("frost");
                 var frame = new Border { Width = 78, Height = 78, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = cover, Margin = new Thickness(0, 0, 9, 0) };
                 frame.Brush(Border.BackgroundProperty, "CoverPlaceholder");
@@ -604,7 +608,9 @@ namespace AlbumArtTool
                     int value = owner.Score(album);
                     score.Text = owner.IsChosen(album) ? "✓ Chosen · " + value + "% match" : value + "% match";
                     score.Classes.Set("accent", owner.IsChosen(album));
-                    this.Brush(Border.BorderBrushProperty, owner.IsChosen(album) ? "SelectedBorder" : "Border");
+                    bool chosen = owner.IsChosen(album);
+                    BorderThickness = new Thickness(chosen ? 2 : 1); Padding = new Thickness(chosen ? 5 : 6);
+                    this.Brush(Border.BorderBrushProperty, chosen ? "SelectedBorder" : "Border");
                     this.Named(album.Title + " on YouTube Music");
                     ToolTip.SetTip(this, album.Title + "\n" + album.Summary + "\nClick to use this album.");
                 };
@@ -619,7 +625,7 @@ namespace AlbumArtTool
             private readonly TextBlock local = Cell(), kbps = Cell(), remote = Cell(), length = Cell();
             private TrackPairing pairing;
             private bool binding;
-            private IDisposable tone;
+            private IDisposable tone, kbpsTone;
 
             private static TextBlock Cell() => new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0), FontSize = 12.5 };
 
@@ -644,6 +650,10 @@ namespace AlbumArtTool
                 local.Text = (t.Number > 0 ? t.Number + ". " : "") + name;
                 kbps.Text = pairing.Replaced ? "320 ✓" : pairing.LocalKbps > 0 ? pairing.LocalKbps + " kbps" : "—";
                 kbps.FontWeight = pairing.Low && !pairing.Replaced ? FontWeight.SemiBold : FontWeight.Normal;
+                kbpsTone?.Dispose();
+                kbpsTone = pairing.Low && !pairing.Replaced ? kbps.Bind(TextBlock.ForegroundProperty, kbps.GetResourceObservable("Warning")) :
+                    pairing.Replaced ? kbps.Bind(TextBlock.ForegroundProperty, kbps.GetResourceObservable("Positive")) : null;
+                if (kbpsTone == null) kbps.ClearValue(TextBlock.ForegroundProperty);
                 remote.Text = pairing.Remote == null ? "No match on this album" : pairing.Remote.Title + (pairing.Remote.MusicVideo ? "  · video" : "");
                 remote.Classes.Set("muted", pairing.Remote == null);
                 string length = pairing.Remote == null ? "" : Format(pairing.Remote.Duration);

@@ -191,6 +191,10 @@ internal static partial class Tests
                 "low songs with an exact match are checked; the one whose length differs is not");
             Assert(state.Status.StartsWith("2 of 3 low songs matched"), "the album shows how many low songs are ready: " + state.Status);
             Assert(Named<Avalonia.Controls.TextBlock>(upgrade, "Selected album").Text == "yeule — Glitch Princess", "the selected album is shown");
+            await upgrade.ChooseAsync(decoy); await Settle();
+            Assert(ReferenceEquals(state.Chosen, decoy) && state.SelectedCount == 0 && state.Status.StartsWith("Found"), "picking another release re-pairs the songs (nothing matches there)");
+            await upgrade.ChooseAsync(listing); await Settle();
+            Assert(ReferenceEquals(state.Chosen, listing) && state.SelectedCount == 2, "switching back restores the matches");
             var replaceAlbum = Named<Avalonia.Controls.Button>(upgrade, "Replace checked songs in this album");
             Assert(replaceAlbum.Text() == "Replace 2 songs", "the button says how many songs will be replaced");
             Shot(upgrade, "youtube-music-upgrade.png");
