@@ -24,11 +24,12 @@ namespace AlbumArtTool
         private readonly Action<ProcessStartInfo> openFolder;
         private readonly Func<Task> fillTitles, fixPictures;
         private readonly Func<LibraryCheckResult, Task> replaceLow;
-        private readonly Button replace = Kit.Button("Replace from YouTube Music…", "primary");
-        private readonly Button fill = Kit.Button("Fill titles from filenames…"), onePicture = Kit.Button("Fix embedded pictures…");
+        // One row of equal-weight actions; each tooltip explains what the short label does.
+        private readonly Button replace = Kit.Button("Replace from YouTube Music…");
+        private readonly Button fill = Kit.Button("Fill missing titles…"), onePicture = Kit.Button("Fix pictures…");
         private readonly ListBox list = new ListBox { Classes = { "grid" } };
         private readonly TextBlock summary = Kit.Label("", Kit.Body);
-        private readonly ComboBox threshold = new ComboBox { Width = 130, HorizontalAlignment = HorizontalAlignment.Right };
+        private readonly ComboBox threshold = new ComboBox { Width = 150, HorizontalAlignment = HorizontalAlignment.Right };
         private readonly Button refresh = Kit.Button("Check again", "primary"), save = Kit.Button("Save report…"), show = Kit.Button("Show selected");
         internal LibraryCheckResult Result { get; private set; }
         internal IReadOnlyList<Row> Rows { get; private set; } = Array.Empty<Row>();
@@ -46,7 +47,7 @@ namespace AlbumArtTool
         internal LibraryCheckWindow(Func<Album[]> albums, Action<ProcessStartInfo> openFolder, Func<Task> fillTitles = null, Func<Task> fixPictures = null, Func<LibraryCheckResult, Task> replaceLow = null)
         {
             currentAlbums = albums; this.openFolder = openFolder; this.fillTitles = fillTitles; this.fixPictures = fixPictures; this.replaceLow = replaceLow;
-            Title = "Check library"; Width = 980; Height = 570; MinWidth = 900; MinHeight = 420;
+            Title = "Check library"; Width = 1000; Height = 570; MinWidth = 950; MinHeight = 420;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             var help = Kit.Label("Songs without a Title tag show their filename in players. Songs with several embedded pictures can show the wrong cover or carry extra artwork. Albums with low-bitrate lossy songs (measured, not just the file header) may be worth downloading again. Results use the last library scan; nothing is changed.", Kit.Body, cls: "muted");
             help.TextWrapping = TextWrapping.Wrap; help.TextTrimming = TextTrimming.None;
@@ -69,14 +70,14 @@ namespace AlbumArtTool
             fill.Click += async (s, e) => { if (this.fillTitles != null) await this.fillTitles(); };
             onePicture.Named("Fix embedded pictures").Tip("Opens Manage library with only \"Standardize embedded artwork\" selected (one " + Artwork.EmbedSide + " px JPEG front cover per song) and previews the changes. Nothing is written until you apply them.");
             onePicture.Click += async (s, e) => { if (this.fixPictures != null) await this.fixPictures(); };
-            foreach (var b in new[] { refresh, save, fill, onePicture, show }) b.Margin = new Thickness(3, 6, 3, 0);
-            var buttons = Kit.Grid("130,140,*,215,215,160", "*").Add(refresh.Cell(0, 0), save.Cell(0, 1), fill.Cell(0, 3), onePicture.Cell(0, 4), show.Cell(0, 5));
+            foreach (var b in new[] { refresh, save, fill, onePicture, replace, show }) b.Margin = new Thickness(3, 6, 3, 0);
+            var buttons = Kit.Grid("124,128,*,166,124,224,128", "*").Add(refresh.Cell(0, 0), save.Cell(0, 1), fill.Cell(0, 3), onePicture.Cell(0, 4), replace.Cell(0, 5), show.Cell(0, 6));
             var card = Kit.Frost(Kit.Inset(list), new Thickness(10)); card.Margin = new Thickness(0, 2, 0, 0);
             replace.Named("Replace from YouTube Music").Tip("Opens a window that finds each low-bitrate album on YouTube Music and replaces the low songs with fresh downloads (best free stream, saved as MP3 320 with your tags and cover). " +
                 "Nothing is replaced until you check songs and click Replace; originals are backed up and can be restored.");
-            replace.Margin = new Thickness(10, 0, 0, 0); replace.IsEnabled = false;
+            replace.IsEnabled = false;
             replace.Click += async (s, e) => { if (this.replaceLow != null && Result != null) await this.replaceLow(Result); };
-            var top = Kit.Grid("*,Auto,Auto,Auto", "*").Add(summary.Cell(0, 0), Kit.Label("Low bitrate:", Kit.Small, cls: "muted").Cell(0, 1), threshold.Cell(0, 2), replace.Cell(0, 3));
+            var top = Kit.Grid("*,Auto,Auto", "*").Add(summary.Cell(0, 0), Kit.Label("Low bitrate:", Kit.Small, cls: "muted").Cell(0, 1), threshold.Cell(0, 2));
             threshold.Margin = new Thickness(8, 0, 0, 0);
             var layout = Kit.Grid("*", "48,36,*,45").Add(help.Cell(0, 0), top.Cell(1, 0), card.Cell(2, 0), buttons.Cell(3, 0));
             layout.Margin = new Thickness(16);

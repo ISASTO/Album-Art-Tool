@@ -336,6 +336,7 @@ internal static partial class Tests
             var button = ButtonStarting(window, "Check library");
             Assert(!button.IsEnabled, "tag checks wait for a library scan");
             await window.ScanAsync();
+            Assert(!Named<Button>(window, "Show issues").IsVisible, "the issues button only appears when there are issues");
             Click(button); await Settle();
             var dialog = window.OwnedWindows.OfType<LibraryCheckWindow>().Single();
             Assert(dialog.Result.MissingTitles.Count == 2 && dialog.Result.MultiplePictures.Count == 2, "the tag check window opens with both checks");
@@ -354,7 +355,7 @@ internal static partial class Tests
             int index = dialog.Rows.ToList().FindIndex(r => r.Path != null && r.Path.EndsWith("05 - two covers.mp3"));
             dialog.Select(index); Click(show);
             Assert(opened.FileName == "explorer.exe" && opened.Arguments == "/select," + UpdateInstaller.QuoteArgument(dialog.Rows[index].Path), "the selected song is highlighted in File Explorer");
-            var fill = ButtonStarting(dialog, "Fill titles from filenames");
+            var fill = Named<Button>(dialog, "Fill titles from filenames");
             Assert(fill.IsEnabled, "songs missing titles can be filled from their filenames");
             Click(fill);
             LibraryManagerWindow manager = null;
@@ -366,7 +367,7 @@ internal static partial class Tests
             Assert(Named<CheckBox>(manager, "Fill missing Title tags from filenames").IsChecked == true && Controls(manager.OptionsPanel).OfType<CheckBox>().Count(c => c.IsChecked == true) == 1,
                 "the manager opens with just the title fill selected");
             manager.Close(); await Settle();
-            Click(ButtonStarting(dialog, "Fix embedded pictures"));
+            Click(Named<Button>(dialog, "Fix embedded pictures"));
             manager = null;
             for (int i = 0; i < 300 && (manager == null || manager.IsWorking || manager.CurrentPlan == null); i++)
             { await Settle(30); manager = window.OwnedWindows.OfType<LibraryManagerWindow>().SingleOrDefault(); }

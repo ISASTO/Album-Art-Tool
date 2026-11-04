@@ -119,7 +119,7 @@ namespace AlbumArtTool
             queueRunning = false;
             progress.IsVisible = progressPercent.IsVisible = false;
             status.Text = "Queue finished · " + jobsFinished + " albums processed" +
-                (jobsWithIssues > 0 ? " · " + jobsWithIssues + " need attention (Details)." : " · Backups saved. Undo is available.");
+                (jobsWithIssues > 0 ? " · " + jobsWithIssues + " need attention (see Issues)." : " · Backups saved. Undo is available.");
             UpdateQueueControls();
         }
 
@@ -128,7 +128,7 @@ namespace AlbumArtTool
             browse.IsEnabled = !busy && !queueRunning && !maintenanceRunning;
             scan.IsEnabled = !maintenanceRunning && !writing && (!queueRunning || busy);
             undo.IsEnabled = !busy && !queueRunning && !maintenanceRunning && lastEdit != null && lastEdit.Entries.Count > 0;
-            issuesButton.IsEnabled = issues.Count > 0;
+            UpdateIssues();
             var selected = albums.SelectedAlbum;
             bool canEdit = !busy && !maintenanceRunning && selected != null && !queuedAlbums.Contains(selected.Key);
             choose.IsEnabled = onlyMissing.IsEnabled = canEdit;
