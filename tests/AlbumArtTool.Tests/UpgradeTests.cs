@@ -91,7 +91,56 @@ internal static partial class Tests
             YtDlpSetup.Allowed("https://github.com/denoland/deno/releases/download/v2.5.0/deno-x86_64-pc-windows-msvc.zip") && !YtDlpSetup.Allowed("https://github.com/someone/else/releases/download/x/yt-dlp.exe") &&
             !YtDlpSetup.Allowed("http://github.com/yt-dlp/yt-dlp/releases/download/x/yt-dlp.exe"), "bot checks are explained and tool downloads only come from the official releases");
 
+        AudioOnlyTests();
         ReplacementRun();
+    }
+
+    private static void AudioOnlyTests()
+    {
+        const string songs = @"{""contents"":{""tabbedSearchResultsRenderer"":{""tabs"":[{""tabRenderer"":{""content"":{""sectionListRenderer"":{""contents"":[{""musicShelfRenderer"":{""contents"":[
+          {""musicResponsiveListItemRenderer"":{""flexColumns"":[{""musicResponsiveListItemFlexColumnRenderer"":{""text"":{""runs"":[{""text"":""Daisy""}]}}},
+            {""musicResponsiveListItemFlexColumnRenderer"":{""text"":{""runs"":[{""text"":""Ashnikko"",""navigationEndpoint"":{""browseEndpoint"":{""browseId"":""UCn3fPGV_gVYAmpgb1APyQug""}}},{""text"":"" • ""},
+              {""text"":""Daisy"",""navigationEndpoint"":{""browseEndpoint"":{""browseId"":""MPREb_GG89FXlnha3""}}},{""text"":"" • ""},{""text"":""2:27""}]}}}],
+            ""overlay"":{""musicItemThumbnailOverlayRenderer"":{""content"":{""musicPlayButtonRenderer"":{""playNavigationEndpoint"":{""watchEndpoint"":{""videoId"":""oYXVYiEV40I"",
+              ""watchEndpointMusicSupportedConfigs"":{""watchEndpointMusicConfig"":{""musicVideoType"":""MUSIC_VIDEO_TYPE_ATV""}}}}}}}},""playlistItemData"":{""videoId"":""oYXVYiEV40I""}}}
+        ]}}]}}}}]}}}";
+        List<YtmTrack> parsed;
+        using (var document = Json.Parse(songs, 512)) parsed = YouTubeMusic.ParseSongs(document.RootElement);
+        Assert(parsed.Count == 1 && parsed[0].Title == "Daisy" && parsed[0].Artists == "Ashnikko" && parsed[0].AlbumBrowseId == "MPREb_GG89FXlnha3" && parsed[0].AlbumTitle == "Daisy" &&
+            parsed[0].Duration == TimeSpan.FromSeconds(147) && parsed[0].VideoId == "oYXVYiEV40I" && !parsed[0].MusicVideo, "song search results give the audio upload with its artist, album and length");
+
+        // An album listed with music videos (as on YouTube Music when signed out).
+        var album = new YtmAlbum { BrowseId = "MPREb_o5PV7XpVCfO", Title = "DEMIDEVIL", Artist = "Ashnikko", Tracks = new List<YtmTrack> {
+            new YtmTrack { Index = 1, Title = "Daisy", VideoId = "6i01tOMgBDU", Duration = TimeSpan.FromSeconds(147), MusicVideo = true },
+            new YtmTrack { Index = 2, Title = "Toxic", VideoId = "VpAUThB0fJE", Duration = TimeSpan.FromSeconds(163), MusicVideo = true },
+            new YtmTrack { Index = 3, Title = "Clitoris! The Musical", VideoId = "atvAtv00001", Duration = TimeSpan.FromSeconds(97) } } };
+        var fake = new FakeYouTubeMusic { Results = q => new List<YtmAlbum>(), Songs = q =>
+            q.EndsWith("Daisy") ? new List<YtmTrack> { new YtmTrack { Title = "Daisy 2.0 (feat. Hatsune Miku)", Artists = "Ashnikko", VideoId = "mXsbksxGH1E", Duration = TimeSpan.FromSeconds(168) }, parsed[0] } :
+            q.EndsWith("Toxic") ? new List<YtmTrack> { new YtmTrack { Title = "Toxic", Artists = "Britney Spears", VideoId = "britney0001", Duration = TimeSpan.FromSeconds(199) },
+                new YtmTrack { Title = "Toxic", Artists = "Ashnikko", VideoId = "toxicvideo1", Duration = TimeSpan.FromSeconds(185), MusicVideo = true } } : new List<YtmTrack>() };
+        AlbumUpgrade.ResolveAudioAsync(fake, album, "Ashnikko", CancellationToken.None).GetAwaiter().GetResult();
+        Assert(album.AudioResolved && fake.SongQueries.SequenceEqual(new[] { "Ashnikko Daisy", "Ashnikko Toxic" }), "only the music-video entries are looked up");
+        Assert(album.Tracks[0].VideoId == "oYXVYiEV40I" && album.Tracks[0].ReplacedVideoId == "6i01tOMgBDU" && !album.Tracks[0].MusicVideo && album.Tracks[0].AlbumTitle == "Daisy",
+            "a music video is replaced by the artist's audio upload of the same song and length (here from the single)");
+        Assert(album.Tracks[1].VideoOnly && album.Tracks[1].VideoId == "VpAUThB0fJE", "another artist's song or another music video is never used; the track is marked video-only");
+        Assert(album.Tracks[2].VideoId == "atvAtv00001" && !album.Tracks[2].VideoOnly, "audio uploads on the album are kept as they are");
+
+        // Real lengths: a header that says 64 kbps for 128 kbps audio doubles the length; the measured length is what counts.
+        Track T(string title, uint number, double headerSeconds) => new Track { Path = "/d/" + number + ".mp3", Title = title, HasTitleTag = true, Number = number, Duration = TimeSpan.FromSeconds(headerSeconds), Bitrate = 64 };
+        var local = new List<Track> { T("Daisy", 1, 293), T("Toxic", 2, 326), T("Clitoris! The Musical", 3, 194) };
+        var real = new Dictionary<string, TimeSpan> { ["/d/1.mp3"] = TimeSpan.FromSeconds(147.2), ["/d/2.mp3"] = TimeSpan.FromSeconds(163.1), ["/d/3.mp3"] = TimeSpan.FromSeconds(97.4) };
+        var low = new HashSet<string>(local.Select(t => t.Path));
+        var header = AlbumUpgrade.Pair(local, low, album, t => t.Bitrate);
+        var measured = AlbumUpgrade.Pair(local, low, album, t => t.Bitrate, t => real[t.Path]);
+        Assert(header.All(p => !p.Selected), "with wrong header lengths nothing would match");
+        Assert(measured[0].Selected && measured[0].Quality == PairQuality.Exact && measured[2].Selected, "with measured lengths the audio uploads match exactly and are checked");
+        Assert(measured[1].Quality == PairQuality.VideoOnly && !measured[1].Selected && !measured[1].CanReplace, "a video-only song is shown but can't be checked");
+        measured[1].Selected = true;
+        var plan = AlbumUpgrade.Plan(measured, Options(NewFolder("audio-only-root"), NewFolder("audio-only-backups")));
+        Assert(plan.Actions.Count == 2 && plan.Issues.Single().Contains("music video"), "a music video is never planned for download");
+        var unresolved = new YtmAlbum { Tracks = new List<YtmTrack> { new YtmTrack { Index = 1, Title = "Daisy", VideoId = "6i01tOMgBDU", Duration = TimeSpan.FromSeconds(147), MusicVideo = true } } };
+        var early = AlbumUpgrade.Pair(local.Take(1).ToList(), low, unresolved, t => t.Bitrate, t => real[t.Path]);
+        Assert(AlbumUpgrade.Plan(early, Options(NewFolder("audio-only-root2"), NewFolder("audio-only-backups2"))).Actions.Count == 0, "an unresolved music-video entry is not downloaded either");
     }
 
     /// <summary>Makes a stand-in for a YouTube Music download: an AAC file of the given length.</summary>
@@ -151,7 +200,10 @@ internal static partial class Tests
     {
         internal readonly List<string> Queries = new List<string>();
         internal Func<string, List<YtmAlbum>> Results;
+        internal Func<string, List<YtmTrack>> Songs = q => new List<YtmTrack>();
+        internal readonly List<string> SongQueries = new List<string>();
         public Task<List<YtmAlbum>> SearchAlbumsAsync(string query, CancellationToken token) { Queries.Add(query); return Task.FromResult(Results(query)); }
+        public Task<List<YtmTrack>> SearchSongsAsync(string query, CancellationToken token) { SongQueries.Add(query); return Task.FromResult(Songs(query)); }
         public Task LoadAlbumAsync(YtmAlbum album, CancellationToken token) => Task.CompletedTask;
         public Task<byte[]> ThumbnailAsync(string url, CancellationToken token) => Task.FromResult(MakeCover(SkiaSharp.SKColors.SteelBlue, 120));
         public void Dispose() { }
@@ -175,11 +227,16 @@ internal static partial class Tests
             var tracks = window.Library.Albums.SelectMany(a => a.Tracks).OrderBy(t => t.Number).ToList();
             var fake = new FakeYouTubeMusic();
             var listing = new YtmAlbum { BrowseId = "MPREb_LDR08NYXGuN", Title = "Glitch Princess", Artist = "yeule", Kind = "Album", Year = "2022", ThumbnailUrl = "https://yt3.googleusercontent.com/x=w544-h544-l90-rj",
-                Tracks = tracks.Select((t, i) => new YtmTrack { Index = i + 1, Title = t.Title, VideoId = "v" + i, Duration = TimeSpan.FromSeconds(Math.Max(1, Math.Round(t.Duration.TotalSeconds)) + (i == 2 ? 20 : 0)) }).ToList() };
+                Tracks = tracks.Select((t, i) => new YtmTrack { Index = i + 1, Title = t.Title, VideoId = "v" + i, MusicVideo = i == 0,
+                    Duration = TimeSpan.FromSeconds(Math.Max(1, Math.Round(t.Duration.TotalSeconds)) + (i == 2 ? 20 : 0)) }).ToList() };
+            // Track 1 is listed as its music video; song search finds the artist's audio upload of it (on the same album).
+            var audioUpload = new YtmTrack { Title = listing.Tracks[0].Title, Artists = "yeule", VideoId = "a0", Duration = listing.Tracks[0].Duration, AlbumBrowseId = listing.BrowseId, AlbumTitle = "Glitch Princess" };
+            fake.Songs = q => q.EndsWith(audioUpload.Title, StringComparison.Ordinal) ? new List<YtmTrack> { audioUpload } : new List<YtmTrack>();
             listing.TrackCount = listing.Tracks.Count;
             var decoy = new YtmAlbum { BrowseId = "MPREb_other", Title = "softscars", Artist = "yeule", Kind = "Album", Year = "2023", Tracks = new List<YtmTrack>() };
             fake.Results = q => new List<YtmAlbum> { decoy, listing };
             var seconds = listing.Tracks.ToDictionary(t => t.Url, t => t.Duration.TotalSeconds);
+            seconds[audioUpload.Url] = audioUpload.Duration.TotalSeconds;
             var requested = new List<string>();
             window.YouTubeMusicForTest = fake; window.DownloadForTest = FakeDownload(url => seconds[url], requested);
             var result = LibraryChecks.Run(window.Library.Albums, 320);
@@ -190,6 +247,8 @@ internal static partial class Tests
             Assert(state.Pairs.Count == 3 && state.Pairs.Take(2).All(p => p.Selected && p.Quality == PairQuality.Exact) && !state.Pairs[2].Selected && state.Pairs[2].Quality == PairQuality.Different,
                 "low songs with an exact match are checked; the one whose length differs is not");
             Assert(state.Status.StartsWith("2 of 3 low songs matched"), "the album shows how many low songs are ready: " + state.Status);
+            Assert(fake.SongQueries.Count == 1 && state.Pairs[0].Remote.VideoId == "a0" && state.Pairs[0].Remote.ReplacedVideoId == "v0" && !state.Pairs[0].Remote.MusicVideo,
+                "the music-video entry is swapped for the artist's audio upload before anything is offered");
             Assert(Named<Avalonia.Controls.TextBlock>(upgrade, "Selected album").Text == "yeule — Glitch Princess", "the selected album is shown");
             await upgrade.ChooseAsync(decoy); await Settle();
             Assert(ReferenceEquals(state.Chosen, decoy) && state.SelectedCount == 0 && state.Status.StartsWith("Found"), "picking another release re-pairs the songs (nothing matches there)");
@@ -201,7 +260,7 @@ internal static partial class Tests
             var before = tracks.ToDictionary(t => t.Path, t => CoverEditor.Hash(t.Path));
             Click(replaceAlbum);
             await Until(() => !upgrade.IsWorking && upgrade.LastJournal != null, "replacement finishes", 60000); await Settle(100);
-            Assert(requested.Count == 2 && state.Pairs.Take(2).All(p => p.Replaced) && state.Pairs.Take(2).All(p => CoverEditor.Hash(p.Local.Path) != before[p.Local.Path]) &&
+            Assert(requested.Contains(audioUpload.Url) && !requested.Contains("https://music.youtube.com/watch?v=v0") && requested.Count == 2 && state.Pairs.Take(2).All(p => p.Replaced) && state.Pairs.Take(2).All(p => CoverEditor.Hash(p.Local.Path) != before[p.Local.Path]) &&
                 CoverEditor.Hash(state.Pairs[2].Local.Path) == before[state.Pairs[2].Local.Path], "only the checked songs are downloaded and replaced: " + upgrade.StatusText);
             using (var file = TagLib.File.Create(state.Pairs[0].Local.Path)) Assert(file.Properties.AudioBitrate >= 318 && file.Tag.Title == names[0], "the replaced song is MP3 320 with its own title");
             Assert(upgrade.StatusText.StartsWith("Replaced 2 of 2 songs"), "the result is reported: " + upgrade.StatusText);
@@ -219,7 +278,7 @@ internal static partial class Tests
     {
         using (var music = new YouTubeMusic())
         {
-            foreach (var (artist, album) in new[] { ("Camera Obscura", "My Maudlin Career"), ("100 gecs", "Snake Eyes"), ("yeule", "Glitch Princess") })
+            foreach (var (artist, album) in new[] { ("Camera Obscura", "My Maudlin Career"), ("100 gecs", "Snake Eyes"), ("yeule", "Glitch Princess"), ("Ashnikko", "DEMIDEVIL") })
             {
                 var found = await music.SearchAlbumsAsync(AlbumUpgrade.Query(artist, album), CancellationToken.None);
                 var best = found.OrderByDescending(a => AlbumUpgrade.AlbumScore(artist, album, 0, a)).FirstOrDefault();
@@ -227,7 +286,11 @@ internal static partial class Tests
                 await music.LoadAlbumAsync(best, CancellationToken.None);
                 var thumb = await music.ThumbnailAsync(best.ThumbnailUrl, CancellationToken.None);
                 Console.WriteLine("YTM " + artist + " / " + album + " → " + best.Title + " · " + best.Summary + " · " + best.PlaylistId + " · thumb " + (thumb?.Length ?? 0) + " bytes");
-                foreach (var t in best.Tracks.Take(3)) Console.WriteLine("   " + t.Index + ". " + t.Title + " " + t.Duration + (t.MusicVideo ? " (video)" : "") + " " + t.Url);
+                int videos = best.Tracks.Count(t => t.MusicVideo);
+                await AlbumUpgrade.ResolveAudioAsync(music, best, artist, CancellationToken.None);
+                Console.WriteLine("   " + videos + " music-video entries → " + best.Tracks.Count(t => t.ReplacedVideoId != null) + " audio uploads found, " + best.Tracks.Count(t => t.VideoOnly) + " video only");
+                foreach (var t in best.Tracks.Take(4)) Console.WriteLine("   " + t.Index + ". " + t.Title + " " + t.Duration + (t.ReplacedVideoId != null ? " (audio upload " + t.VideoId + " instead of video " + t.ReplacedVideoId + (t.AlbumTitle.Length > 0 ? ", from " + t.AlbumTitle : "") + ")" : t.VideoOnly ? " (video only)" : "") + " " + t.Url);
+                if (best.Tracks.Any(t => t.MusicVideo) || videos > 0 && best.Tracks.Count(t => t.ReplacedVideoId != null) < videos / 2) { Console.Error.WriteLine("FAIL: audio uploads were not found for " + album); return 1; }
                 if (best.Tracks.Count == 0 || best.Tracks.Any(t => t.Duration <= TimeSpan.Zero || t.VideoId.Length != 11) || AlbumUpgrade.AlbumScore(artist, album, 0, best) < 80)
                 { Console.Error.WriteLine("FAIL: unexpected album data for " + album); return 1; }
             }

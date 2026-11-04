@@ -34,12 +34,12 @@ namespace AlbumArtTool
             internal YtmAlbum Chosen;
             internal List<TrackPairing> Pairs = new List<TrackPairing>();
             internal string Query, Status = "Waiting to search…", Tone = "Accent", Problem;
-            internal bool Searched, Searching;
+            internal bool Searched, Searching, Resolving;
             internal event Action Changed;
             internal void Set(string status, string tone) { Status = status; Tone = tone; Changed?.Invoke(); }
             internal void Refresh() => Changed?.Invoke();
             internal int LowCount => Pairs.Count > 0 ? Pairs.Count(p => p.Low) : Low.Tracks.Count;
-            internal int SelectedCount => Pairs.Count(p => p.Selected && p.CanReplace);
+            internal int SelectedCount => Resolving ? 0 : Pairs.Count(p => p.Selected && p.CanReplace && !p.Remote.MusicVideo);
             internal string Title => string.Join(" — ", new[] { Low.Artist, Low.Album }.Where(v => !string.IsNullOrWhiteSpace(v)));
         }
 
@@ -51,6 +51,9 @@ namespace AlbumArtTool
         private readonly IYouTubeMusic music;
         private readonly Func<string, string, CancellationToken, Action<double>, string> download;
         private readonly int limit;
+        private readonly LibraryCheckResult checkResult;
+        // Real lengths from the audio packets: headers can be wrong (a 128 kbps file whose header says 64 reads twice as long).
+        private readonly Dictionary<string, TimeSpan> lengths = new Dictionary<string, TimeSpan>(StringComparer.OrdinalIgnoreCase);
         private readonly List<AlbumState> states;
         private readonly CancellationTokenSource closing = new CancellationTokenSource();
         private CancellationTokenSource running;
@@ -82,7 +85,8 @@ namespace AlbumArtTool
             Action<ProcessStartInfo> openLink, IYouTubeMusic youtube = null, Func<string, string, CancellationToken, Action<double>, string> fetch = null)
         {
             root = musicRoot; canStart = ready; exclusive = setExclusive; refreshLibrary = refresh; open = openLink; music = youtube ?? new YouTubeMusic(); download = fetch;
-            limit = result.LowBitrateLimit;
+            limit = result.LowBitrateLimit; checkResult = result;
+            foreach (var pair in result.MeasuredSeconds) lengths[pair.Key] = TimeSpan.FromSeconds(pair.Value);
             states = result.LowBitrateAlbums().Select(low =>
             {
                 var album = library.FirstOrDefault(a => a.Tracks.Any(t => low.Tracks.Any(l => l.Path.Equals(t.Path, StringComparison.OrdinalIgnoreCase))));
@@ -302,9 +306,11 @@ namespace AlbumArtTool
 
         internal async Task SearchAsync(AlbumState state, string text, CancellationToken token)
         {
-            state.Searching = true; state.Problem = null; state.Set("Searching YouTube Music…", "Accent");
+            state.Searching = true; state.Problem = null;
             try
             {
+                await MeasureAsync(state, token);
+                state.Set("Searching YouTube Music…", "Accent");
                 var found = await music.SearchAlbumsAsync(text, token);
                 var ranked = found.Select(a => (Album: a, Score: AlbumUpgrade.AlbumScore(state.Low.Artist, state.Low.Album, state.Tracks.Count, a)))
                     .OrderByDescending(r => r.Score).Take(8).ToList();
@@ -323,8 +329,9 @@ namespace AlbumArtTool
                 }
                 state.Chosen = best; state.Pairs = bestPairs ?? Pair(state, null);
                 state.Searched = true;
-                UpdateStatus(state);
                 _ = LoadThumbnailsAsync(state, token);
+                await ResolveAsync(state, token);
+                UpdateStatus(state);
             }
             catch (OperationCanceledException) { state.Set("Search stopped", "Warning"); }
             catch (Exception e) when (e is IOException || e is System.Net.Http.HttpRequestException || e is InvalidDataException || e is System.Text.Json.JsonException)
@@ -333,7 +340,46 @@ namespace AlbumArtTool
         }
 
         private List<TrackPairing> Pair(AlbumState state, YtmAlbum album) =>
-            AlbumUpgrade.Pair(state.Tracks, new HashSet<string>(state.Low.Tracks.Select(t => t.Path), StringComparer.OrdinalIgnoreCase), album, Kbps);
+            AlbumUpgrade.Pair(state.Tracks, new HashSet<string>(state.Low.Tracks.Select(t => t.Path), StringComparer.OrdinalIgnoreCase), album, Kbps, Length);
+
+        internal TimeSpan Length(Track track) => lengths.TryGetValue(track.Path, out var real) ? real : track.Duration;
+
+        // Measures the album's songs (all of them, not just the low ones) so lengths compare correctly.
+        private async Task MeasureAsync(AlbumState state, CancellationToken token)
+        {
+            var missing = state.Tracks.Where(t => !lengths.ContainsKey(t.Path)).ToList();
+            if (missing.Count == 0) return;
+            string ffmpeg = Ffmpeg, probe = BitrateProbe.FindProbe(ffmpeg);
+            if (ffmpeg == null && probe == null) return;
+            state.Set("Measuring your songs…", "Accent");
+            var measured = await Task.Run(() =>
+            {
+                var found = new System.Collections.Concurrent.ConcurrentDictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                Parallel.ForEach(missing, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Math.Min(4, Environment.ProcessorCount)), CancellationToken = token }, track =>
+                {
+                    try { found[track.Path] = BitrateProbe.MeasureFull(ffmpeg, probe, track.Path, token).Seconds; }
+                    catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is System.ComponentModel.Win32Exception) { }
+                });
+                return found;
+            }, token);
+            foreach (var pair in measured) lengths[pair.Key] = TimeSpan.FromSeconds(pair.Value);
+        }
+
+        // Swaps the chosen album's music-video entries for the artist's audio uploads, then pairs again.
+        private async Task ResolveAsync(AlbumState state, CancellationToken token)
+        {
+            var album = state.Chosen;
+            if (album == null || album.AudioResolved || album.Tracks == null || !album.Tracks.Any(t => t.MusicVideo)) return;
+            state.Resolving = true; UpdateButtons();
+            int videos = album.Tracks.Count(t => t.MusicVideo);
+            state.Set("Finding audio-only versions… 0/" + videos, "Accent");
+            try
+            {
+                await AlbumUpgrade.ResolveAudioAsync(music, album, state.Low.Artist, token, new Progress<(int Done, int Total)>(p => state.Set("Finding audio-only versions… " + p.Done + "/" + p.Total, "Accent")));
+                if (ReferenceEquals(state.Chosen, album)) state.Pairs = Pair(state, album);
+            }
+            finally { state.Resolving = false; }
+        }
 
         private async Task ChooseAsync(AlbumState state, YtmAlbum album)
         {
@@ -341,6 +387,8 @@ namespace AlbumArtTool
             {
                 await music.LoadAlbumAsync(album, closing.Token);
                 state.Chosen = album; state.Pairs = Pair(state, album); state.Scores[album] = AlbumUpgrade.AlbumScore(state.Low.Artist, state.Low.Album, state.Tracks.Count, album);
+                if (ReferenceEquals(state, shown)) Show(state);
+                await ResolveAsync(state, closing.Token);
                 UpdateStatus(state);
             }
             catch (Exception e) when (e is IOException || e is System.Net.Http.HttpRequestException || e is InvalidDataException || e is OperationCanceledException || e is System.Text.Json.JsonException)
@@ -390,7 +438,8 @@ namespace AlbumArtTool
             trackList.ItemsSource = state.Pairs.Count > 0 ? state.Pairs : null;
             tableNote.Text = state.Searching ? "Searching YouTube Music…" : state.Problem != null ? state.Problem :
                 state.Chosen == null ? (state.Candidates.Count == 0 ? "No album found. Try a different search above." : "None of the results matches closely. Click the right album above.") :
-                "Checked songs are replaced. Orange lengths differ from your file — listen on YouTube Music before checking them.";
+                state.Resolving ? "Looking up the artist's audio uploads for songs YouTube Music lists as music videos…" :
+                "Only audio uploads are used, never music videos. Orange lengths differ from your file — listen before checking them.";
             openYtm.IsEnabled = state.Chosen != null;
             UpdateButtons();
         }
@@ -654,22 +703,28 @@ namespace AlbumArtTool
                 kbpsTone = pairing.Low && !pairing.Replaced ? kbps.Bind(TextBlock.ForegroundProperty, kbps.GetResourceObservable("Warning")) :
                     pairing.Replaced ? kbps.Bind(TextBlock.ForegroundProperty, kbps.GetResourceObservable("Positive")) : null;
                 if (kbpsTone == null) kbps.ClearValue(TextBlock.ForegroundProperty);
-                remote.Text = pairing.Remote == null ? "No match on this album" : pairing.Remote.Title + (pairing.Remote.MusicVideo ? "  · video" : "");
-                remote.Classes.Set("muted", pairing.Remote == null);
-                string length = pairing.Remote == null ? "" : Format(pairing.Remote.Duration);
-                string delta = pairing.Remote == null ? "" : pairing.Quality == PairQuality.Exact ? " · same" : pairing.SecondsApart >= 999 ? "" :
-                    " · " + (pairing.Remote.Duration > t.Duration ? "+" : "−") + Math.Round(pairing.SecondsApart) + " s";
+                var r = pairing.Remote;
+                bool videoOnly = pairing.Quality == PairQuality.VideoOnly;
+                var mine = owner.Length(t);
+                remote.Text = r == null ? "No match on this album" : videoOnly ? r.Title + " — music video only, not used" :
+                    r.Title + (r.MusicVideo ? "  · finding audio…" : !string.IsNullOrEmpty(r.AlbumTitle) && r.ReplacedVideoId != null ? "  · from " + r.AlbumTitle : "");
+                remote.Classes.Set("muted", r == null || videoOnly);
+                string length = r == null || videoOnly ? "" : Format(r.Duration);
+                string delta = r == null || videoOnly ? "" : pairing.Quality == PairQuality.Exact ? " · same" : pairing.SecondsApart >= 999 ? "" :
+                    " · " + (r.Duration > mine ? "+" : "−") + Math.Round(pairing.SecondsApart) + " s";
                 this.length.Text = length + delta;
                 tone?.Dispose();
-                tone = pairing.Remote != null && pairing.Quality != PairQuality.Exact ? this.length.Bind(TextBlock.ForegroundProperty, this.length.GetResourceObservable("Warning")) : null;
+                tone = r != null && !videoOnly && pairing.Quality != PairQuality.Exact ? this.length.Bind(TextBlock.ForegroundProperty, this.length.GetResourceObservable("Warning")) : null;
                 if (tone == null) this.length.ClearValue(TextBlock.ForegroundProperty);
                 check.IsEnabled = pairing.CanReplace && !owner.IsWorking;
                 check.IsChecked = pairing.Selected && pairing.CanReplace;
                 check.Named("Replace " + name);
-                ToolTip.SetTip(this, t.Path + "\nYours: " + Format(t.Duration) + (pairing.LocalKbps > 0 ? " · " + pairing.LocalKbps + " kbps" : "") +
-                    (pairing.Remote == null ? "\nNo matching track on the chosen YouTube Music album." :
-                    "\nYouTube Music: " + pairing.Remote.Title + (pairing.Remote.Artists.Length > 0 ? " — " + pairing.Remote.Artists : "") + " · " + Format(pairing.Remote.Duration) +
-                    (pairing.Remote.MusicVideo ? "\nThis entry is the official music video; its audio can include an intro or outro — compare lengths." : "") +
+                ToolTip.SetTip(this, t.Path + "\nYours: " + Format(mine) + (pairing.LocalKbps > 0 ? " · " + pairing.LocalKbps + " kbps" : "") +
+                    (Math.Abs((mine - t.Duration).TotalSeconds) > 2 ? " (measured; the file's header says " + Format(t.Duration) + ")" : "") +
+                    (r == null ? "\nNo matching track on the chosen YouTube Music album." :
+                    videoOnly ? "\nYouTube Music only has the music video of this song, and music videos are never downloaded (they can have intros, outros or silence)." :
+                    "\nYouTube Music: " + r.Title + (r.Artists.Length > 0 ? " — " + r.Artists : "") + " · " + Format(r.Duration) +
+                    (r.ReplacedVideoId != null ? "\nThe album lists the music video; this is the artist's audio upload of the song" + (string.IsNullOrEmpty(r.AlbumTitle) ? "" : ", from \"" + r.AlbumTitle + "\"") + "." : "") +
                     (pairing.Quality == PairQuality.Exact ? "" : "\nThe length differs from your file. Double-click the YouTube Music title to listen first.")));
                 binding = false;
             }

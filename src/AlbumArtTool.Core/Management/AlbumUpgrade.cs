@@ -9,7 +9,8 @@ using AlbumArtTool.Online;
 
 namespace AlbumArtTool.Management
 {
-    public enum PairQuality { Exact, Close, Different, Missing }
+    /// <summary>VideoOnly: YouTube Music has only the music video of this song, which is never downloaded.</summary>
+    public enum PairQuality { Exact, Close, Different, Missing, VideoOnly }
 
     /// <summary>One of your songs and the YouTube Music track that would replace it.</summary>
     public sealed class TrackPairing
@@ -24,7 +25,7 @@ namespace AlbumArtTool.Management
         public bool Selected { get; set; }
         /// <summary>Replaced in this session (the new MP3 is in place).</summary>
         public bool Replaced { get; set; }
-        public bool CanReplace => Remote != null && !Replaced;
+        public bool CanReplace => Remote != null && !Replaced && Quality != PairQuality.VideoOnly;
     }
 
     public static partial class AlbumUpgrade
@@ -59,15 +60,17 @@ namespace AlbumArtTool.Management
         /// Pairs every local song with at most one YouTube Music track (title first, then track number and length).
         /// Low songs with an exact match (same title, length within 3 s) are selected; anything else waits for the user.
         /// </summary>
-        public static List<TrackPairing> Pair(IReadOnlyList<Track> local, ISet<string> lowPaths, YtmAlbum album, Func<Track, int> kbps)
+        public static List<TrackPairing> Pair(IReadOnlyList<Track> local, ISet<string> lowPaths, YtmAlbum album, Func<Track, int> kbps, Func<Track, TimeSpan> length = null)
         {
+            length = length ?? (t => t.Duration);
             var remote = album?.Tracks ?? new List<YtmTrack>();
             var options = new List<(int L, int R, double Score, double Title, double Apart)>();
             for (int l = 0; l < local.Count; l++)
                 for (int r = 0; r < remote.Count; r++)
                 {
                     double title = TitleSimilarity(local[l].HasTitleTag ? local[l].Title : System.IO.Path.GetFileNameWithoutExtension(local[l].Path), remote[r].Title);
-                    double apart = local[l].Duration > TimeSpan.Zero && remote[r].Duration > TimeSpan.Zero ? Math.Abs((local[l].Duration - remote[r].Duration).TotalSeconds) : 999;
+                    var mine = length(local[l]);
+                    double apart = mine > TimeSpan.Zero && remote[r].Duration > TimeSpan.Zero ? Math.Abs((mine - remote[r].Duration).TotalSeconds) : 999;
                     bool sameNumber = local[l].Number > 0 && local[l].Number == remote[r].Index;
                     if (title < 0.6 && !(sameNumber && title >= 0.35 && apart <= ExactSeconds)) continue;
                     double score = title + (sameNumber ? 0.15 : 0) + (apart <= ExactSeconds ? 0.2 : apart <= CloseSeconds ? 0.1 : 0);
@@ -81,7 +84,9 @@ namespace AlbumArtTool.Management
                 if (pairing.Remote != null || usedRemote.Contains(option.R)) continue;
                 usedRemote.Add(option.R);
                 pairing.Remote = remote[option.R]; pairing.TitleScore = option.Title; pairing.SecondsApart = option.Apart;
-                pairing.Quality = option.Apart <= ExactSeconds && option.Title >= 0.85 ? PairQuality.Exact : option.Apart <= CloseSeconds ? PairQuality.Close : PairQuality.Different;
+                // Before ResolveAudioAsync runs, a video entry still counts for choosing the album; Plan never downloads one.
+                pairing.Quality = remote[option.R].VideoOnly ? PairQuality.VideoOnly :
+                    option.Apart <= ExactSeconds && option.Title >= 0.85 ? PairQuality.Exact : option.Apart <= CloseSeconds ? PairQuality.Close : PairQuality.Different;
             }
             foreach (var pairing in pairings) pairing.Selected = pairing.Low && pairing.Quality == PairQuality.Exact;
             return pairings;
@@ -99,6 +104,8 @@ namespace AlbumArtTool.Management
             var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var pairing in pairings.Where(p => p.Selected && p.Remote != null))
             {
+                if (pairing.Remote.MusicVideo || pairing.Remote.VideoOnly)
+                { plan.Issues.Add(pairing.Local.Path + ": YouTube Music only lists the music video of this song; music videos are never downloaded."); continue; }
                 var track = pairing.Local;
                 string target = System.IO.Path.ChangeExtension(track.Path, ".mp3");
                 if (!target.Equals(track.Path, StringComparison.OrdinalIgnoreCase) && (System.IO.File.Exists(target) || !targets.Add(target)))
@@ -112,6 +119,39 @@ namespace AlbumArtTool.Management
                 });
             }
             return plan;
+        }
+
+        /// <summary>
+        /// Swaps every music-video entry of the album for the artist's audio upload of the same song, found with YouTube Music's
+        /// song search: same title, same artist, and the same album (or, from a single or another release, the same length within 2 s).
+        /// Entries with no audio upload are marked VideoOnly and never offered for download.
+        /// </summary>
+        internal static async System.Threading.Tasks.Task ResolveAudioAsync(IYouTubeMusic music, YtmAlbum album, string artist, System.Threading.CancellationToken token, IProgress<(int Done, int Total)> progress = null)
+        {
+            if (album.AudioResolved || album.Tracks == null) return;
+            var videos = album.Tracks.Where(t => t.MusicVideo).ToList();
+            int done = 0;
+            foreach (var track in videos)
+            {
+                token.ThrowIfCancellationRequested();
+                string who = string.IsNullOrWhiteSpace(album.Artist) ? artist : album.Artist;
+                var songs = await music.SearchSongsAsync((who + " " + TitleCleanup.Clean(track.Title)).Trim(), token).ConfigureAwait(true);
+                var audio = songs.Where(song => !song.MusicVideo && TitleSimilarity(song.Title, track.Title) >= 0.9 &&
+                        (Similarity(song.Artists, who) >= 0.6 || Contains(song.Artists, who) || Contains(who, song.Artists)) &&
+                        (song.AlbumBrowseId == album.BrowseId || track.Duration > TimeSpan.Zero && song.Duration > TimeSpan.Zero && Math.Abs((song.Duration - track.Duration).TotalSeconds) <= 2))
+                    .OrderByDescending(song => song.AlbumBrowseId == album.BrowseId)
+                    .ThenBy(song => Math.Abs((song.Duration - track.Duration).TotalSeconds)).FirstOrDefault();
+                if (audio != null)
+                {
+                    track.ReplacedVideoId = track.VideoId; track.VideoId = audio.VideoId; track.MusicVideo = false;
+                    if (audio.Duration > TimeSpan.Zero) track.Duration = audio.Duration;
+                    if (audio.AlbumBrowseId != album.BrowseId) track.AlbumTitle = audio.AlbumTitle;
+                }
+                else track.VideoOnly = true;
+                progress?.Report((++done, videos.Count));
+                await System.Threading.Tasks.Task.Delay(120, token).ConfigureAwait(true);
+            }
+            album.AudioResolved = true;
         }
 
         /// <summary>Titles compared without featured-artist credits, punctuation, accents or letter case.</summary>

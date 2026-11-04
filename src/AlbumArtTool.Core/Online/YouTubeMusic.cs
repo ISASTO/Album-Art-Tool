@@ -22,6 +22,13 @@ namespace AlbumArtTool.Online
         public TimeSpan Duration { get; set; }
         /// <summary>True when YouTube Music lists the official music video for this album track (its audio can differ, e.g. an intro).</summary>
         public bool MusicVideo { get; set; }
+        /// <summary>For song-search results: the album the audio upload belongs to.</summary>
+        public string AlbumBrowseId { get; set; } = "";
+        public string AlbumTitle { get; set; } = "";
+        /// <summary>Set when a music-video entry was replaced by the artist's audio upload (the original video id is kept here).</summary>
+        public string ReplacedVideoId { get; set; }
+        /// <summary>True when YouTube Music only has the music video of this track (no audio upload was found).</summary>
+        public bool VideoOnly { get; set; }
         public string Url => "https://music.youtube.com/watch?v=" + VideoId;
     }
 
@@ -37,6 +44,8 @@ namespace AlbumArtTool.Online
         public int TrackCount { get; set; }
         public string PlaylistId { get; set; } = "";
         public List<YtmTrack> Tracks { get; set; }
+        /// <summary>Music-video entries have been swapped for audio uploads (see AlbumUpgrade.ResolveAudioAsync).</summary>
+        public bool AudioResolved { get; set; }
         public string Url => string.IsNullOrEmpty(PlaylistId) ? "https://music.youtube.com/browse/" + BrowseId : "https://music.youtube.com/playlist?list=" + PlaylistId;
         public string Summary => string.Join(" · ", new[] { Kind, Artist, Year, TrackCount > 0 ? TrackCount + (TrackCount == 1 ? " song" : " songs") : "" }.Where(s => !string.IsNullOrWhiteSpace(s)));
     }
@@ -47,6 +56,8 @@ namespace AlbumArtTool.Online
         /// <summary>Fills Tracks, TrackCount and PlaylistId.</summary>
         Task LoadAlbumAsync(YtmAlbum album, CancellationToken token);
         Task<byte[]> ThumbnailAsync(string url, CancellationToken token);
+        /// <summary>Song search: audio uploads ("Art Tracks") with their artist, album and length.</summary>
+        Task<List<YtmTrack>> SearchSongsAsync(string query, CancellationToken token);
     }
 
     // YouTube Music (music.youtube.com) only, through the same web API its site uses (the "WEB_REMIX" client).
@@ -57,6 +68,8 @@ namespace AlbumArtTool.Online
         private const string ClientVersion = "1.20251015.01.00";
         // The albums filter of YouTube Music's search page.
         internal const string AlbumFilter = "EgWKAQIYAWoMEA4QChADEAQQCRAF";
+        // The songs filter: audio uploads only, never music videos.
+        internal const string SongFilter = "EgWKAQIIAWoMEA4QChADEAQQCRAF";
         private readonly HttpClient client;
 
         internal YouTubeMusic(HttpMessageHandler handler = null)
@@ -73,6 +86,12 @@ namespace AlbumArtTool.Online
         {
             using (var document = await PostAsync("search", "\"query\":" + JsonString(query) + ",\"params\":\"" + AlbumFilter + "\"", token).ConfigureAwait(false))
                 return ParseSearch(document.RootElement);
+        }
+
+        public async Task<List<YtmTrack>> SearchSongsAsync(string query, CancellationToken token)
+        {
+            using (var document = await PostAsync("search", "\"query\":" + JsonString(query) + ",\"params\":\"" + SongFilter + "\"", token).ConfigureAwait(false))
+                return ParseSongs(document.RootElement);
         }
 
         public async Task LoadAlbumAsync(YtmAlbum album, CancellationToken token)
@@ -147,6 +166,35 @@ namespace AlbumArtTool.Online
                 if (album.Title.Length > 0 && albums.All(a => a.BrowseId != browseId)) albums.Add(album);
             }
             return albums;
+        }
+
+        // "Title" / "Artist • Album • 2:27" with links: the artist run points at a channel, the album run at MPREb_…
+        internal static List<YtmTrack> ParseSongs(JsonElement root)
+        {
+            var songs = new List<YtmTrack>();
+            foreach (var item in Find(root, "musicResponsiveListItemRenderer"))
+            {
+                string videoId = Json.String(Json.Get(item, "playlistItemData"), "videoId");
+                var watch = Find(item, "watchEndpoint").Cast<JsonElement?>().FirstOrDefault();
+                if (videoId.Length == 0) videoId = Json.String(watch, "videoId");
+                string type = Json.String(Path(watch, "watchEndpointMusicSupportedConfigs", "watchEndpointMusicConfig"), "musicVideoType");
+                var columns = Json.Array(item, "flexColumns").Select(c => Json.Array(Json.Get(Json.Get(c, "musicResponsiveListItemFlexColumnRenderer"), "text"), "runs").ToList()).ToList();
+                if (videoId.Length == 0 || columns.Count < 2) continue;
+                var song = new YtmTrack { VideoId = videoId, Title = string.Concat(columns[0].Select(r => Json.String(r, "text"))).Trim(),
+                    MusicVideo = type.Length > 0 && type != "MUSIC_VIDEO_TYPE_ATV" };
+                var artists = new List<string>();
+                foreach (var run in columns[1])
+                {
+                    string text = Json.String(run, "text").Trim();
+                    string browseId = Json.String(Path(run, "navigationEndpoint", "browseEndpoint"), "browseId");
+                    if (browseId.StartsWith("MPREb_", StringComparison.Ordinal)) { song.AlbumBrowseId = browseId; song.AlbumTitle = text; }
+                    else if (browseId.StartsWith("UC", StringComparison.Ordinal)) artists.Add(text);
+                    else if (text.Contains(':') && ParseDuration(text) > TimeSpan.Zero) song.Duration = ParseDuration(text);
+                }
+                song.Artists = string.Join(", ", artists);
+                if (song.Title.Length > 0) songs.Add(song);
+            }
+            return songs;
         }
 
         internal static void ParseAlbum(JsonElement root, YtmAlbum album)
