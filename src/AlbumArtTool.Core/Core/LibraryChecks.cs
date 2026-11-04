@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace AlbumArtTool.Core
 {
@@ -15,6 +16,39 @@ namespace AlbumArtTool.Core
         public List<Track> LowBitrate { get; } = new List<Track>();
         public int LowBitrateLimit { get; set; }
         public int TracksChecked { get; set; }
+        /// <summary>Measured kbps by path, for low-bitrate candidates that were verified.</summary>
+        public Dictionary<string, int> Measured { get; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Songs whose header bitrate looked low but whose measured bitrate is at or above the limit.</summary>
+        public List<Track> HeaderWrong { get; } = new List<Track>();
+        /// <summary>Songs that could not be measured (kept in LowBitrate with their header bitrate).</summary>
+        public List<string> MeasureIssues { get; } = new List<string>();
+        public bool Verified { get; set; }
+
+        /// <summary>The measured bitrate when verified, otherwise the header bitrate.</summary>
+        public int Bitrate(Track track) => Measured.TryGetValue(track.Path, out int kbps) ? kbps : track.Bitrate;
+
+        /// <summary>Low-bitrate songs grouped by album (folder + album tag), lowest bitrate first.</summary>
+        public List<LowBitrateAlbum> LowBitrateAlbums() =>
+            LowBitrate.GroupBy(t => System.IO.Path.GetDirectoryName(t.Path) + "\u001f" + (t.AlbumTitle ?? ""), StringComparer.OrdinalIgnoreCase)
+                .Select(g => new LowBitrateAlbum(g.First().AlbumTitle, g.Select(t => t.ArtistText).FirstOrDefault(a => !string.IsNullOrWhiteSpace(a)) ?? "",
+                    System.IO.Path.GetDirectoryName(g.First().Path), g.OrderBy(t => t.Number).ThenBy(t => t.Path, StringComparer.CurrentCultureIgnoreCase).ToList(), this))
+                .OrderBy(a => a.MinKbps).ThenBy(a => a.Artist, StringComparer.CurrentCultureIgnoreCase).ThenBy(a => a.Album, StringComparer.CurrentCultureIgnoreCase).ToList();
+    }
+
+    public sealed class LowBitrateAlbum
+    {
+        public string Album { get; }
+        public string Artist { get; }
+        public string Folder { get; }
+        public List<Track> Tracks { get; }
+        public int MinKbps { get; }
+        public int MaxKbps { get; }
+        internal LowBitrateAlbum(string album, string artist, string folder, List<Track> tracks, LibraryCheckResult result)
+        {
+            Album = string.IsNullOrWhiteSpace(album) ? System.IO.Path.GetFileName(folder) : album; Artist = artist; Folder = folder; Tracks = tracks;
+            MinKbps = tracks.Min(result.Bitrate); MaxKbps = tracks.Max(result.Bitrate);
+        }
+        public string Range => MinKbps == MaxKbps ? MinKbps + " kbps" : MinKbps + "–" + MaxKbps + " kbps";
     }
 
     // Read-only checks over a library scan. Everything comes from tags the scan already read,
@@ -67,6 +101,58 @@ namespace AlbumArtTool.Core
             return result;
         }
 
+        public sealed class Measurements
+        {
+            public bool Available;
+            public Dictionary<string, int> Kbps = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            public List<string> Issues = new List<string>();
+        }
+
+        /// <summary>
+        /// Measures the real bitrate of each song with ffprobe (or FFmpeg, which lists the same audio packets).
+        /// Safe to run in the background: it only reads the given tracks. Available is false when neither tool is set up.
+        /// </summary>
+        public static Measurements Measure(IReadOnlyList<Track> candidates, CancellationToken token, IProgress<ProgressInfo> progress = null)
+        {
+            var result = new Measurements();
+            string ffmpeg = Management.Encoder.Find(), probe = Management.BitrateProbe.FindProbe(ffmpeg);
+            if (ffmpeg == null && probe == null) return result;
+            result.Available = true;
+            var measured = new System.Collections.Concurrent.ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var issues = new System.Collections.Concurrent.ConcurrentBag<string>();
+            int done = 0;
+            System.Threading.Tasks.Parallel.ForEach(candidates, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Math.Min(4, Environment.ProcessorCount)), CancellationToken = token }, track =>
+            {
+                try { measured[track.Path] = Management.BitrateProbe.Measure(ffmpeg, probe, track.Path, token); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception e) when (e is System.IO.IOException || e is UnauthorizedAccessException || e is System.ComponentModel.Win32Exception) { issues.Add(track.Path + ": " + e.Message); }
+                int n = Interlocked.Increment(ref done);
+                progress?.Report(new ProgressInfo { Completed = n, Total = candidates.Count, Message = "Measuring real bitrates · " + n + "/" + candidates.Count });
+            });
+            token.ThrowIfCancellationRequested();
+            foreach (var pair in measured) result.Kbps[pair.Key] = pair.Value;
+            result.Issues.AddRange(issues.OrderBy(i => i, StringComparer.OrdinalIgnoreCase));
+            return result;
+        }
+
+        /// <summary>Uses measured bitrates: songs that really are at or above the limit leave the low-bitrate list.</summary>
+        public static void Apply(LibraryCheckResult result, Measurements measured)
+        {
+            if (!measured.Available) return;
+            foreach (var pair in measured.Kbps) result.Measured[pair.Key] = pair.Value;
+            result.MeasureIssues.Clear(); result.MeasureIssues.AddRange(measured.Issues);
+            var candidates = result.LowBitrate.ToArray();
+            result.HeaderWrong.Clear();
+            result.HeaderWrong.AddRange(candidates.Where(t => result.Measured.TryGetValue(t.Path, out int kbps) && kbps >= result.LowBitrateLimit));
+            var keep = candidates.Where(t => !result.HeaderWrong.Contains(t)).OrderBy(result.Bitrate).ThenBy(t => t.Path, StringComparer.CurrentCultureIgnoreCase).ToList();
+            result.LowBitrate.Clear(); result.LowBitrate.AddRange(keep);
+            result.Verified = true;
+        }
+
+        /// <summary>Measure and Apply in one step.</summary>
+        public static void Verify(LibraryCheckResult result, CancellationToken token, IProgress<ProgressInfo> progress = null) =>
+            Apply(result, Measure(result.LowBitrate.ToArray(), token, progress));
+
         public static string Csv(LibraryCheckResult result)
         {
             var text = new StringBuilder("Check,Artist,Album,Title,Embedded pictures,Bitrate (kbps),Format,Path\r\n");
@@ -77,10 +163,10 @@ namespace AlbumArtTool.Core
                 if (value.Length > 0 && "=+-@\t\r".IndexOf(value[0]) >= 0) value = "'" + value;
                 return "\"" + value.Replace("\"", "\"\"") + "\"";
             }
-            void Row(string check, Track t) => text.Append(string.Join(",", new[] { check, t.ArtistText, t.AlbumTitle, t.HasTitleTag ? t.Title : "", t.PictureSummary, t.Bitrate > 0 ? t.Bitrate.ToString() : "", Format(t), t.Path }.Select(Escape))).Append("\r\n");
+            void Row(string check, Track t) => text.Append(string.Join(",", new[] { check, t.ArtistText, t.AlbumTitle, t.HasTitleTag ? t.Title : "", t.PictureSummary, result.Bitrate(t) > 0 ? result.Bitrate(t).ToString() : "", Format(t), t.Path }.Select(Escape))).Append("\r\n");
             foreach (var track in result.MissingTitles) Row("Missing Title tag", track);
             foreach (var track in result.MultiplePictures) Row(track.CoverPictures > 1 ? "Several embedded covers" : "Several embedded pictures", track);
-            foreach (var track in result.LowBitrate) Row("Below " + result.LowBitrateLimit + " kbps", track);
+            foreach (var track in result.LowBitrate) Row("Below " + result.LowBitrateLimit + " kbps" + (result.Measured.ContainsKey(track.Path) ? " (measured)" : " (header)"), track);
             return text.ToString();
         }
     }

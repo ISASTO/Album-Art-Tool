@@ -339,12 +339,16 @@ internal static partial class Tests
             var dialog = window.OwnedWindows.OfType<LibraryCheckWindow>().Single();
             Assert(dialog.Result.MissingTitles.Count == 2 && dialog.Result.MultiplePictures.Count == 2, "the tag check window opens with both checks");
             Assert(Named<TextBlock>(dialog, "Tag check summary").Text.StartsWith("2 missing a Title tag · 2 with several embedded pictures (1 with several covers)"), "the summary counts each finding");
-            Assert(dialog.Rows.Count(r => r.Header) == 3 && dialog.Rows.Count(r => r.Path != null) == 4 + dialog.Result.LowBitrate.Count, "results are grouped under the three checks");
+            Assert(dialog.Rows.Count(r => r.Header) == 3 && dialog.Rows.Count(r => r.Path != null) == 4 + dialog.Result.LowBitrateAlbums().Count, "results are grouped under the three checks");
             var threshold = Named<ComboBox>(dialog, "Low bitrate threshold");
             threshold.SelectedIndex = Array.IndexOf(LibraryChecks.BitrateChoices, 320);
             Assert(dialog.Result.LowBitrateLimit == 320 && dialog.Result.LowBitrate.Count == 4, "changing the threshold rechecks low-bitrate songs");
+            await dialog.Verification; await Settle();
+            var albumRows = dialog.Rows.Where(r => r.Folder).ToArray();
+            Assert(dialog.Result.Verified == (AlbumArtTool.Management.Encoder.Find() != null) && albumRows.Length == dialog.Result.LowBitrateAlbums().Count && albumRows.Length == 1 &&
+                albumRows[0].Detail.StartsWith("4 songs · ") && albumRows[0].Path == root, "low-bitrate songs are measured and grouped into one row per album: " + string.Join(" | ", albumRows.Select(a => a.Text + " / " + a.Detail)));
             ProcessStartInfo opened = null; window.StartExplorer = info => opened = info;
-            var show = ButtonStarting(dialog, "Show selected file");
+            var show = ButtonStarting(dialog, "Show selected");
             Assert(!show.IsEnabled, "a song must be selected before it can be shown");
             int index = dialog.Rows.ToList().FindIndex(r => r.Path != null && r.Path.EndsWith("05 - two covers.mp3"));
             dialog.Select(index); Click(show);

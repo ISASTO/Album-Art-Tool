@@ -73,6 +73,9 @@ namespace AlbumArtTool.Management
                 var exe = archive.Entries.Single(e => e.FullName.EndsWith("/bin/ffmpeg.exe", StringComparison.OrdinalIgnoreCase));
                 if (exe.Length > 350L * 1024 * 1024) throw new IOException("The FFmpeg executable is too large.");
                 exe.ExtractToFile(Path.Combine(output, "ffmpeg.exe"));
+                // ffprobe measures real audio bitrates for the library check; FFmpeg alone can do it too, so it is optional.
+                var probe = archive.Entries.FirstOrDefault(e => e.FullName.EndsWith("/bin/ffprobe.exe", StringComparison.OrdinalIgnoreCase));
+                if (probe != null && probe.Length <= 350L * 1024 * 1024) probe.ExtractToFile(Path.Combine(output, "ffprobe.exe"));
                 int count = 0;
                 foreach (var entry in archive.Entries.Where(e => e.Length > 0 && e.Length < 2 * 1024 * 1024 &&
                     (Path.GetFileName(e.FullName).StartsWith("LICENSE", StringComparison.OrdinalIgnoreCase) || Path.GetFileName(e.FullName).StartsWith("COPYING", StringComparison.OrdinalIgnoreCase))))

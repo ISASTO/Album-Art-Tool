@@ -339,8 +339,56 @@ internal static partial class Tests
         return root;
     }
 
+    // A CBR MP3 whose Xing header understates its size reads as low-bitrate from the header; measuring the packets finds the truth.
+    private static void BitrateVerifyTests()
+    {
+        string ffmpeg = Encoder.Find();
+        if (ffmpeg == null) { Console.WriteLine("SKIP bitrate verification: no FFmpeg"); return; }
+        string root = NewFolder("bitrate-verify");
+        string Make(string name, string kbps)
+        {
+            string path = Path.Combine(root, name);
+            Encoder.Run(ffmpeg, new[] { "-v", "error", "-nostdin", "-y", "-f", "lavfi", "-i", "anoisesrc=d=6:c=pink:r=44100:a=0.3", "-ac", "2", "-c:a", "libmp3lame", "-b:a", kbps,
+                "-metadata", "title=" + name, "-metadata", "album=Verify album", "-metadata", "artist=Verify artist", path }, CancellationToken.None, timeoutSeconds: 120);
+            return path;
+        }
+        string honest = Make("honest.mp3", "64k"), lying = Make("lying.mp3", "192k");
+        // Shrink the Xing/Info header's byte count to a quarter so tag readers compute a quarter of the real bitrate.
+        byte[] bytes = File.ReadAllBytes(lying);
+        int at = Enumerable.Range(0, Math.Min(bytes.Length - 16, 20000)).First(i => bytes[i] == 'I' && bytes[i + 1] == 'n' && bytes[i + 2] == 'f' && bytes[i + 3] == 'o' || bytes[i] == 'X' && bytes[i + 1] == 'i' && bytes[i + 2] == 'n' && bytes[i + 3] == 'g');
+        int flags = bytes[at + 7], offset = at + 8 + ((flags & 1) != 0 ? 4 : 0);
+        Assert((flags & 2) != 0, "the encoder wrote a Xing/Info byte count");
+        uint size = (uint)(bytes[offset] << 24 | bytes[offset + 1] << 16 | bytes[offset + 2] << 8 | bytes[offset + 3]) / 4;
+        // Tag readers only trust a VBR "Xing" header (FFmpeg labels CBR files "Info").
+        bytes[at] = (byte)'X'; bytes[at + 1] = (byte)'i'; bytes[at + 2] = (byte)'n'; bytes[at + 3] = (byte)'g';
+        bytes[offset] = (byte)(size >> 24); bytes[offset + 1] = (byte)(size >> 16); bytes[offset + 2] = (byte)(size >> 8); bytes[offset + 3] = (byte)size;
+        File.WriteAllBytes(lying, bytes);
+        var albums = Scanner.Scan(root, CancellationToken.None).Albums;
+        var tracks = albums.SelectMany(a => a.Tracks).ToDictionary(t => Path.GetFileName(t.Path));
+        Assert(tracks["lying.mp3"].Bitrate < 100 && Math.Abs(tracks["honest.mp3"].Bitrate - 64) <= 2, "headers report " + tracks["lying.mp3"].Bitrate + " and " + tracks["honest.mp3"].Bitrate + " kbps");
+        var result = LibraryChecks.Run(albums, 128);
+        Assert(result.LowBitrate.Count == 2, "both songs look low-bitrate from their headers");
+        BitrateProbe.ClearCache();
+        LibraryChecks.Verify(result, CancellationToken.None);
+        Assert(result.Verified && result.LowBitrate.Single().Path == honest && result.HeaderWrong.Single().Path == lying && result.MeasureIssues.Count == 0,
+            "measuring drops the song whose header lied and keeps the genuinely low one: measured " + string.Join(", ", result.Measured.Select(m => Path.GetFileName(m.Key) + "=" + m.Value)) + " issues " + string.Join("; ", result.MeasureIssues));
+        Assert(Math.Abs(result.Bitrate(tracks["honest.mp3"]) - 64) <= 3 && Math.Abs(result.Measured[lying] - 192) <= 4, "measured " + result.Measured[honest] + " and " + result.Measured[lying] + " kbps");
+        var grouped = result.LowBitrateAlbums().Single();
+        Assert(grouped.Album == "Verify album" && grouped.Artist == "Verify artist" && grouped.Tracks.Count == 1 && grouped.Folder == root, "low-bitrate songs are grouped by album");
+        Assert(LibraryChecks.Csv(result).Contains("Below 128 kbps (measured)"), "the report says the bitrate was measured");
+        // ffprobe and FFmpeg's packet listing agree.
+        string probe = BitrateProbe.FindProbe(ffmpeg);
+        BitrateProbe.ClearCache();
+        int viaFfmpeg = BitrateProbe.Measure(ffmpeg, null, lying, CancellationToken.None);
+        BitrateProbe.ClearCache();
+        if (probe != null) { int viaProbe = BitrateProbe.Measure(ffmpeg, probe, lying, CancellationToken.None); Assert(Math.Abs(viaProbe - viaFfmpeg) <= 2, "ffprobe (" + viaProbe + ") and FFmpeg (" + viaFfmpeg + ") agree"); }
+        else Console.WriteLine("ffprobe not found; FFmpeg measured " + viaFfmpeg + " kbps");
+        Assert(Math.Abs(viaFfmpeg - 192) <= 4, "FFmpeg alone measures the real bitrate: " + viaFfmpeg);
+    }
+
     private static void LibraryCheckTests()
     {
+        BitrateVerifyTests();
         string root = LibraryCheckFolder();
         foreach (bool restarted in new[] { false, true })
         {
@@ -367,7 +415,7 @@ internal static partial class Tests
         Assert(LibraryChecks.IsLowBitrate(new Track { Path = "a.mp3", Bitrate = 96 }, 128) && !LibraryChecks.IsLowBitrate(new Track { Path = "a.flac", Bitrate = 96, Lossless = true }, 128) &&
             !LibraryChecks.IsLowBitrate(new Track { Path = "a.mp3", Bitrate = 0 }, 128) && !LibraryChecks.IsLowBitrate(new Track { Path = "a.mp3", Bitrate = 128 }, 128),
             "low bitrate means lossy, known and strictly below the threshold");
-        Assert(LibraryChecks.Csv(all).Contains("\"Below 320 kbps\"") && LibraryChecks.Format(new Track { Path = "x.m4a" }) == "AAC/M4A", "the report lists low-bitrate songs with their format");
+        Assert(LibraryChecks.Csv(all).Contains("\"Below 320 kbps (header)\"") && LibraryChecks.Format(new Track { Path = "x.m4a" }) == "AAC/M4A", "the report lists low-bitrate songs with their format");
         Assert(Artwork.Describe(new TagLib.IPicture[] { new TagLib.Picture { Type = TagLib.PictureType.LeafletPage }, new TagLib.Picture { Type = TagLib.PictureType.LeafletPage }, new TagLib.Picture { Type = TagLib.PictureType.Media } })
             == "2 booklet pages, 1 disc picture", "picture descriptions name each picture type");
     }

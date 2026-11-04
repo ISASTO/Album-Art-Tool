@@ -27,14 +27,18 @@ namespace AlbumArtTool
         private readonly ListBox list = new ListBox { Classes = { "grid" } };
         private readonly TextBlock summary = Kit.Label("", Kit.Body);
         private readonly ComboBox threshold = new ComboBox { Width = 130, HorizontalAlignment = HorizontalAlignment.Right };
-        private readonly Button refresh = Kit.Button("Check again", "primary"), save = Kit.Button("Save report…"), show = Kit.Button("Show selected file");
+        private readonly Button refresh = Kit.Button("Check again", "primary"), save = Kit.Button("Save report…"), show = Kit.Button("Show selected");
         internal LibraryCheckResult Result { get; private set; }
         internal IReadOnlyList<Row> Rows { get; private set; } = Array.Empty<Row>();
+        /// <summary>The bitrate measurement started by the last check (completed when there is nothing to measure).</summary>
+        internal Task Verification { get; private set; } = Task.CompletedTask;
+        private System.Threading.CancellationTokenSource measuring;
+        private string measureStatus = "";
 
         internal sealed class Row
         {
             internal string Text, Detail, Path, Tip;
-            internal bool Header;
+            internal bool Header, Folder;
         }
 
         internal LibraryCheckWindow(Func<Album[]> albums, Action<ProcessStartInfo> openFolder, Func<Task> fillTitles = null, Func<Task> fixPictures = null)
@@ -42,12 +46,14 @@ namespace AlbumArtTool
             currentAlbums = albums; this.openFolder = openFolder; this.fillTitles = fillTitles; this.fixPictures = fixPictures;
             Title = "Check library"; Width = 980; Height = 570; MinWidth = 900; MinHeight = 420;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            var help = Kit.Label("Songs without a Title tag show their filename in players. Songs with several embedded pictures can show the wrong cover or carry extra artwork. Low-bitrate lossy songs may be worth downloading again. Results use the last library scan; nothing is changed.", Kit.Body, cls: "muted");
+            var help = Kit.Label("Songs without a Title tag show their filename in players. Songs with several embedded pictures can show the wrong cover or carry extra artwork. Albums with low-bitrate lossy songs (measured, not just the file header) may be worth downloading again. Results use the last library scan; nothing is changed.", Kit.Body, cls: "muted");
             help.TextWrapping = TextWrapping.Wrap; help.TextTrimming = TextTrimming.None;
             summary.Named("Tag check summary");
             foreach (int kbps in LibraryChecks.BitrateChoices) threshold.Items.Add("Below " + kbps + " kbps");
             threshold.SelectedIndex = Array.IndexOf(LibraryChecks.BitrateChoices, LibraryChecks.DefaultLowBitrate);
-            threshold.Named("Low bitrate threshold").Tip("Lossy songs (MP3, AAC, Ogg, Opus, WMA…) below this bitrate are listed. Lossless files are never listed.");
+            threshold.Named("Low bitrate threshold").Tip("Albums with lossy songs (MP3, AAC, Ogg, Opus, WMA…) below this bitrate are listed. Lossless files are never listed.\n\n" +
+                "The bitrate in a file's header can be wrong (common with VBR MP3s), so each candidate is measured with ffprobe/FFmpeg: the total size of its audio packets divided by their duration. " +
+                "Songs whose real bitrate is high enough are dropped from the list. Without FFmpeg, header bitrates are shown and marked as unverified.");
             threshold.SelectionChanged += (s, e) => { if (Result != null) Check(); };
             list.Named("Tag check results");
             list.ItemTemplate = new FuncDataTemplate<Row>((row, scope) => new RowView(), true);
@@ -55,6 +61,8 @@ namespace AlbumArtTool
             refresh.Click += (s, e) => Check();
             save.Click += async (s, e) => await SaveAsync();
             show.IsEnabled = false; show.Click += (s, e) => ShowSelected();
+            show.Tip("Highlights the selected song in File Explorer, or opens the selected album's folder.");
+            Closed += (s, e) => measuring?.Cancel();
             fill.Named("Fill titles from filenames").Tip("Opens Manage library with only \"Fill missing Title tags from filenames\" selected and previews the changes. Nothing is written until you apply them.");
             fill.Click += async (s, e) => { if (this.fillTitles != null) await this.fillTitles(); };
             onePicture.Named("Fix embedded pictures").Tip("Opens Manage library with only \"Standardize embedded artwork\" selected (one " + Artwork.EmbedSide + " px JPEG front cover per song) and previews the changes. Nothing is written until you apply them.");
@@ -94,6 +102,30 @@ namespace AlbumArtTool
         {
             int limit = LibraryChecks.BitrateChoices[Math.Max(0, threshold.SelectedIndex)];
             Result = LibraryChecks.Run(currentAlbums(), limit);
+            measuring?.Cancel();
+            measureStatus = Result.LowBitrate.Count > 0 ? "measuring " + Result.LowBitrate.Count + " songs…" : "";
+            ShowRows();
+            Verification = Result.LowBitrate.Count > 0 ? VerifyAsync(Result) : Task.CompletedTask;
+        }
+
+        // Header bitrates are shown at once; the real bitrates replace them when measured (in the background, cancelled by a new check).
+        private async Task VerifyAsync(LibraryCheckResult result)
+        {
+            var source = measuring = new System.Threading.CancellationTokenSource();
+            var progress = new Progress<ProgressInfo>(p => { if (ReferenceEquals(Result, result) && !source.IsCancellationRequested) { measureStatus = "measuring " + p.Completed + "/" + p.Total + "…"; summary.Text = Summary(); } });
+            var candidates = result.LowBitrate.ToArray();
+            LibraryChecks.Measurements measured;
+            try { measured = await Task.Run(() => LibraryChecks.Measure(candidates, source.Token, progress)); }
+            catch (OperationCanceledException) { return; }
+            if (!ReferenceEquals(Result, result) || source.IsCancellationRequested) return;
+            LibraryChecks.Apply(result, measured);
+            measureStatus = result.Verified ? "" : "header bitrates (set up FFmpeg in Manage library to verify)";
+            ShowRows();
+        }
+
+        private void ShowRows()
+        {
+            int limit = Result.LowBitrateLimit;
             var rows = new List<Row>();
             rows.Add(new Row { Header = true, Text = "Songs missing a Title tag", Detail = Count(Result.MissingTitles.Count) });
             if (Result.MissingTitles.Count == 0) rows.Add(new Row { Text = "Every song has a Title tag." });
@@ -104,28 +136,45 @@ namespace AlbumArtTool
             foreach (var t in Result.MultiplePictures)
                 rows.Add(new Row { Text = t.Path, Detail = t.PictureSummary, Path = t.Path,
                     Tip = t.Path + "\n" + t.PictureSummary + (t.CoverPictures > 1 ? "\nSeveral front/unlabeled covers: players may show any of them." : "") });
-            rows.Add(new Row { Header = true, Text = "Lossy songs below " + limit + " kbps", Detail = Count(Result.LowBitrate.Count) });
-            if (Result.LowBitrate.Count == 0) rows.Add(new Row { Text = "No lossy song is below " + limit + " kbps." });
-            foreach (var t in Result.LowBitrate)
-                rows.Add(new Row { Text = t.Path, Detail = t.Bitrate + " kbps " + LibraryChecks.Format(t), Path = t.Path,
-                    Tip = t.Path + "\n" + t.Bitrate + " kbps · " + (t.Codec ?? "") + (string.IsNullOrWhiteSpace(Describe(t)) ? "" : "\n" + Describe(t)) });
+            var albums = Result.LowBitrateAlbums();
+            string basis = Result.Verified ? "measured" : "header";
+            rows.Add(new Row { Header = true, Text = "Albums with lossy songs below " + limit + " kbps", Detail = Count(albums.Count, "album") + " · " + Count(Result.LowBitrate.Count) });
+            if (albums.Count == 0) rows.Add(new Row { Text = Result.Verified ? "No lossy song is really below " + limit + " kbps." : "No lossy song is below " + limit + " kbps." });
+            foreach (var album in albums)
+            {
+                string name = string.Join(" — ", new[] { album.Artist, album.Album }.Where(v => !string.IsNullOrWhiteSpace(v)));
+                string formats = string.Join("/", album.Tracks.Select(LibraryChecks.Format).Distinct());
+                var songs = album.Tracks.Select(t => "  " + Result.Bitrate(t) + " kbps" + (Result.Measured.TryGetValue(t.Path, out int m) && Math.Abs(m - t.Bitrate) > 2 ? " (header said " + t.Bitrate + ")" : "") +
+                    "  " + System.IO.Path.GetFileName(t.Path));
+                rows.Add(new Row { Text = name.Length > 0 ? name : album.Folder, Detail = Count(album.Tracks.Count) + " · " + album.Range + " " + basis + " · " + formats,
+                    Path = album.Folder, Folder = true, Tip = album.Folder + "\n" + string.Join("\n", songs.Take(40)) + (album.Tracks.Count > 40 ? "\n  …" : "") });
+            }
+            if (Result.HeaderWrong.Count > 0)
+                rows.Add(new Row { Text = Count(Result.HeaderWrong.Count) + " not listed: their headers reported a low bitrate, but they measure at least " + limit + " kbps", Tip =
+                    string.Join("\n", Result.HeaderWrong.Take(40).Select(t => "header " + t.Bitrate + " kbps → measured " + Result.Bitrate(t) + " kbps  " + t.Path)) + (Result.HeaderWrong.Count > 40 ? "\n…" : "") });
+            if (Result.MeasureIssues.Count > 0)
+                rows.Add(new Row { Text = Count(Result.MeasureIssues.Count) + " could not be measured and show their header bitrate", Tip = string.Join("\n", Result.MeasureIssues.Take(40)) });
             Rows = rows; list.ItemsSource = rows; show.IsEnabled = false;
-            summary.Text = Result.MissingTitles.Count + " missing a Title tag · " + Result.MultiplePictures.Count + " with several embedded pictures (" +
-                Result.MultiplePictures.Count(t => t.CoverPictures > 1) + " with several covers) · " + Result.LowBitrate.Count + " below " + limit + " kbps · " + Result.TracksChecked + " songs checked";
+            summary.Text = Summary();
             fill.IsEnabled = fillTitles != null && Result.MissingTitles.Count > 0;
             onePicture.IsEnabled = fixPictures != null && Result.MultiplePictures.Count > 0;
             save.IsEnabled = Result.MissingTitles.Count + Result.MultiplePictures.Count + Result.LowBitrate.Count > 0;
         }
 
-        private static string Count(int n) => n + (n == 1 ? " song" : " songs");
+        private string Summary() => Result.MissingTitles.Count + " missing a Title tag · " + Result.MultiplePictures.Count + " with several embedded pictures (" +
+            Result.MultiplePictures.Count(t => t.CoverPictures > 1) + " with several covers) · " + Count(Result.LowBitrateAlbums().Count, "album") + " below " + Result.LowBitrateLimit + " kbps" +
+            (measureStatus.Length > 0 ? " (" + measureStatus + ")" : Result.Verified ? " (measured)" : "") + " · " + Result.TracksChecked + " songs checked";
+
+        private static string Count(int n, string noun = "song") => n + " " + noun + (n == 1 ? "" : "s");
         private static string Describe(Track t) => string.Join(" · ", new[] { t.ArtistText, t.AlbumTitle }.Where(s => !string.IsNullOrWhiteSpace(s)));
 
         internal void Select(int index) => list.SelectedIndex = index;
 
         private void ShowSelected()
         {
-            if (!(list.SelectedItem is Row { Path: string path })) return;
-            try { openFolder(new ProcessStartInfo("explorer.exe", "/select," + Updates.UpdateInstaller.QuoteArgument(path)) { UseShellExecute = true }); }
+            if (!(list.SelectedItem is Row { Path: string path } row)) return;
+            string arguments = row.Folder ? Updates.UpdateInstaller.QuoteArgument(path) : "/select," + Updates.UpdateInstaller.QuoteArgument(path);
+            try { openFolder(new ProcessStartInfo("explorer.exe", arguments) { UseShellExecute = true }); }
             catch (Exception e) { _ = Dialogs.ShowMessage(this, "Could not open folder", e.Message); }
         }
 
