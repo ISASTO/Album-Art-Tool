@@ -26,6 +26,11 @@ namespace AlbumArtTool.Ui
 
         internal const string Keyboard = "M19,10H17V8H19M19,13H17V11H19M16,10H14V8H16M16,13H14V11H16M16,17H8V15H16M7,10H5V8H7M7,13H5V11H7M8,11H10V13H8M8,8H10V10H8M11,11H13V13H11M11,8H13V10H11M20,5H4C2.89,5 2,5.89 2,7V17A2,2 0 0,0 4,19H20A2,2 0 0,0 22,17V7C22,5.89 21.1,5 20,5Z";
 
-        internal static readonly string[] All = { Undo, Refresh, Stop, Folder, Settings, Queue, Album, Artist, Health, Organize, Activity, Search, Duplicates, Check, Warning, Add, Delete, Download, Open, Keyboard };
+        internal const string Back = "M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z";
+        internal const string Play = "M8,5.14V19.14L19,12.14L8,5.14Z";
+        internal const string Close = "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z";
+        internal const string AddMusic = "M15,6H3V8H15V6M15,10H3V12H15V10M3,16H11V14H3V16M17,6V14.18C16.69,14.07 16.35,14 16,14A3,3 0 0,0 13,17A3,3 0 0,0 16,20A3,3 0 0,0 19,17V8H22V6H17Z";
+
+        internal static readonly string[] All = { Back, Play, Close, AddMusic, Undo, Refresh, Stop, Folder, Settings, Queue, Album, Artist, Health, Organize, Activity, Search, Duplicates, Check, Warning, Add, Delete, Download, Open, Keyboard };
     }
 }

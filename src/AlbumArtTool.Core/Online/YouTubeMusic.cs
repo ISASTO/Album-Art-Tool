@@ -58,11 +58,15 @@ namespace AlbumArtTool.Online
         Task<byte[]> ThumbnailAsync(string url, CancellationToken token);
         /// <summary>Song search: audio uploads ("Art Tracks") with their artist, album and length.</summary>
         Task<List<YtmTrack>> SearchSongsAsync(string query, CancellationToken token);
+        /// <summary>Artist search: YouTube Music artist pages (channels), best match first.</summary>
+        Task<List<YtmArtist>> SearchArtistsAsync(string query, CancellationToken token);
+        /// <summary>Fills the artist's name, picture and every album, single and EP.</summary>
+        Task LoadArtistAsync(YtmArtist artist, CancellationToken token);
     }
 
     // YouTube Music (music.youtube.com) only, through the same web API its site uses (the "WEB_REMIX" client).
     // Search is restricted to albums (EPs and singles included); album pages give the track list with durations.
-    internal sealed class YouTubeMusic : IYouTubeMusic
+    internal sealed partial class YouTubeMusic : IYouTubeMusic
     {
         private const string Api = "https://music.youtube.com/youtubei/v1/";
         private const string ClientVersion = "1.20251015.01.00";

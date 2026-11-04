@@ -14,7 +14,7 @@ namespace AlbumArtTool
     // One window: a sidebar of pages instead of a header full of buttons and a stack of tool windows.
     internal sealed partial class MainWindow
     {
-        internal enum Page { Albums, Artists, Health, Organize, YouTube, Activity, Settings, Welcome }
+        internal enum Page { Albums, Artists, AddMusic, Health, Organize, YouTube, Activity, Settings, Welcome }
 
         private sealed class NavItem
         {
@@ -54,10 +54,11 @@ namespace AlbumArtTool
             var pages = new StackPanel { Spacing = 2 };
             pages.Children.Add(AddNav(Page.Albums, Icons.Album, "Albums", "Add, change and standardize album covers (Ctrl+1)."));
             pages.Children.Add(AddNav(Page.Artists, Icons.Artist, "Artists", "Collapse guest credits into each album's main artist (Ctrl+2)."));
-            pages.Children.Add(AddNav(Page.Health, Icons.Health, "Health", "Missing titles, extra pictures, low-bitrate albums and duplicates, each with a fix (Ctrl+3)."));
-            pages.Children.Add(AddNav(Page.Organize, Icons.Organize, "Organize", "Convert, standardize, tidy and reorganize the whole library with presets. Every change is previewed and can be undone (Ctrl+4)."));
+            pages.Children.Add(AddNav(Page.AddMusic, Icons.AddMusic, "Add music", "Search YouTube Music for artists, albums and songs and add them to your library as MP3 320 (Ctrl+3)."));
+            pages.Children.Add(AddNav(Page.Health, Icons.Health, "Health", "Missing titles, extra pictures, low-bitrate albums and duplicates, each with a fix (Ctrl+4)."));
+            pages.Children.Add(AddNav(Page.Organize, Icons.Organize, "Organize", "Convert, standardize, tidy and reorganize the whole library with presets. Every change is previewed and can be undone (Ctrl+5)."));
             pages.Children.Add(AddNav(Page.YouTube, Icons.Download, "YouTube Music", "Replace low-bitrate songs with fresh downloads from YouTube Music. Opened from Health."));
-            pages.Children.Add(AddNav(Page.Activity, Icons.Activity, "Activity", "Work in progress, recent results, problems and Undo (Ctrl+5)."));
+            pages.Children.Add(AddNav(Page.Activity, Icons.Activity, "Activity", "Work in progress, recent results, problems and Undo (Ctrl+6)."));
             nav[Page.YouTube].Button.IsVisible = false;
             var settings = AddNav(Page.Settings, Icons.Settings, "Settings", "Appearance, music and backup folders, helper programs and app updates (Ctrl+,).");
             // Where the music is, at the foot of the sidebar.
@@ -97,6 +98,7 @@ namespace AlbumArtTool
             if (page == Page.Artists && !showingArtists) { if (!busy) SwitchArtists(); return; }
             if (page == Page.Health && !EnsureHealth()) return;
             if (page == Page.Organize) EnsureOrganize();
+            if (page == Page.AddMusic) EnsureAddMusic().Refresh();
             if (page == Page.Settings) EnsureSettings().Refresh();
             if (page == Page.YouTube && youtubePage == null) return;
             ShowPage(page);
@@ -106,7 +108,7 @@ namespace AlbumArtTool
         {
             current = page;
             Control shown = page == Page.Albums || page == Page.Artists ? libraryView : page == Page.Health ? (Control)healthPage : page == Page.Organize ? (Control)organizePage :
-                page == Page.YouTube ? (Control)youtubePage : page == Page.Activity ? activityPage : page == Page.Welcome ? welcomePage : (Control)settingsPage;
+                page == Page.YouTube ? (Control)youtubePage : page == Page.Activity ? activityPage : page == Page.Welcome ? welcomePage : page == Page.AddMusic ? addMusicPage : (Control)settingsPage;
             bool changed = !shown.IsVisible;
             foreach (Control child in pageHost.Children) child.IsVisible = ReferenceEquals(child, shown);
             if (changed) FadeIn(shown);
@@ -126,7 +128,13 @@ namespace AlbumArtTool
                 case Page.Albums: pageTitle.Text = "Albums"; pageSubtitle.Text = !hasScanned ? "Scanning your music folder…" : albumsCount + (albumsCount == 1 ? " album · " : " albums · ") + tracks + (tracks == 1 ? " track" : " tracks"); break;
                 case Page.Artists: pageTitle.Text = "Artists"; pageSubtitle.Text = "Collapse guest credits into each album's main artist. Already-correct tracks are left alone."; break;
                 case Page.Health: pageTitle.Text = "Library health"; pageSubtitle.Text = "Based on the last scan. Nothing changes until you choose a fix and apply it."; break;
-                case Page.Organize: pageTitle.Text = "Organize"; pageSubtitle.Text = "Choose what to change in " + Kit.MiddleEllipsis(organizePage?.Root ?? Root, 60) + ". Every change is previewed first and every original is backed up."; break;
+                case Page.Organize:
+                    pageTitle.Text = "Organize";
+                    pageSubtitle.Text = organizePage != null && !string.Equals(organizePage.Root, Root, StringComparison.OrdinalIgnoreCase) && string.Equals(organizePage.Root, Management.AddMusic.Folder, StringComparison.OrdinalIgnoreCase)
+                        ? "Tidy up New music before it joins your library: pick your preset, preview, apply, then go back to Add music."
+                        : "Choose what to change in " + Kit.MiddleEllipsis(organizePage?.Root ?? Root, 60) + ". Every change is previewed first and every original is backed up.";
+                    break;
+                case Page.AddMusic: pageTitle.Text = "Add music"; pageSubtitle.Text = "Search YouTube Music, then add albums or songs. They download as MP3 320 into New music, where you can tidy them before adding them to your library."; break;
                 case Page.YouTube: pageTitle.Text = "Replace from YouTube Music"; pageSubtitle.Text = "Checked songs are downloaded at YouTube Music's best free quality and saved as MP3 320 with your tags and cover. Originals are backed up first."; break;
                 case Page.Activity: pageTitle.Text = "Activity"; pageSubtitle.Text = "Work in progress, recent results, problems and Undo."; break;
                 case Page.Welcome: pageTitle.Text = ""; pageSubtitle.Text = ""; break;
@@ -154,21 +162,45 @@ namespace AlbumArtTool
             return true;
         }
 
-        private OrganizePage EnsureOrganize()
+        private OrganizePage EnsureOrganize(string folder = null)
         {
-            // A new music folder gets a fresh Organize page, unless a run is still going in the old one.
-            if (organizePage != null && !organizePage.IsWorking && !string.Equals(organizePage.Root, Root, StringComparison.OrdinalIgnoreCase))
+            // Organize works on the music folder, or on New music before it joins the library. A different folder gets a
+            // fresh page, unless a run is still going in the old one.
+            folder ??= organizePage != null && organizePage.IsWorking ? organizePage.Root : Root;
+            if (organizePage != null && !organizePage.IsWorking && !string.Equals(organizePage.Root, folder, StringComparison.OrdinalIgnoreCase))
             { pageHost.Children.Remove(organizePage); organizePage = null; }
             if (organizePage == null)
             {
-                organizePage = new OrganizePage(Root,
-                    () => !busy && !queueRunning && !maintenanceRunning && pending == null && (healthPage == null || !healthPage.IsScanning),
+                bool library = string.Equals(folder, Root, StringComparison.OrdinalIgnoreCase);
+                organizePage = new OrganizePage(folder,
+                    () => !busy && !queueRunning && !maintenanceRunning && pending == null && (healthPage == null || !healthPage.IsScanning) && (library || addMusicPage == null || !addMusicPage.Queue.IsRunning),
                     value => { maintenanceRunning = value; UpdateQueueControls(); },
-                    async root => { lastEdit = null; Root = root; await ScanAsync(); }, () => Navigate(Page.Settings));
+                    library ? async root => { lastEdit = null; Root = root; await ScanAsync(); } : _ => { addMusicPage?.Refresh(); return Task.CompletedTask; },
+                    () => Navigate(Page.Settings));
                 AddPage(organizePage);
             }
             return organizePage;
         }
+
+        private AddMusicPage addMusicPage;
+        internal AddMusicPage AddMusicView => addMusicPage;
+
+        private AddMusicPage EnsureAddMusic()
+        {
+            if (addMusicPage != null) return addMusicPage;
+            var music = YouTubeMusicForTest ?? (addMusicService ??= new Online.YouTubeMusic());
+            var download = DownloadForTest ?? ((url, folder, token, progress) => Management.YtDlp.Download(Management.YtDlp.Find(), Management.Encoder.Find(), url, folder, token, progress));
+            AddMusicPage.DownloadsInjected = DownloadForTest != null;
+            var queue = new Management.DownloadQueue(() => Management.AddMusic.Folder, Management.Encoder.Find, download, music.ThumbnailAsync);
+            addMusicPage = new AddMusicPage(music, queue, () => Root, () => !busy && !queueRunning && !maintenanceRunning && (organizePage == null || !organizePage.IsWorking),
+                folder => { ShowOrganize(folder); return Task.CompletedTask; }, async () => { lastEdit = null; await ScanAsync(); }, () => Navigate(Page.Settings), info => StartExplorer(info));
+            addMusicPage.Changed += UpdateBadges;
+            AddPage(addMusicPage);
+            return addMusicPage;
+        }
+
+        private Online.YouTubeMusic addMusicService;
+        internal AddMusicPage ShowAddMusic() { Navigate(Page.AddMusic); return addMusicPage; }
 
         private SettingsPanel EnsureSettings()
         {
@@ -180,7 +212,7 @@ namespace AlbumArtTool
             return settingsPage;
         }
 
-        internal OrganizePage ShowOrganize() { EnsureOrganize(); ShowPage(Page.Organize); return organizePage; }
+        internal OrganizePage ShowOrganize(string folder = null) { EnsureOrganize(folder); ShowPage(Page.Organize); return organizePage; }
         internal SettingsPanel ShowSettings() { Navigate(Page.Settings); return settingsPage; }
 
         /// <summary>Closes the YouTube Music page (refused while songs are being replaced).</summary>
@@ -199,6 +231,8 @@ namespace AlbumArtTool
             int missing = library.Albums.Count(a => a.MissingCount > 0), artistChanges = library.Albums.Count(a => a.ArtistChangeCount > 0);
             SetBadge(Page.Albums, hasScanned && missing > 0 ? missing.ToString() : null, missing + " albums are missing cover art");
             SetBadge(Page.Artists, hasScanned && artistChanges > 0 ? artistChanges.ToString() : null, artistChanges + " albums have guest credits to collapse");
+            int downloads = addMusicPage?.Queue.Waiting ?? 0;
+            SetBadge(Page.AddMusic, downloads > 0 ? downloads.ToString() : null, downloads + " songs waiting to download");
             SetBadge(Page.Activity, QueuedCount > 0 ? QueuedCount.ToString() : issues.Count > 0 ? issues.Count.ToString() : null,
                 QueuedCount > 0 ? QueuedCount + " albums queued or in progress" : issues.Count + " problems to review", warning: QueuedCount == 0 && issues.Count > 0);
             nav[Page.Health].Button.IsEnabled = !busy && hasScanned && library.Albums.Count > 0;
