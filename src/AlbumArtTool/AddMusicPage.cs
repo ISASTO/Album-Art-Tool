@@ -51,7 +51,9 @@ namespace AlbumArtTool
         private readonly ListBox queueList = new ListBox { Classes = { "grid" } };
         private readonly EmptyState queueEmpty = new EmptyState("Download queue", withAction: false);
         private readonly TextBlock waitingText = Kit.Label("", Kit.Body, true), folderText = Kit.Label("", Kit.Small, cls: "muted"), mergeText = Kit.Label("", Kit.Small, cls: "muted");
-        private readonly Button renameNew = Kit.IconButton(Icons.Artist, "Rename artists…");
+        private readonly Button renameNew = Kit.IconButton(Icons.Artist, "Rename artists…"), coversNew = Kit.IconButton(Icons.Album, "Change covers…");
+        /// <summary>Opens the cover window for New music (set by the main window).</summary>
+        internal Func<Task> ChangeCovers;
         /// <summary>Opens the rename dialog for a folder (set by the main window).</summary>
         internal Func<string, Task> RenameArtists;
         private readonly Button tidy = Kit.IconButton(Icons.Organize, "Tidy up in Organize…"), merge = Kit.Button("Add to library", "primary"),
@@ -133,7 +135,11 @@ namespace AlbumArtTool
             renameNew.Named("Rename artists in New music").Tip("Change one or more artist names in the songs in New music to a single name, before they join your library. You preview every change in Organize first.");
             renameNew.Click += async (s, e) => { if (RenameArtists != null) await RenameArtists(AddMusic.Folder); };
             renameNew.Height = 36; renameNew.HorizontalAlignment = HorizontalAlignment.Stretch; renameNew.Margin = new Thickness(0, 6, 0, 0);
-            footer.Children.Add(waitingText); footer.Children.Add(folderRow); footer.Children.Add(tidy); footer.Children.Add(renameNew); footer.Children.Add(merge); footer.Children.Add(mergeText); footer.Children.Add(undoMerge);
+            coversNew.Named("Change covers in New music").Tip("Pick a different cover for any album in New music: suggestions from Bandcamp, Deezer and Cover Art Archive, an image file, or one dropped on the album.");
+            coversNew.Click += async (s, e) => { if (ChangeCovers != null) await ChangeCovers(); };
+            coversNew.Height = 36; coversNew.HorizontalAlignment = HorizontalAlignment.Stretch; coversNew.Margin = new Thickness(0, 6, 0, 0);
+            var edits = Kit.Grid("*,6,*", "Auto").Add(renameNew.Cell(0, 0), coversNew.Cell(0, 2));
+            footer.Children.Add(waitingText); footer.Children.Add(folderRow); footer.Children.Add(tidy); footer.Children.Add(edits); footer.Children.Add(merge); footer.Children.Add(mergeText); footer.Children.Add(undoMerge);
             var footerCard = new Border { Child = footer, BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(0, 10, 0, 0), Margin = new Thickness(0, 8, 0, 0) };
             footerCard.Brush(Border.BorderBrushProperty, "Border");
             var right = Kit.Frost(Kit.Grid("*", "Auto,*,Auto").Add(queueTitle.Cell(0, 0), queueHost.Cell(1, 0), footerCard.Cell(2, 0)), new Thickness(14, 12, 14, 12), 14);
@@ -459,7 +465,7 @@ namespace AlbumArtTool
             waitingText.Text = waiting == 0 ? "No songs waiting" : waiting + (waiting == 1 ? " song ready to add" : " songs ready to add");
             folderText.Text = Kit.MiddleEllipsis(folder, 38); folderText.Tip(folder);
             tidy.IsEnabled = waiting > 0 && !Queue.IsRunning && !merging;
-            renameNew.IsEnabled = tidy.IsEnabled;
+            renameNew.IsEnabled = coversNew.IsEnabled = tidy.IsEnabled;
             merge.IsEnabled = waiting > 0 && !Queue.IsRunning && !merging;
             merge.Tip(Queue.IsRunning ? "Wait for the downloads to finish, then add them to your library." : MergeTip);
             undoMerge.IsVisible = LibraryMerge.CanUndo; undoMerge.IsEnabled = !merging && !Queue.IsRunning;

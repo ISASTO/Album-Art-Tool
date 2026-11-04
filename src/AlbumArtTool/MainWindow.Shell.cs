@@ -233,12 +233,26 @@ namespace AlbumArtTool
             addMusicPage = new AddMusicPage(music, queue, () => Root, () => !busy && !queueRunning && !maintenanceRunning && (organizePage == null || !organizePage.IsWorking),
                 folder => { ShowOrganize(folder); return Task.CompletedTask; }, async () => { lastEdit = null; await ScanAsync(); }, () => Navigate(Page.Settings), info => StartExplorer(info));
             addMusicPage.RenameArtists = folder => ShowRenameArtistAsync(folder);
+            addMusicPage.ChangeCovers = ShowNewMusicCoversAsync;
             addMusicPage.Changed += UpdateBadges;
             AddPage(addMusicPage);
             return addMusicPage;
         }
 
         private Online.YouTubeMusic addMusicService;
+        private NewMusicCoversWindow coversWindow;
+
+        /// <summary>The cover window for the albums in New music.</summary>
+        internal async Task<NewMusicCoversWindow> ShowNewMusicCoversAsync()
+        {
+            if (coversWindow != null) { coversWindow.Activate(); return coversWindow; }
+            var window = coversWindow = new NewMusicCoversWindow(Management.AddMusic.Folder, coverSearch);
+            window.Changed += () => addMusicPage?.Refresh();
+            window.Closed += (s, e) => { if (coversWindow == window) coversWindow = null; };
+            window.Show(this);
+            await window.LoadAsync();
+            return window;
+        }
         internal AddMusicPage ShowAddMusic() { Navigate(Page.AddMusic); return addMusicPage; }
 
         private SettingsPanel EnsureSettings()

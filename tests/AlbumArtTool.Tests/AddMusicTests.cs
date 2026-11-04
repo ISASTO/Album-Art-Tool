@@ -223,6 +223,23 @@ internal static partial class Tests
                 Assert(file.Tag.FirstPerformer == "Yeule" && file.Tag.FirstAlbumArtist == "Yeule", "the downloaded songs get the new artist name before joining the library");
             Assert(File.Exists(Path.Combine(root, "Someone", "Older", "one.mp3")) && window.Library.Albums.All(a => a.Artist != "Yeule"), "the library itself is untouched");
             window.Navigate(MainWindow.Page.AddMusic);
+            Assert(Named<Button>(page, "Change covers in New music").IsEnabled, "covers can be changed in New music");
+            var covers = await window.ShowNewMusicCoversAsync(); await Settle();
+            Assert(covers.Albums.AlbumCount == 2, "the cover window lists the albums in New music");
+            covers.Albums.Select(covers.Albums.AlbumCount - 1);
+            var target = covers.Albums.SelectedAlbum;
+            string song = target.Tracks[0].Path, before = CoverEditor.Hash(song);
+            string image = Path.Combine(NewFolder("new-music-cover"), "new.png"); File.WriteAllBytes(image, MakeCover(SkiaSharp.SKColors.Gold, 900));
+            covers.Stage(image);
+            Assert(Named<Button>(covers, "Apply cover in New music").IsEnabled, "a chosen image can be applied");
+            Shot(covers, "new-music-covers.png");
+            await covers.ApplyAsync();
+            using (var file = TagLib.File.Create(song))
+                Assert(CoverEditor.Hash(song) != before && file.Tag.Pictures.Length == 1 && Size(file.Tag.Pictures[0].Data.Data).Width <= 900, "the new cover is embedded in the New music songs");
+            Assert(Named<Button>(covers, "Undo cover change").IsVisible, "the change can be undone");
+            await covers.UndoAsync();
+            Assert(CoverEditor.Hash(song) == before, "Undo puts the old cover back");
+            covers.Close();
             await page.MergeAsync();
             await Until(() => window.Library.Albums.Any(a => a.Title == "Glitch Princess"), "the added albums appear in the library", 15000);
             Assert(File.Exists(Path.Combine(root, "yeule", "softscars", "01 - x w x.mp3")) && AddMusic.Waiting(AddMusic.Folder).Count == 0 && Named<TextBlock>(page, "Add to library status").Text.StartsWith("4 files added"),
