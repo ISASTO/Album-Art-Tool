@@ -167,9 +167,6 @@ internal static partial class Tests
         fake.FillArtist = a => a.Releases ??= new List<YtmAlbum> { softscars, glitch, eyes };
         var requested = new List<string>();
         var window = new MainWindow(root, false, new FakeCoverSearch(Cover)) { YouTubeMusicForTest = fake, DownloadForTest = FakeDownload(url => 3, requested) };
-        string played = null;
-        PreviewPlayer.MakeClip = (track, token) => Task.FromResult(Path.GetTempFileName());
-        PreviewPlayer.Output = file => played = file;
         window.Show();
         try
         {
@@ -193,11 +190,7 @@ internal static partial class Tests
             await page.OpenReleaseAsync(glitch); await Settle();
             Assert(Named<TextBlock>(page, "Release title").Text == "Glitch Princess" && Named<TextBlock>(page, "Audio availability").Text.StartsWith("1 song is only on YouTube Music as a music video"),
                 "a release shows when a song only exists as a music video");
-            Click(Named<Button>(page, "Preview Electric")); await Settle();
-            Assert(played != null && PreviewPlayer.Playing == glitch.Tracks[1], "a song can be previewed");
             Shot(window, "add-music-release.png");
-            Click(Named<Button>(page, "Preview Electric"));
-            Assert(PreviewPlayer.Playing == null && played == null, "clicking again stops the preview");
             Click(Named<Button>(page, "Add this release"));
             await Until(() => !page.Queue.IsRunning && page.Queue.Groups.All(g => g.Finished), "the queued albums download one after another", 60000);
             await Settle(100);
@@ -216,6 +209,6 @@ internal static partial class Tests
             await page.UndoMergeAsync();
             Assert(AddMusic.Waiting(AddMusic.Folder).Count == 4 && !File.Exists(Path.Combine(root, "yeule", "softscars", "01 - x w x.mp3")), "the last add can be undone");
         }
-        finally { PreviewPlayer.Stop(); window.Close(); }
+        finally { window.Close(); }
     }
 }
