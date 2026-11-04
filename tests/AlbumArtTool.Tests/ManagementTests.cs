@@ -273,7 +273,7 @@ internal static partial class Tests
             using (var file = TagLib.File.Create(path)) kept = file.Tag.Pictures[Artwork.BestPictureIndex(file.Tag.Pictures)].Data.Data;
             expected = Artwork.Standardize(kept); bool resized = !ReferenceEquals(expected, kept);
             string original = CoverEditor.Hash(path), singleHash = CoverEditor.Hash(single), metadata = Metadata(path), audio = AudioHash(path); long before = new FileInfo(path).Length;
-            var options = Options(root, NewFolder("one-picture-backup-" + name)); options.EncoderPath = null; options.Shrink = true;
+            var options = Options(root, NewFolder("one-picture-backup-" + name)); options.EncoderPath = null; options.Shrink = options.SingleCover = true;
             var plan = LibraryPlanner.Build(options, CancellationToken.None);
             var work = plan.Actions.Where(a => a.HasWork).ToArray();
             string detail = string.Join(" | ", work.Select(a => Path.GetFileName(a.Source) + ": " + a.Description + " — " + a.Reason)) + " | issues: " + string.Join(";", plan.Issues);
@@ -294,7 +294,7 @@ internal static partial class Tests
         string mixed = NewFolder("one-picture-slot"), song = CopyTrack(mixed, "song.mp3");
         byte[] fit = Artwork.EmbedCover(small);
         using (var file = TagLib.File.Create(song)) { file.Tag.Pictures = new[] { P(fit, TagLib.PictureType.BackCover) }; file.Save(); }
-        var only = Options(mixed, NewFolder("one-picture-slot-backups")); only.EncoderPath = null; only.Shrink = true;
+        var only = Options(mixed, NewFolder("one-picture-slot-backups")); only.EncoderPath = null; only.Shrink = only.SingleCover = true;
         var moved = LibraryPlanner.Build(only, CancellationToken.None);
         Assert(moved.Actions.Single().Description == "One front cover" && LibraryRunner.Run(moved, CancellationToken.None).Issues.Count == 0, "a lone back cover is moved, not re-encoded");
         using (var file = TagLib.File.Create(song))
@@ -440,7 +440,7 @@ internal static partial class Tests
 
         // Artwork standard alone must not duplicate or truncate frames from the ID3v1/APE tags.
         string apeCopy = Path.Combine(NewFolder("id3-real-world-artwork"), "ape.mp3"); File.Copy(ape, apeCopy);
-        var artwork = Options(Path.GetDirectoryName(apeCopy), NewFolder("id3-real-world-artwork-backups")); artwork.EncoderPath = null; artwork.Shrink = true;
+        var artwork = Options(Path.GetDirectoryName(apeCopy), NewFolder("id3-real-world-artwork-backups")); artwork.EncoderPath = null; artwork.Shrink = artwork.SingleCover = true;
         var artPlan = LibraryPlanner.Build(artwork, CancellationToken.None);
         Assert(LibraryRunner.Run(artPlan, CancellationToken.None).Issues.Count == 0, "resizing artwork in a file with ID3v1 and APE tags succeeds: " + string.Join(";", LibraryJournal.Last().Issues));
         using (var file = TagLib.File.Create(apeCopy))
@@ -465,7 +465,7 @@ internal static partial class Tests
         }
         using (var file = TagLib.File.Create(mixed)) Assert(string.IsNullOrEmpty(file.Tag.Title), "the mixed fixture has no title in any tag");
         var hashes = new[] { latin, ape, old, damaged, mixed }.ToDictionary(p => p, CoverEditor.Hash);
-        var options = Options(root, NewFolder("id3-real-world-backups")); options.EncoderPath = null; options.Shrink = options.Id3v23 = options.TitleFromFilename = true;
+        var options = Options(root, NewFolder("id3-real-world-backups")); options.EncoderPath = null; options.Shrink = options.SingleCover = options.Id3v23 = options.TitleFromFilename = true;
         var plan = LibraryPlanner.Build(options, CancellationToken.None);
         Assert(plan.Actions.Single(a => a.Source == damaged).Reason.Contains("duplicate frame") && plan.Actions.Single(a => a.Source == ape).Reason.Contains("APE tag") &&
             !plan.Actions.Single(a => a.Source == latin).HasWork && plan.Actions.Single(a => a.Source == old).Reason.Contains("ID3v2.2"),

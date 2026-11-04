@@ -59,6 +59,33 @@ internal static partial class Tests
         Assert(plan.Actions.Where(a => a.HasWork).All(a => a.NewAlbumArtists == null), "album artists can be left as they are");
     }
 
+    private static void LargeCoverTests()
+    {
+        string root = NewFolder("large-covers"), album = Path.Combine(root, "Artist", "Album"); Directory.CreateDirectory(album);
+        string big = CopyTrack(album, "01.mp3", "Album", "Artist"), small = CopyTrack(album, "02.mp3", "Album", "Artist");
+        TagLib.IPicture Picture(byte[] data) => new TagLib.Picture(new TagLib.ByteVector(data)) { Type = TagLib.PictureType.FrontCover, MimeType = "image/jpeg" };
+        using (var file = TagLib.File.Create(big)) { file.Tag.Pictures = new[] { Picture(Artwork.Normalize(MakeCover(SkiaSharp.SKColors.Coral, 1400), 1600)) }; file.Save(); }
+        using (var file = TagLib.File.Create(small)) { file.Tag.Pictures = new[] { Picture(Artwork.EmbedCover(MakeCover(SkiaSharp.SKColors.Coral, 500))) }; file.Save(); }
+        var scan = Scanner.Scan(root, CancellationToken.None, useCache: false);
+        var check = LibraryChecks.Run(scan.Albums);
+        Assert(check.LargeCovers.Count == 1 && check.LargeCovers[0].Path == big && check.LargeCovers[0].LargestPicture == 1400, "the check finds covers larger than 600 px and their size");
+        var options = Options(root, NewFolder("large-covers-backups")); options.EncoderPath = null; options.Shrink = true;
+        var plan = LibraryPlanner.Build(options, CancellationToken.None);
+        var work = plan.Actions.Where(a => a.HasWork).ToList();
+        Assert(work.Count == 1 && work[0].Source == big && work[0].Shrink && !work[0].SinglePicture && work[0].Description == "Resize art", "Shrink covers only resizes the large one, on its own");
+        LibraryRunner.Run(plan, CancellationToken.None);
+        using (var file = TagLib.File.Create(big))
+            Assert(file.Tag.Pictures.Length == 1 && Size(file.Tag.Pictures[0].Data.Data).Width == Artwork.EmbedSide && Artwork.IsJpeg(file.Tag.Pictures[0].Data.Data), "the large cover becomes a 600 × 600 JPEG");
+        Assert(LibraryChecks.Run(Scanner.Scan(root, CancellationToken.None, useCache: false).Albums).LargeCovers.Count == 0, "afterwards no cover is over 600 px");
+
+        string presets = Path.Combine(NewFolder("old-presets"), "organize-presets.txt");
+        File.WriteAllText(presets, "Old artwork\tsquare,shrink");
+        var loaded = OrganizePresets.LoadCustom(presets).Single();
+        Assert(loaded.Options.SetEquals(new[] { OrganizePresets.Square, OrganizePresets.Shrink, OrganizePresets.SingleCover }), "a preset saved before the split keeps doing both");
+        OrganizePresets.SaveCustom(new[] { new OrganizePreset { Name = "Only shrink", Options = new System.Collections.Generic.HashSet<string> { OrganizePresets.Shrink } } }, presets);
+        Assert(OrganizePresets.LoadCustom(presets).Single().Options.SetEquals(new[] { OrganizePresets.Shrink }), "new presets keep shrink on its own");
+    }
+
     private static async Task ArtistTagsGui()
     {
         string root = ArtistTagFolder("artist-tags-gui", out string solo, out string guest, out string tagged);

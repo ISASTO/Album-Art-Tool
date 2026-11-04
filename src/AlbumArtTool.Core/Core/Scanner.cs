@@ -154,7 +154,7 @@ namespace AlbumArtTool.Core
                             AudioStart = file.InvariantStartPosition, AudioEnd = file.InvariantEndPosition,
                             SampleRate = file.Properties.AudioSampleRate, Channels = file.Properties.AudioChannels,
                             HasCover = cover != null, Stamp = stamp, PictureCount = pictures.Length,
-                            CoverPictures = pictures.Count(Artwork.IsCover), PictureSummary = Artwork.Describe(pictures)
+                            CoverPictures = pictures.Count(Artwork.IsCover), PictureSummary = Artwork.Describe(pictures), LargestPicture = Artwork.LargestSide(pictures)
                         });
                         if (target.Thumbnail == null && cover != null)
                         { target.Thumbnail = Artwork.Thumbnail(cover); target.PreviewTrack = path; }

@@ -16,7 +16,10 @@ namespace AlbumArtTool.Management
         public bool Convert { get; set; }
         public bool ConvertOtherLossy { get; set; }
         public bool Square { get; set; }
+        /// <summary>Resize embedded pictures over 600 px (or not JPEG) to a quality-88 JPEG of at most 600 px.</summary>
         public bool Shrink { get; set; }
+        /// <summary>Keep exactly one embedded picture per song, in the front-cover slot.</summary>
+        public bool SingleCover { get; set; }
         public bool Id3v23 { get; set; }
         public bool Organize { get; set; }
         public bool RenameFromTitle { get; set; }
@@ -239,12 +242,12 @@ namespace AlbumArtTool.Management
                 try
                 {
                     if (!track.Stamp.Matches(track.Path)) throw new IOException("The file changed during preview. Preview again.");
-                    if (options.Square || options.Shrink || options.Id3v23)
+                    if (options.Square || options.Shrink || options.SingleCover || options.Id3v23)
                         using (var file = TagLib.File.Create(track.Path, TagLib.ReadStyle.None))
                         {
                             var pictures = file.Tag.Pictures;
                             // The artwork standard: exactly one embedded picture, in the front-cover slot.
-                            if (options.Shrink && pictures.Length > 0 && (pictures.Length > 1 || pictures[0].Type != TagLib.PictureType.FrontCover))
+                            if (options.SingleCover && pictures.Length > 0 && (pictures.Length > 1 || pictures[0].Type != TagLib.PictureType.FrontCover))
                             {
                                 int keep = Artwork.BestPictureIndex(pictures);
                                 row.SinglePicture = true;

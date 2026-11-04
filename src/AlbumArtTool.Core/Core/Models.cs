@@ -54,6 +54,8 @@ namespace AlbumArtTool.Core
         /// <summary>Embedded pictures of any type, and how many are front/unlabeled covers.</summary>
         public int PictureCount { get; set; }
         public int CoverPictures { get; set; }
+        /// <summary>The longest side, in pixels, of the largest embedded picture (0 when there is none or it cannot be read).</summary>
+        public int LargestPicture { get; set; }
         public string PictureSummary { get; set; } = "";
         public FileStamp Stamp { get; set; }
 
