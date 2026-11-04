@@ -78,7 +78,7 @@ namespace AlbumArtTool.Management
         /// </summary>
         internal static void EncodeReplacement(string exe, string input, Track original, string temp, double expectedSeconds, CancellationToken token, Action<double> progress)
         {
-            if (exe == null) throw new IOException("Set up FFmpeg in Manage library first: it makes the MP3 320 files.");
+            if (exe == null) throw new IOException("Set up FFmpeg in Settings first: it makes the MP3 320 files.");
             var args = new List<string> { "-v", "error", "-nostdin", "-i", input, "-map", "0:a:0", "-vn", "-map_metadata", "-1", "-c:a", "libmp3lame", "-b:a", "320k",
                 "-id3v2_version", "3", "-write_id3v1", "0", "-ac", "2", "-progress", "pipe:1", "-nostats", "-y", temp };
             Run(exe, args, token, line =>

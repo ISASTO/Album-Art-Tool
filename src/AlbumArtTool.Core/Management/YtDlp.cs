@@ -97,7 +97,7 @@ namespace AlbumArtTool.Management
         {
             error = error.Trim();
             if (error.IndexOf("confirm you", StringComparison.OrdinalIgnoreCase) >= 0 || error.IndexOf("not a bot", StringComparison.OrdinalIgnoreCase) >= 0)
-                return "YouTube asked to confirm you're not a bot. Try again later, or choose a cookies file from a signed-in browser (Settings in the YouTube Music window).";
+                return "YouTube asked to confirm you're not a bot. Try again later, or choose a cookies file from a signed-in browser (Settings › YouTube cookies).";
             if (error.IndexOf("Video unavailable", StringComparison.OrdinalIgnoreCase) >= 0 || error.IndexOf("not available", StringComparison.OrdinalIgnoreCase) >= 0)
                 return "This track isn't available from YouTube Music in your region.";
             if (error.IndexOf("JavaScript", StringComparison.OrdinalIgnoreCase) >= 0 || error.IndexOf("n challenge", StringComparison.OrdinalIgnoreCase) >= 0)

@@ -12,7 +12,7 @@ namespace AlbumArtTool
 {
     internal sealed partial class MainWindow
     {
-        private readonly Button queueButton = Kit.Button("Queue (0)", "chrome");
+        private readonly Button queueButton = Kit.IconButton(Icons.Queue, "Queue (0)", "ghost");
         private readonly Queue<CoverJob> waitingJobs = new Queue<CoverJob>();
         private readonly HashSet<string> queuedAlbums = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> queueHistory = new List<string>();
@@ -146,7 +146,7 @@ namespace AlbumArtTool
 
         private void UpdateQueueDisplay()
         {
-            queueButton.Content = "Queue (" + QueuedCount + ")" + (queueRunning ? " · working" : jobsFinished > 0 ? " · " + jobsFinished + " finished" : "");
+            queueButton.SetText("Queue (" + QueuedCount + ")" + (queueRunning ? " · working" : jobsFinished > 0 ? " · " + jobsFinished + " finished" : ""));
             queueButton.Tip("View work in progress, waiting albums, and recent results. Waiting jobs can be cleared.");
             if (queueWindow == null) return;
             var lines = new List<string>();

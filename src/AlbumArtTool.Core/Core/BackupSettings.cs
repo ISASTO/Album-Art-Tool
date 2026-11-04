@@ -17,7 +17,7 @@ namespace AlbumArtTool.Core
         internal static string NewFolder(string sourceFolder)
         {
             string root = Root;
-            if (Within(root, sourceFolder)) throw new IOException("Choose a backup folder outside your music folder in Manage library.");
+            if (Within(root, sourceFolder)) throw new IOException("Choose a backup folder outside your music folder in Settings.");
             return Path.Combine(root, "edit-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N").Substring(0, 10));
         }
         internal static bool Within(string path, string parent) =>
