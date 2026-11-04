@@ -29,7 +29,7 @@ namespace AlbumArtTool
         private readonly Button fill = Kit.Button("Fill missing titles…"), onePicture = Kit.Button("Fix pictures…");
         private readonly ListBox list = new ListBox { Classes = { "grid" } };
         private readonly TextBlock summary = Kit.Label("", Kit.Body);
-        private readonly ComboBox threshold = new ComboBox { Width = 130, HorizontalAlignment = HorizontalAlignment.Right };
+        private readonly ComboBox threshold = new ComboBox { Width = 150, HorizontalAlignment = HorizontalAlignment.Right };
         private readonly Button refresh = Kit.Button("Check again", "primary"), save = Kit.Button("Save report…"), show = Kit.Button("Show selected");
         internal LibraryCheckResult Result { get; private set; }
         internal IReadOnlyList<Row> Rows { get; private set; } = Array.Empty<Row>();
