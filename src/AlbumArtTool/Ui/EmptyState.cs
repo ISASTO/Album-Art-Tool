@@ -14,7 +14,7 @@ namespace AlbumArtTool.Ui
         private readonly Button action = Kit.Button("");
         private Action onAction;
 
-        internal EmptyState()
+        internal EmptyState(string name = "Empty list", bool withAction = true)
         {
             Spacing = 8; MaxWidth = 380; HorizontalAlignment = HorizontalAlignment.Center; VerticalAlignment = VerticalAlignment.Center;
             icon.Brush(PathIcon.ForegroundProperty, "Muted"); icon.Opacity = 0.7; icon.HorizontalAlignment = HorizontalAlignment.Center; icon.Margin = new Thickness(0, 0, 0, 4);
@@ -23,11 +23,12 @@ namespace AlbumArtTool.Ui
                 text.TextAlignment = TextAlignment.Center; text.HorizontalAlignment = HorizontalAlignment.Center;
                 text.TextWrapping = TextWrapping.Wrap; text.TextTrimming = TextTrimming.None;
             }
-            title.Named("Empty list title"); message.Named("Empty list message");
+            title.Named(name + " title"); message.Named(name + " message");
             action.HorizontalAlignment = HorizontalAlignment.Center; action.Padding = new Thickness(16, 2); action.Height = 34; action.Margin = new Thickness(0, 6, 0, 0);
-            action.Named("Empty list action");
+            action.Named(name + " action");
             action.Click += (s, e) => onAction?.Invoke();
-            Children.Add(icon); Children.Add(title); Children.Add(message); Children.Add(action);
+            Children.Add(icon); Children.Add(title); Children.Add(message);
+            if (withAction) Children.Add(action);
         }
 
         internal string Title => title.Text;
