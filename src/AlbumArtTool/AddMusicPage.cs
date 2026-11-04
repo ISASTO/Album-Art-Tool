@@ -342,7 +342,7 @@ namespace AlbumArtTool
             {
                 int count = rows.Count(r => r.Checked);
                 addChecked.Content = "Add " + count + " checked " + (count == 1 ? "song" : "songs");
-                addChecked.IsEnabled = count > 0;
+                addChecked.IsEnabled = addChecked.IsVisible = count > 0;
                 bool queued = Queue.Contains(release.BrowseId);
                 addAll.IsEnabled = !queued && tracks.Any(t => !t.VideoOnly);
                 addAll.SetText(queued ? "Added" : "Add " + Kind(release).ToLowerInvariant());

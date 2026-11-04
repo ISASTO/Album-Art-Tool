@@ -155,7 +155,7 @@ internal static partial class Tests
         YtmAlbum Album(string id, string title, string kind, string year, params (string Title, bool VideoOnly)[] tracks) => new YtmAlbum
         {
             BrowseId = id, Title = title, Artist = "yeule", Kind = kind, Year = year, ThumbnailUrl = "https://lh3.googleusercontent.com/" + id + "=w544-h544", TrackCount = tracks.Length,
-            Tracks = tracks.Select((t, i) => new YtmTrack { Index = i + 1, Title = t.Title, Artists = "yeule", VideoId = (id + i + "xxxxxxxxxxx").Substring(0, 11), Duration = TimeSpan.FromSeconds(2 + i), VideoOnly = t.VideoOnly }).ToList()
+            Tracks = tracks.Select((t, i) => new YtmTrack { Index = i + 1, Title = t.Title, Artists = "yeule", VideoId = (id.Substring(6, 4) + i + "xxxxxxxxxxx").Substring(0, 11), Duration = TimeSpan.FromSeconds(2 + i), VideoOnly = t.VideoOnly }).ToList()
         };
         var glitch = Album("MPREb_glitch", "Glitch Princess", "Album", "2022", ("My Name is Nat Cmiel", false), ("Electric", false), ("Bites on My Neck", true));
         var softscars = Album("MPREb_soft", "softscars", "Album", "2023", ("x w x", false), ("software update", false));
@@ -203,7 +203,7 @@ internal static partial class Tests
             await Settle(100);
             var waiting = AddMusic.Waiting(AddMusic.Folder);
             Assert(waiting.Count == 4 && !requested.Contains(glitch.Tracks[2].Url) && Named<TextBlock>(page, "Songs in New music").Text == "4 songs ready to add",
-                "both albums are in New music, without the music-video-only song: " + string.Join(", ", page.Queue.Groups.Select(g => g.Status)));
+                "both albums are in New music, without the music-video-only song: " + string.Join(", ", page.Queue.Groups.Select(g => g.Status)) + " · " + waiting.Count + " files · " + Named<TextBlock>(page, "Songs in New music").Text);
             Assert(window.Badge(MainWindow.Page.AddMusic) == "", "the sidebar count clears when downloads finish");
             Shot(window, "add-music-queue.png");
             Click(Named<Button>(page, "Tidy up in Organize"));

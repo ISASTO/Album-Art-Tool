@@ -134,7 +134,7 @@ namespace AlbumArtTool
                         ? "Tidy up New music before it joins your library: pick your preset, preview, apply, then go back to Add music."
                         : "Choose what to change in " + Kit.MiddleEllipsis(organizePage?.Root ?? Root, 60) + ". Every change is previewed first and every original is backed up.";
                     break;
-                case Page.AddMusic: pageTitle.Text = "Add music"; pageSubtitle.Text = "Search YouTube Music, then add albums or songs. They download as MP3 320 into New music, where you can tidy them before adding them to your library."; break;
+                case Page.AddMusic: pageTitle.Text = "Add music"; pageSubtitle.Text = "Search YouTube Music and add albums or songs. They download as MP3 320 to New music, ready to tidy and add to your library."; break;
                 case Page.YouTube: pageTitle.Text = "Replace from YouTube Music"; pageSubtitle.Text = "Checked songs are downloaded at YouTube Music's best free quality and saved as MP3 320 with your tags and cover. Originals are backed up first."; break;
                 case Page.Activity: pageTitle.Text = "Activity"; pageSubtitle.Text = "Work in progress, recent results, problems and Undo."; break;
                 case Page.Welcome: pageTitle.Text = ""; pageSubtitle.Text = ""; break;
