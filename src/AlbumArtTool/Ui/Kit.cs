@@ -53,8 +53,12 @@ namespace AlbumArtTool.Ui
 
         internal static void SetIcon(Button button, string data)
         {
-            if (button.Content is Panel panel && panel.Children.OfType<PathIcon>().FirstOrDefault() is PathIcon icon)
-                try { icon.Data = StreamGeometry.Parse(data); } catch (Exception) { }
+            if (button.Content is Panel panel && panel.Children.OfType<PathIcon>().FirstOrDefault() is PathIcon icon) SetIcon(icon, data);
+        }
+
+        internal static void SetIcon(PathIcon icon, string data)
+        {
+            try { icon.Data = StreamGeometry.Parse(data); } catch (Exception) { }
         }
 
         internal static PathIcon Glyph(string data, double size = 14)

@@ -44,6 +44,7 @@ namespace AlbumArtTool
         private bool applyingPreset;
         private readonly Action openSettings;
         private readonly ListBox files = new ListBox { Classes = { "grid" } };
+        private readonly EmptyState hint = new EmptyState("Organize preview", withAction: false);
         private readonly Control optionsPanel;
         private List<FileRow> rows = new List<FileRow>();
         private Dictionary<string, List<FileRow>> mergeGroups = new Dictionary<string, List<FileRow>>();
@@ -134,7 +135,10 @@ namespace AlbumArtTool
             header.Margin = new Thickness(34, 0, 6, 0);
             var headerBar = new Border { Child = header, BorderThickness = new Thickness(0, 0, 0, 1) };
             headerBar.Brush(Border.BorderBrushProperty, "Border"); headerBar.Brush(Border.BackgroundProperty, "InsetHeader");
-            var table = Kit.Inset(Kit.Grid("*", "Auto,*").Add(headerBar.Cell(0, 0), files.Cell(1, 0))); table.Padding = new Thickness(0);
+            hint.Show(Icons.Organize, "Nothing to preview yet", "Choose a preset or the options you want, then click Preview changes. Every change is listed here before anything happens.");
+            hint.Margin = new Thickness(24);
+            var listHost = new Panel(); listHost.Children.Add(files); listHost.Children.Add(hint);
+            var table = Kit.Inset(Kit.Grid("*", "Auto,*").Add(headerBar.Cell(0, 0), listHost.Cell(1, 0))); table.Padding = new Thickness(0);
             table.Margin = new Thickness(0, 6, 0, 0);
             progress.Named("Library management progress"); progress.IsVisible = false;
             var layout = Kit.Grid("*", "Auto,Auto,Auto,Auto,*,Auto,Auto").Add(presets.Cell(0, 0), saveRow.Cell(1, 0), optionsCard.Cell(2, 0),
@@ -360,6 +364,7 @@ namespace AlbumArtTool
             mergeGroups = rows.Where(r => r.Tag is LibraryAction a && !string.IsNullOrEmpty(a.MergeGroup)).GroupBy(r => ((LibraryAction)r.Tag).MergeGroup).ToDictionary(g => g.Key, g => g.ToList());
             foreach (var row in rows) row.Toggle = OnToggle;
             files.ItemsSource = rows;
+            hint.IsVisible = rows.Count == 0 && !IsWorking;
         }
 
         // Rows stay readable and scrollable while work runs, but selections are locked.
@@ -387,6 +392,7 @@ namespace AlbumArtTool
             foreach (var check in optionBoxes.Values) check.IsEnabled = !value;
             foreach (Control control in new Control[] { preview, undo, presetChips, savePreset, deletePreset, confirmSave, presetName }) control.IsEnabled = !value;
             stop.IsEnabled = value; progress.IsVisible = value; UpdateApply(); UpdatePresetState();
+            hint.IsVisible = rows.Count == 0 && !value;
         }
 
         private void UpdateApply()

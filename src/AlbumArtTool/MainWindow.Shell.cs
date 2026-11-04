@@ -14,7 +14,7 @@ namespace AlbumArtTool
     // One window: a sidebar of pages instead of a header full of buttons and a stack of tool windows.
     internal sealed partial class MainWindow
     {
-        internal enum Page { Albums, Artists, Health, Organize, YouTube, Activity, Settings }
+        internal enum Page { Albums, Artists, Health, Organize, YouTube, Activity, Settings, Welcome }
 
         private sealed class NavItem
         {
@@ -106,8 +106,10 @@ namespace AlbumArtTool
         {
             current = page;
             Control shown = page == Page.Albums || page == Page.Artists ? libraryView : page == Page.Health ? (Control)healthPage : page == Page.Organize ? (Control)organizePage :
-                page == Page.YouTube ? (Control)youtubePage : page == Page.Activity ? activityPage : (Control)settingsPage;
+                page == Page.YouTube ? (Control)youtubePage : page == Page.Activity ? activityPage : page == Page.Welcome ? welcomePage : (Control)settingsPage;
+            bool changed = !shown.IsVisible;
             foreach (Control child in pageHost.Children) child.IsVisible = ReferenceEquals(child, shown);
+            if (changed) FadeIn(shown);
             if (viewChips != null) viewChips.IsVisible = !showingArtists;
             foreach (var item in nav.Values) item.Button.Classes.Set("selected", item.Page == page);
             closePage.IsVisible = page == Page.YouTube;
@@ -127,6 +129,7 @@ namespace AlbumArtTool
                 case Page.Organize: pageTitle.Text = "Organize"; pageSubtitle.Text = "Choose what to change in " + Kit.MiddleEllipsis(organizePage?.Root ?? Root, 60) + ". Every change is previewed first and every original is backed up."; break;
                 case Page.YouTube: pageTitle.Text = "Replace from YouTube Music"; pageSubtitle.Text = "Checked songs are downloaded at YouTube Music's best free quality and saved as MP3 320 with your tags and cover. Originals are backed up first."; break;
                 case Page.Activity: pageTitle.Text = "Activity"; pageSubtitle.Text = "Work in progress, recent results, problems and Undo."; break;
+                case Page.Welcome: pageTitle.Text = ""; pageSubtitle.Text = ""; break;
                 default: pageTitle.Text = "Settings"; pageSubtitle.Text = "Appearance, folders, helper programs and updates."; break;
             }
         }
@@ -210,6 +213,7 @@ namespace AlbumArtTool
             item.BadgeText.Text = text ?? "";
             item.Badge.Brush(Border.BackgroundProperty, warning ? "BadgeWarning" : "BadgeAccent");
             ToolTip.SetTip(item.Badge, text == null ? null : tip);
+            Avalonia.Automation.AutomationProperties.SetHelpText(item.Button, text == null ? null : tip);
         }
     }
 

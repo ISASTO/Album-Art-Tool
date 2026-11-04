@@ -33,6 +33,9 @@ internal static partial class Tests
         using (var session = HeadlessUnitTestSession.StartNew(typeof(Tests)))
             session.Dispatch(async () =>
             {
+                // Screenshots should show finished pages; the fade itself is checked in the first-run test.
+                MainWindow.PageFade = false;
+                await Gui("first run, shortcuts and empty states", FirstRunGui);
                 await Gui("main window and online covers", MainWindowGui);
                 await Gui("queue", QueueGui);
                 await Gui("track artists and duplicates", LibraryToolsGui);
@@ -125,6 +128,44 @@ internal static partial class Tests
             await OnlineGui(window, list);
         }
         finally { window.Close(); }
+    }
+
+    private static async Task FirstRunGui()
+    {
+        string root = NewFolder("first-run"), album = Path.Combine(root, "Alpha");
+        CopyTrack(Directory.CreateDirectory(album).FullName, "one.mp3", "Alpha", "First Artist");
+        MainWindow.PageFade = true;
+        var window = new MainWindow(root, false, new FakeCoverSearch(Cover), firstRun: true);
+        window.Show();
+        try
+        {
+            await Settle();
+            Assert(window.CurrentPage == MainWindow.Page.Welcome && Named<TextBlock>(window, "Music folder to scan first").Text.Length > 0 && window.Library.Albums.Count == 0,
+                "first run shows Welcome with the folder to scan, and scans nothing yet");
+            Shot(window, "welcome.png");
+            Click(ButtonStarting(window, "Scan this folder"));
+            await Until(() => window.CurrentPage == MainWindow.Page.Health, "after the first scan the app lands on Library health", 15000);
+            await Until(() => window.Health.Opacity > 0.999, "the new page fades in completely", 3000);
+            Assert(window.Badge(MainWindow.Page.Albums) == "1", "the Albums page shows how many albums are missing art");
+            var shortcuts = window.ShowShortcuts(); await Settle();
+            Assert(Named<Grid>(shortcuts, "Keyboard shortcuts").Children.Count == MainWindow.Shortcuts.Length * 2 && MainWindow.Shortcuts.Any(k => k.Keys == "F1"), "F1 lists every keyboard shortcut");
+            Shot(shortcuts, "keyboard-shortcuts.png");
+            Assert(ReferenceEquals(window.ShowShortcuts(), shortcuts), "the shortcuts window is reused");
+            shortcuts.Close();
+            window.Navigate(MainWindow.Page.Albums);
+            var search = Named<TextBox>(window, "Search albums, artists or folders");
+            search.Text = "no such album"; await Settle(250);
+            Assert(Named<TextBlock>(window, "Empty list title").Text.StartsWith("No albums match") && Named<Button>(window, "Empty list action").IsEffectivelyVisible,
+                "an empty search says why and offers to clear it");
+            Shot(window, "empty-search.png");
+            Click(Named<Button>(window, "Empty list action")); await Settle(250);
+            Assert(search.Text == "" && window.Albums.AlbumCount == 1, "Clear search restores the list");
+            Click(ButtonStarting(window, "Has art ("));
+            Assert(Named<TextBlock>(window, "Empty list title").Text == "No album has cover art yet" && Named<Button>(window, "Empty list action").Text() == "Show missing art", "an empty view points to the view that has albums");
+            Click(Named<Button>(window, "Empty list action"));
+            Assert(window.Albums.AlbumCount == 1 && ButtonStarting(window, "Missing art (").Classes.Contains("selected"), "the empty state's action switches the view");
+        }
+        finally { MainWindow.PageFade = false; window.Close(); }
     }
 
     private static async Task ThemeGui(MainWindow window)
