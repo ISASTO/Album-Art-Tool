@@ -45,6 +45,7 @@ internal static partial class Tests
                 await Gui("update handoff", UpdateHandoffGui);
                 await Gui("YouTube Music replacement", UpgradeGui);
                 await Gui("add music", AddMusicGui);
+                await Gui("artist tags", ArtistTagsGui);
                 return 0;
             }, CancellationToken.None).GetAwaiter().GetResult();
     }
@@ -406,7 +407,7 @@ internal static partial class Tests
             Assert(window.CurrentPage == MainWindow.Page.Health && dialog.IsVisible, "the Health page opens with both checks");
             Assert(dialog.Result.MissingTitles.Count == 2 && dialog.Result.MultiplePictures.Count == 2, "the tag check window opens with both checks");
             Assert(Named<TextBlock>(dialog, "Tag check summary").Text.StartsWith("2 missing a Title tag · 2 with several embedded pictures (1 with several covers)"), "the summary counts each finding");
-            Assert(dialog.Rows.Count(r => r.Header) == 3 && dialog.Rows.Count(r => r.Path != null) == 4 + dialog.Result.LowBitrateAlbums().Count, "results are grouped under the three checks");
+            Assert(dialog.Rows.Count(r => r.Header) == 4 && dialog.Rows.Count(r => r.Path != null) == 4 + dialog.Result.MissingAlbumArtists.Count + dialog.Result.LowBitrateAlbums().Count, "results are grouped under the four checks");
             var threshold = Named<ComboBox>(dialog, "Low bitrate threshold");
             threshold.SelectedIndex = Array.IndexOf(LibraryChecks.BitrateChoices, 320);
             Assert(dialog.Result.LowBitrateLimit == 320 && dialog.Result.LowBitrate.Count == 4, "changing the threshold rechecks low-bitrate songs");
@@ -525,11 +526,11 @@ internal static partial class Tests
         {
             BackupSettings.Root = backups;
             var options = Controls(form.OptionsPanel).OfType<CheckBox>().ToArray();
-            Assert(options.Length == 12 && options.All(c => c.IsChecked == false) && !ButtonStarting(form, "Preview changes").IsEnabled, "Organize starts with nothing selected and nothing to preview");
+            Assert(options.Length == 13 && options.All(c => c.IsChecked == false) && !ButtonStarting(form, "Preview changes").IsEnabled, "Organize starts with nothing selected and nothing to preview");
             var chips = Controls(form).OfType<Button>().Where(b => b.Classes.Contains("chip")).ToArray();
             Assert(chips.Select(b => b.Text()).SequenceEqual(new[] { "Tidy tags", "Standardize artwork", "Full clean-up" }), "the built-in presets are offered");
             Click(Named<Button>(form, "Preset Tidy tags"));
-            Assert(form.SelectedOptions.SequenceEqual(new[] { OrganizePresets.TitleFromName, OrganizePresets.CleanTitles, OrganizePresets.Id3v23 }) && Named<Button>(form, "Preset Tidy tags").Classes.Contains("selected"),
+            Assert(form.SelectedOptions.SequenceEqual(new[] { OrganizePresets.TitleFromName, OrganizePresets.AlbumArtistFromArtist, OrganizePresets.CleanTitles, OrganizePresets.Id3v23 }) && Named<Button>(form, "Preset Tidy tags").Classes.Contains("selected"),
                 "a preset selects exactly its options and is highlighted");
             Assert(!Named<Button>(form, "Save as preset").IsEnabled, "a built-in preset is already saved");
             Named<CheckBox>(form, "Combine multi-disc albums").IsChecked = true;
@@ -545,7 +546,7 @@ internal static partial class Tests
             Assert(form.SelectedOptions.SequenceEqual(new[] { OrganizePresets.Square, OrganizePresets.Shrink }) && !Named<Button>(form, "Delete preset").IsVisible, "presets switch the selection");
             Click(Named<Button>(form, "Preset My phone"));
             Click(Named<Button>(form, "Delete preset"));
-            Assert(form.CustomPresets.Count == 0 && OrganizePresets.LoadCustom().Count == 0 && form.SelectedOptions.Count() == 4, "a custom preset can be deleted, keeping the selection");
+            Assert(form.CustomPresets.Count == 0 && OrganizePresets.LoadCustom().Count == 0 && form.SelectedOptions.Count() == 5, "a custom preset can be deleted, keeping the selection");
             foreach (var box in options) box.IsChecked = false;
             foreach (string name in new[] { "Convert lossless to MP3 320", "Crop artwork to squares", "Remove confirmed duplicates", "Organize into Artist / Album folders", "Move old tool backups off the player" })
                 Named<CheckBox>(form, name).IsChecked = true;
@@ -554,7 +555,7 @@ internal static partial class Tests
             var checks = Controls(form.OptionsPanel).OfType<CheckBox>().ToArray();
             for (int n = 1; n <= 8; n++) reporter.Report(new ProgressInfo { Completed = n * 300, Total = 6589, Message = n * 300 + "/6589 tracks scanned · Artist/Album " + n });
             await Settle(60);
-            Assert(checks.Length == 12 && checks.All(c => !c.IsEnabled), "options are locked while work runs");
+            Assert(checks.Length == 13 && checks.All(c => !c.IsEnabled), "options are locked while work runs");
             var tipped = Controls(form).Where(c => c is CheckBox || c is Button || c is TextBox).ToArray();
             Assert(tipped.Length >= 26 && tipped.All(c => ToolTip.GetTip(c) is string tip && tip.Length >= 40),
                 "every option, button and field in Organize has detailed mouse-over text: " + string.Join(", ", tipped.Where(c => !(ToolTip.GetTip(c) is string t && t.Length >= 40)).Select(c => c.GetType().Name + " " + (c as ContentControl)?.Content)));

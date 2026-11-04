@@ -23,6 +23,12 @@ namespace AlbumArtTool.Management
         public bool CombineDiscs { get; set; }
         public bool RemoveFeaturedTitles { get; set; }
         public bool TitleFromFilename { get; set; }
+        /// <summary>Fill missing Album Artist tags from the song's (main) artist.</summary>
+        public bool AlbumArtistFromArtist { get; set; }
+        /// <summary>Rename an artist everywhere: every Artist (and, with RenameAlbumArtists, Album Artist) entry equal to RenameArtistFrom becomes RenameArtistTo.</summary>
+        public string RenameArtistFrom { get; set; }
+        public string RenameArtistTo { get; set; }
+        public bool RenameAlbumArtists { get; set; } = true;
         public bool Duplicates { get; set; }
         public bool ArchiveOldBackups { get; set; }
         /// <summary>yt-dlp, for replacements from YouTube Music.</summary>
@@ -50,6 +56,10 @@ namespace AlbumArtTool.Management
         public bool Archive { get; set; }
         public bool Selected { get; set; } = true;
         public string NewTitle { get; set; }
+        /// <summary>New Artist and Album Artist tags (null: unchanged).</summary>
+        public string[] NewArtists { get; set; }
+        public string[] NewAlbumArtists { get; set; }
+        public bool AlbumArtistFilled { get; set; }
         /// <summary>NewTitle fills a missing Title tag from the filename (rather than cleaning an existing title).</summary>
         public bool TitleFromName { get; set; }
         public bool MergeDiscs { get; set; }
@@ -64,13 +74,14 @@ namespace AlbumArtTool.Management
         public string ReplacementTitle { get; set; }
         public double ReplacementSeconds { get; set; }
         // Shrinking artwork rewrites only the picture data, through the same verified tag edit.
-        internal bool ChangesTags => MergeDiscs || NewTitle != null || Shrink || SinglePicture || Id3v23;
+        internal bool ChangesTags => MergeDiscs || NewTitle != null || NewArtists != null || NewAlbumArtists != null || Shrink || SinglePicture || Id3v23;
         internal FileStamp Stamp;
         internal bool Move => !string.IsNullOrEmpty(Target) && !Source.Equals(Target, StringComparison.OrdinalIgnoreCase);
         internal bool Rename => !string.IsNullOrEmpty(Target) && !Path.GetFileNameWithoutExtension(Source).Equals(Path.GetFileNameWithoutExtension(Target), StringComparison.Ordinal);
         internal bool HasWork => Archive || Convert || Square || Move || Rename || ChangesTags || ReplacementUrl != null;
         internal string Description => Archive ? Keeper != null ? "Remove duplicate (backed up)" : "Archive old backup" :
-            string.Join(" + ", new[] { ReplacementUrl != null ? "YouTube Music → MP3 320" : null, Convert ? "MP3 320" : null, Square ? "Square art" : null, SinglePicture ? "One front cover" : null, Shrink ? "Resize art" : null, Id3v23 ? "ID3v2.3" : null, MergeDiscs ? "Combine discs · track " + MergedTrack : null, NewTitle != null ? TitleFromName ? "Title from filename" : "Clean title" : null, Rename ? "Rename" : null,
+            string.Join(" + ", new[] { ReplacementUrl != null ? "YouTube Music → MP3 320" : null, Convert ? "MP3 320" : null, Square ? "Square art" : null, SinglePicture ? "One front cover" : null, Shrink ? "Resize art" : null, Id3v23 ? "ID3v2.3" : null, MergeDiscs ? "Combine discs · track " + MergedTrack : null, NewTitle != null ? TitleFromName ? "Title from filename" : "Clean title" : null,
+                AlbumArtistFilled ? "Album artist from artist" : NewArtists != null || NewAlbumArtists != null ? "Rename artist" : null, Rename ? "Rename" : null,
                 Move && !Path.GetDirectoryName(Source).Equals(Path.GetDirectoryName(Target), StringComparison.OrdinalIgnoreCase) ? "Move" : null }.Where(s => s != null));
     }
 
@@ -275,6 +286,31 @@ namespace AlbumArtTool.Management
                                 dest = Path.Combine(dest, "Disc " + (track.Disc > 0 ? track.Disc.ToString() : Regex.Match(parent, @"\d+").Value));
                             row.Target = Path.Combine(dest, Path.GetFileName(track.Path));
                         }
+                    }
+                    if (options.AlbumArtistFromArtist && LibraryChecks.NeedsAlbumArtist(track))
+                    {
+                        var album = albumFor[track.Path];
+                        // The album's main artist when this song credits it (guests stay on the Artist tag), otherwise the song's first artist.
+                        string main = album.MainArtist;
+                        string artist = !string.IsNullOrWhiteSpace(main) && track.Performers.Any(p => ArtistRules.Normalize(p) == ArtistRules.Normalize(main)) ? main :
+                            track.Performers.First(p => !string.IsNullOrWhiteSpace(p)).Trim();
+                        row.NewAlbumArtists = new[] { artist }; row.AlbumArtistFilled = true;
+                        AddReason(row, "Missing Album Artist tag → \"" + artist + "\" (from the artist).");
+                    }
+                    if (!string.IsNullOrWhiteSpace(options.RenameArtistFrom) && !string.IsNullOrWhiteSpace(options.RenameArtistTo))
+                    {
+                        string from = ArtistRules.Normalize(options.RenameArtistFrom), to = options.RenameArtistTo.Trim();
+                        string[] Swap(string[] names)
+                        {
+                            if (names == null || !names.Any(n => ArtistRules.Normalize(n) == from)) return null;
+                            return names.Select(n => ArtistRules.Normalize(n) == from ? to : n).Distinct(StringComparer.Ordinal).ToArray();
+                        }
+                        var artists = Swap(track.Performers);
+                        var albumArtists = options.RenameAlbumArtists ? Swap(row.NewAlbumArtists ?? track.AlbumArtists) : null;
+                        if (artists != null && !artists.SequenceEqual(track.Performers, StringComparer.Ordinal)) row.NewArtists = artists;
+                        if (albumArtists != null && !albumArtists.SequenceEqual(row.NewAlbumArtists ?? track.AlbumArtists, StringComparer.Ordinal)) row.NewAlbumArtists = albumArtists;
+                        if (row.NewArtists != null || albumArtists != null && row.NewAlbumArtists == albumArtists)
+                            AddReason(row, "Artist " + options.RenameArtistFrom.Trim() + " → " + to + (row.NewArtists != null && albumArtists != null ? " (artist and album artist)" : row.NewArtists != null ? " (artist)" : " (album artist)") + ".");
                     }
                     if (options.TitleFromFilename && !track.HasTitleTag)
                     {

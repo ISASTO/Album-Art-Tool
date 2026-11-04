@@ -226,7 +226,9 @@ namespace AlbumArtTool
             var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
             var help = Kit.IconButton(Icons.Keyboard, "", "ghost").Named("Keyboard shortcuts").Tip("Keyboard shortcuts (F1).");
             help.Click += (s, e) => ShowShortcuts();
-            foreach (var b in new[] { closePage, undo, help }) { b.Height = 34; actions.Children.Add(b); }
+            renameArtist.Named("Rename an artist").Tip("Rename an artist in every song of your library (Artist and Album Artist tags), for example to fix its spelling. You preview every change first.");
+            renameArtist.Click += (s, e) => ShowRenameArtist();
+            foreach (var b in new[] { renameArtist, closePage, undo, help }) { b.Height = 34; actions.Children.Add(b); }
             var header = Kit.Grid("*,Auto", "Auto").Add(titles.Cell(0, 0), actions.Cell(0, 1));
             header.Margin = new Thickness(0, 0, 0, 14);
 
