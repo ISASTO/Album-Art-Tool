@@ -92,7 +92,7 @@ namespace AlbumArtTool
                 "Nothing is replaced until you check songs and click Replace; originals are backed up and can be restored.");
             replace.IsEnabled = false;
             replace.Click += async (s, e) => { if (this.replaceLow != null && Result != null) await this.replaceLow(Result); };
-            threshold.Width = 128; threshold.MinHeight = 24; threshold.FontSize = 11.5; threshold.Margin = new Thickness(0, -4, 0, 0);
+            threshold.Width = 150; threshold.MinHeight = 24; threshold.FontSize = 11.5; threshold.Margin = new Thickness(0, -4, 0, 0);
             var cards = Kit.Grid("*,*,1.25*,*", "Auto").Add(
                 Card("Missing titles", titlesCount, titlesDetail, fill, () => ShowFindings(titlesHeader)).Cell(0, 0),
                 Card("Extra pictures", picturesCount, picturesDetail, onePicture, () => ShowFindings(picturesHeader)).Cell(0, 1),
