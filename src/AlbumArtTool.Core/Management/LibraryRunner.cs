@@ -272,6 +272,8 @@ namespace AlbumArtTool.Management
                             if (file.Tag.Title == row.NewTitle) break;
                         }
                 }
+                if (row?.NewArtists != null) file.Tag.Performers = row.NewArtists;
+                if (row?.NewAlbumArtists != null) file.Tag.AlbumArtists = row.NewAlbumArtists;
                 if (row?.MergeDiscs == true)
                 {
                     file.Tag.Album = row.MergedAlbum; file.Tag.Track = row.MergedTrack; file.Tag.TrackCount = row.MergedTrackCount;
@@ -295,6 +297,8 @@ namespace AlbumArtTool.Management
                 }
                 if (id3 && Id3Standard.Problem(file, id3Snapshot) is string problem) throw new IOException("The tag could not be saved as ID3v2.3 (" + problem + "). Original kept.");
                 if (row?.NewTitle != null && file.Tag.Title != row.NewTitle) throw new IOException("The format did not retain the new song title. Original kept.");
+                if (row?.NewArtists != null && !file.Tag.Performers.SequenceEqual(row.NewArtists, StringComparer.Ordinal)) throw new IOException("The format did not retain the new artist. Original kept.");
+                if (row?.NewAlbumArtists != null && row.MergeDiscs != true && !file.Tag.AlbumArtists.SequenceEqual(row.NewAlbumArtists, StringComparer.Ordinal)) throw new IOException("The format did not retain the new album artist. Original kept.");
                 if (row?.MergeDiscs == true && (file.Tag.Album != row.MergedAlbum || file.Tag.Track != row.MergedTrack || file.Tag.TrackCount != row.MergedTrackCount ||
                     file.Tag.Disc != 1 || file.Tag.DiscCount != 1 || file.Tag.FirstAlbumArtist != row.MergedArtist)) throw new IOException("The format did not retain the combined album and track numbering. Original kept.");
             }

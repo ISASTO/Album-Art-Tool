@@ -115,6 +115,7 @@ namespace AlbumArtTool
             if (viewChips != null) viewChips.IsVisible = !showingArtists;
             foreach (var item in nav.Values) item.Button.Classes.Set("selected", item.Page == page);
             closePage.IsVisible = page == Page.YouTube;
+            renameArtist.IsVisible = page == Page.Artists;
             if (page == Page.YouTube) youtubePage.Start();
             if (page == Page.Organize) organizePage.Refresh();
             UpdateHeader();
@@ -154,7 +155,7 @@ namespace AlbumArtTool
             if (healthPage == null)
             {
                 healthPage = new HealthPage(() => library.Albums.ToArray(), info => StartExplorer(info), () => ShowOrganize().PreviewTitleFill(), () => ShowOrganize().PreviewArtworkFix(),
-                    result => { ShowUpgrade(result); return Task.CompletedTask; }, () => !busy && !maintenanceRunning && library.Albums.Count > 0);
+                    result => { ShowUpgrade(result); return Task.CompletedTask; }, () => !busy && !maintenanceRunning && library.Albums.Count > 0, () => ShowOrganize().PreviewAlbumArtistFill());
                 AddPage(healthPage);
                 healthVersion = libraryVersion;
             }
@@ -181,6 +182,23 @@ namespace AlbumArtTool
             }
             return organizePage;
         }
+
+        private readonly Button renameArtist = Kit.IconButton(Icons.Artist, "Rename an artist…", "ghost");
+        private RenameArtistWindow renameWindow;
+
+        /// <summary>The rename dialog; its Preview opens Organize with the rename on its own.</summary>
+        internal RenameArtistWindow ShowRenameArtist()
+        {
+            if (renameWindow != null) { renameWindow.Activate(); return renameWindow; }
+            if (busy || library.Albums.Count == 0) return null;
+            var window = renameWindow = new RenameArtistWindow(library.Albums);
+            window.Start = (from, to, both) => _ = RenameAsync(EnsureOrganize(Root), from, to, both);
+            window.Closed += (s, e) => { if (renameWindow == window) renameWindow = null; };
+            window.Show(this);
+            return window;
+        }
+
+        private Task RenameAsync(OrganizePage page, string from, string to, bool both) { ShowPage(Page.Organize); return page.PreviewArtistRename(from, to, both); }
 
         private AddMusicPage addMusicPage;
         internal AddMusicPage AddMusicView => addMusicPage;

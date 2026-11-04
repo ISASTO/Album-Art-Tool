@@ -23,20 +23,20 @@ namespace AlbumArtTool.Management
     internal static class OrganizePresets
     {
         internal const string Convert = "convert", Compatibility = "compatibility", Square = "square", Shrink = "shrink",
-            TitleFromName = "titleFromName", CleanTitles = "cleanTitles", Id3v23 = "id3v23",
+            TitleFromName = "titleFromName", CleanTitles = "cleanTitles", Id3v23 = "id3v23", AlbumArtistFromArtist = "albumArtistFromArtist",
             Organize = "organize", Rename = "rename", Combine = "combine", Duplicates = "duplicates", Archive = "archive";
 
-        internal static readonly string[] Keys = { Convert, Compatibility, Square, Shrink, TitleFromName, CleanTitles, Id3v23, Organize, Rename, Combine, Duplicates, Archive };
+        internal static readonly string[] Keys = { Convert, Compatibility, Square, Shrink, TitleFromName, AlbumArtistFromArtist, CleanTitles, Id3v23, Organize, Rename, Combine, Duplicates, Archive };
         internal const int MaxName = 40, MaxCustom = 24;
 
         internal static string FilePath => Path.Combine(BackupSettings.AppData, "organize-presets.txt");
 
         internal static IReadOnlyList<OrganizePreset> BuiltIn { get; } = new[]
         {
-            Make("Tidy tags", "Fill missing titles from filenames, remove “feat.” credits from titles and standardize MP3 tags to ID3v2.3.", TitleFromName, CleanTitles, Id3v23),
+            Make("Tidy tags", "Fill missing titles from filenames and missing album artists from the artist, remove “feat.” credits from titles and standardize MP3 tags to ID3v2.3.", TitleFromName, AlbumArtistFromArtist, CleanTitles, Id3v23),
             Make("Standardize artwork", "Crop embedded artwork to squares and keep one front cover per song as a JPEG of at most " + Artwork.EmbedSide + " px.", Square, Shrink),
             Make("Full clean-up", "Convert lossless audio to MP3 320, standardize artwork and tags, remove confirmed duplicates, sort into Artist / Album folders and move old backups off the player.",
-                Convert, Square, Shrink, TitleFromName, Id3v23, Organize, Duplicates, Archive),
+                Convert, Square, Shrink, TitleFromName, AlbumArtistFromArtist, Id3v23, Organize, Duplicates, Archive),
         };
 
         private static OrganizePreset Make(string name, string description, params string[] options) =>

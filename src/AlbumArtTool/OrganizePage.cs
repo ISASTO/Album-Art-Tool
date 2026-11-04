@@ -26,7 +26,7 @@ namespace AlbumArtTool
         private readonly CheckBox convert = Kit.Check("Convert lossless to MP3 320", false), compatibility = Kit.Check("Also convert other lossy formats", false),
             square = Kit.Check("Crop artwork to squares", false), shrink = Kit.Check("One front cover per song (JPEG ≤ " + Artwork.EmbedSide + " px)", false),
             titleFromName = Kit.Check("Fill missing titles from filenames", false), cleanTitles = Kit.Check("Remove “feat.” credits from titles", false),
-            id3v23 = Kit.Check("Standardize MP3 tags to ID3v2.3", false),
+            id3v23 = Kit.Check("Standardize MP3 tags to ID3v2.3", false), albumArtist = Kit.Check("Fill missing album artists from the artist", false),
             organize = Kit.Check("Sort into Artist / Album folders", false), rename = Kit.Check("Rename files from their titles", false), combine = Kit.Check("Combine multi-disc albums", false),
             duplicates = Kit.Check("Remove confirmed duplicates", false), archive = Kit.Check("Move old tool backups off the player", false);
         private readonly Dictionary<string, CheckBox> optionBoxes;
@@ -75,7 +75,7 @@ namespace AlbumArtTool
             optionBoxes = new Dictionary<string, CheckBox>
             {
                 [OrganizePresets.Convert] = convert, [OrganizePresets.Compatibility] = compatibility, [OrganizePresets.Square] = square, [OrganizePresets.Shrink] = shrink,
-                [OrganizePresets.TitleFromName] = titleFromName, [OrganizePresets.CleanTitles] = cleanTitles, [OrganizePresets.Id3v23] = id3v23,
+                [OrganizePresets.TitleFromName] = titleFromName, [OrganizePresets.CleanTitles] = cleanTitles, [OrganizePresets.Id3v23] = id3v23, [OrganizePresets.AlbumArtistFromArtist] = albumArtist,
                 [OrganizePresets.Organize] = organize, [OrganizePresets.Rename] = rename, [OrganizePresets.Combine] = combine,
                 [OrganizePresets.Duplicates] = duplicates, [OrganizePresets.Archive] = archive,
             };
@@ -84,6 +84,7 @@ namespace AlbumArtTool
             shrink.Named("Standardize embedded artwork");
             titleFromName.Named("Fill missing Title tags from filenames");
             id3v23.Named("Standardize MP3 tags to ID3v2.3");
+            albumArtist.Named("Fill missing album artists from the artist");
             organize.Named("Organize into Artist / Album folders"); duplicates.Named("Remove confirmed duplicates"); archive.Named("Move old tool backups off the player");
             AddTips();
 
@@ -117,7 +118,7 @@ namespace AlbumArtTool
             helper.Children.Add(helperCaption); helper.Children.Add(encoderState); helper.Children.Add(setupEncoder);
             var options = Kit.Grid("*,*,*", "Auto,Auto").Add(
                 Group("Audio", convert, compatibility).Cell(0, 0), Group("Artwork", square, shrink).Cell(0, 1), Group("Cleanup", duplicates, archive).Cell(0, 2),
-                Group("Tags", titleFromName, cleanTitles, id3v23).Cell(1, 0), Group("Files & folders", organize, rename, combine).Cell(1, 1), helper.Cell(1, 2)).Named("Library management options");
+                Group("Tags", titleFromName, albumArtist, cleanTitles, id3v23).Cell(1, 0), Group("Files & folders", organize, rename, combine).Cell(1, 1), helper.Cell(1, 2)).Named("Library management options");
             helper.Margin = new Thickness(8, 8, 8, 4);
             optionsPanel = options;
             var optionsCard = Kit.Frost(options, new Thickness(10, 6, 10, 6), 14); optionsCard.Margin = new Thickness(0, 0, 0, 8);
@@ -141,8 +142,14 @@ namespace AlbumArtTool
             var table = Kit.Inset(Kit.Grid("*", "Auto,*").Add(headerBar.Cell(0, 0), listHost.Cell(1, 0))); table.Padding = new Thickness(0);
             table.Margin = new Thickness(0, 6, 0, 0);
             progress.Named("Library management progress"); progress.IsVisible = false;
-            var layout = Kit.Grid("*", "Auto,Auto,Auto,Auto,*,Auto,Auto").Add(presets.Cell(0, 0), saveRow.Cell(1, 0), optionsCard.Cell(2, 0),
-                state.Cell(3, 0), table.Cell(4, 0), progress.Cell(5, 0), actions.Cell(6, 0));
+            // A whole-library artist rename (started from Artists) is shown above the options until it is applied or cancelled.
+            renameText.TextWrapping = TextWrapping.Wrap; renameText.TextTrimming = TextTrimming.None; renameText.Named("Artist rename");
+            cancelRename.Tip("Stop renaming this artist. Nothing has been changed yet.");
+            cancelRename.Click += (s, e) => { SetRename(null, null, true); InvalidatePlan(); UpdatePresetState(); };
+            renameBanner = new Border { Child = Kit.Grid("*,Auto", "Auto").Add(renameText.Cell(0, 0), cancelRename.Cell(0, 1)), CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 8), Margin = new Thickness(0, 0, 0, 8), IsVisible = false };
+            renameBanner.Brush(Border.BackgroundProperty, "BadgeWarning");
+            var layout = Kit.Grid("*", "Auto,Auto,Auto,Auto,Auto,*,Auto,Auto").Add(presets.Cell(0, 0), saveRow.Cell(1, 0), renameBanner.Cell(2, 0), optionsCard.Cell(3, 0),
+                state.Cell(4, 0), table.Cell(5, 0), progress.Cell(6, 0), actions.Cell(7, 0));
             Content = layout;
             preview.Click += async (s, e) => await PreviewAsync(); apply.Click += async (s, e) => await ApplyAsync();
             undo.Click += (s, e) => PreviewUndo(); stop.Click += (s, e) => source?.Cancel();
@@ -207,7 +214,7 @@ namespace AlbumArtTool
             foreach (var chip in presetChips.Children.OfType<Button>()) chip.Classes.Set("selected", ReferenceEquals(chip.Tag, match));
             deletePreset.IsVisible = match != null && !match.BuiltIn;
             savePreset.IsEnabled = !IsWorking && SelectedOptions.Any() && match == null;
-            preview.IsEnabled = !IsWorking && SelectedOptions.Any();
+            preview.IsEnabled = !IsWorking && (SelectedOptions.Any() || renameFrom != null);
         }
 
         private void ShowSaveRow(bool show)
@@ -275,6 +282,8 @@ namespace AlbumArtTool
                 "When a song has several pictures, the best cover is kept (a front cover first, then an unlabeled picture, then the largest image) and back covers, booklet pages and duplicates are removed. " +
                 "Larger or non-JPEG pictures are re-encoded; smaller pictures are never enlarged; pictures already in that form are left byte for byte. Leftover tag padding is removed, so files really get smaller. " +
                 "Audio and other tags are unchanged." + safe);
+            albumArtist.Tip("Gives songs with an Artist but no Album Artist tag an album artist, so players keep each album together under one artist.\n\n" +
+                "The album's main artist is used when the song credits it (guests stay on the Artist tag only); otherwise the song's first artist. Songs that already have an album artist are left alone." + safe);
             titleFromName.Tip("Gives songs without a Title tag their filename as the title, without the extension or a leading track number: \"01 - Song.mp3\" → \"Song\".\n\n" +
                 "Songs that already have a title are left alone and files keep their names. Files with no tags at all get one. " +
                 "Combined with \"Remove featured artists\" the new title is cleaned too." + safe);
@@ -304,6 +313,34 @@ namespace AlbumArtTool
 
         // Used by the Check library window: select just one option and preview it.
         internal Task PreviewTitleFill() => PreviewOnly(titleFromName);
+        internal Task PreviewAlbumArtistFill() => PreviewOnly(albumArtist);
+
+        private readonly TextBlock renameText = Kit.Label("", Kit.Body);
+        private readonly Button cancelRename = Kit.Button("Cancel rename", "link");
+        private Border renameBanner;
+        private string renameFrom, renameTo;
+        private bool renameAlbumArtists = true;
+        internal string RenameFrom => renameFrom;
+
+        private void SetRename(string from, string to, bool albumArtists)
+        {
+            renameFrom = string.IsNullOrWhiteSpace(from) ? null : from.Trim(); renameTo = to?.Trim(); renameAlbumArtists = albumArtists;
+            renameBanner.IsVisible = renameFrom != null;
+            renameText.Text = renameFrom == null ? "" : "Renaming the artist “" + renameFrom + "” to “" + renameTo + "” in every song's Artist" + (albumArtists ? " and Album Artist" : "") +
+                " tag. This is a big change: review the list, then Apply. Originals are backed up and Preview Undo restores them.";
+        }
+
+        /// <summary>Previews renaming an artist across the whole library (on its own, with every other option cleared).</summary>
+        internal Task PreviewArtistRename(string from, string to, bool albumArtists)
+        {
+            if (IsWorking) return Task.CompletedTask;
+            applyingPreset = true;
+            try { foreach (var check in optionBoxes.Values) check.IsChecked = false; }
+            finally { applyingPreset = false; }
+            SetRename(from, to, albumArtists);
+            InvalidatePlan(); UpdatePresetState();
+            return PreviewAsync();
+        }
         internal Task PreviewArtworkFix() => PreviewOnly(shrink);
 
         private Task PreviewOnly(CheckBox option)
@@ -420,7 +457,8 @@ namespace AlbumArtTool
             if (IsWorking || !Ready()) return;
             encoder = Management.Encoder.Find(); UpdateEncoder();
             var options = new LibraryOptions { Root = root, BackupRoot = BackupSettings.Root, EncoderPath = encoder, Convert = convert.On(), ConvertOtherLossy = compatibility.On(),
-                Square = square.On(), Shrink = shrink.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On(), TitleFromFilename = titleFromName.On(), Id3v23 = id3v23.On() };
+                Square = square.On(), Shrink = shrink.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On(), TitleFromFilename = titleFromName.On(), Id3v23 = id3v23.On(),
+                AlbumArtistFromArtist = albumArtist.On(), RenameArtistFrom = renameFrom, RenameArtistTo = renameTo, RenameAlbumArtists = renameAlbumArtists };
             source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
             SetWorking(true); exclusive(true); SetRows(new List<FileRow>()); plan = null; undoJournal = null;
             try
@@ -477,7 +515,9 @@ namespace AlbumArtTool
             catch (Exception e) { state.Text = "Task could not finish: " + e.Message + " Completed changes can be reviewed in the backup journal."; wrote = true; }
             finally
             {
+                bool renamed = plan != null && renameFrom != null;
                 plan = null; undoJournal = null; exclusive(false); SetWorking(false); apply.IsEnabled = false;
+                if (renamed) SetRename(null, null, true);
                 if (wrote) await refreshLibrary(root);
             }
         }

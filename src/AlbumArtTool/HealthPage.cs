@@ -24,7 +24,10 @@ namespace AlbumArtTool
     {
         private readonly Func<Album[]> currentAlbums;
         private readonly Action<ProcessStartInfo> openFolder;
-        private readonly Func<Task> fillTitles, fixPictures;
+        private readonly Func<Task> fillTitles, fixPictures, fillAlbumArtists;
+        private readonly Button fillArtists = Kit.Button("Fill from artist…");
+        private readonly TextBlock albumArtistsCount = Metric(), albumArtistsDetail = Detail();
+        private int albumArtistsHeader;
         private readonly Func<LibraryCheckResult, Task> replaceLow;
         // One row of equal-weight actions; each tooltip explains what the short label does.
         private readonly Button replace = Kit.Button("Replace from YouTube Music…");
@@ -58,8 +61,11 @@ namespace AlbumArtTool
             internal bool Header, Folder;
         }
 
-        internal HealthPage(Func<Album[]> albums, Action<ProcessStartInfo> openFolder, Func<Task> fillTitles = null, Func<Task> fixPictures = null, Func<LibraryCheckResult, Task> replaceLow = null, Func<bool> canFindDuplicates = null)
+        internal HealthPage(Func<Album[]> albums, Action<ProcessStartInfo> openFolder, Func<Task> fillTitles = null, Func<Task> fixPictures = null, Func<LibraryCheckResult, Task> replaceLow = null, Func<bool> canFindDuplicates = null, Func<Task> fillAlbumArtists = null)
         {
+            this.fillAlbumArtists = fillAlbumArtists;
+            fillArtists.Named("Fill album artists from the artist").Tip("Opens Organize with only \"Fill missing album artists from the artist\" selected and previews the changes. Nothing is written until you apply them.");
+            fillArtists.Click += async (s, e) => { if (this.fillAlbumArtists != null) await this.fillAlbumArtists(); };
             currentAlbums = albums; this.openFolder = openFolder; this.fillTitles = fillTitles; this.fixPictures = fixPictures; this.replaceLow = replaceLow;
             this.canFindDuplicates = canFindDuplicates ?? (() => true);
             summary.Named("Tag check summary"); summary.Classes.Add("muted"); summary.FontSize = Kit.Small;
@@ -93,11 +99,12 @@ namespace AlbumArtTool
             replace.IsEnabled = false;
             replace.Click += async (s, e) => { if (this.replaceLow != null && Result != null) await this.replaceLow(Result); };
             threshold.Width = 150; threshold.MinHeight = 24; threshold.FontSize = 11.5; threshold.Margin = new Thickness(0, -4, 0, 0);
-            var cards = Kit.Grid("*,*,1.25*,*", "Auto").Add(
+            var cards = Kit.Grid("*,*,*,1.3*,*", "Auto").Add(
                 Card("Missing titles", titlesCount, titlesDetail, fill, () => ShowFindings(titlesHeader)).Cell(0, 0),
-                Card("Extra pictures", picturesCount, picturesDetail, onePicture, () => ShowFindings(picturesHeader)).Cell(0, 1),
-                Card("Low bitrate", bitrateCount, bitrateDetail, replace, () => ShowFindings(bitrateHeader), threshold).Cell(0, 2),
-                Card("Duplicates", duplicatesCount, duplicatesDetail, findDuplicates, () => { if (Duplicates != null) ShowView(true); }).Cell(0, 3));
+                Card("No album artist", albumArtistsCount, albumArtistsDetail, fillArtists, () => ShowFindings(albumArtistsHeader)).Cell(0, 1),
+                Card("Extra pictures", picturesCount, picturesDetail, onePicture, () => ShowFindings(picturesHeader)).Cell(0, 2),
+                Card("Low bitrate", bitrateCount, bitrateDetail, replace, () => ShowFindings(bitrateHeader), threshold).Cell(0, 3),
+                Card("Duplicates", duplicatesCount, duplicatesDetail, findDuplicates, () => { if (Duplicates != null) ShowView(true); }).Cell(0, 4));
             cards.Margin = new Thickness(-5, 0, -5, 10);
             duplicatesCount.Text = "Not checked"; duplicatesDetail.Text = "Compares audio, not just names.";
             var buttons = Kit.Grid("Auto,Auto,*,Auto", "*").Add(refresh.Cell(0, 0), save.Cell(0, 1), show.Cell(0, 3));
@@ -236,6 +243,11 @@ namespace AlbumArtTool
             if (Result.MissingTitles.Count == 0) rows.Add(new Row { Text = "Every song has a Title tag." });
             foreach (var t in Result.MissingTitles)
                 rows.Add(new Row { Text = t.Path, Detail = Describe(t), Path = t.Path, Tip = t.Path + "\nShown as: " + Path.GetFileNameWithoutExtension(t.Path) + "\nFilled title would be: " + LibraryChecks.SuggestedTitle(t.Path) });
+            albumArtistsHeader = rows.Count;
+            rows.Add(new Row { Header = true, Text = "Songs without an Album Artist tag", Detail = Count(Result.MissingAlbumArtists.Count) });
+            if (Result.MissingAlbumArtists.Count == 0) rows.Add(new Row { Text = "Every song with an artist also has an album artist." });
+            foreach (var t in Result.MissingAlbumArtists)
+                rows.Add(new Row { Text = t.Path, Detail = Describe(t), Path = t.Path, Tip = t.Path + "\nArtist: " + t.ArtistText + "\nNo Album Artist tag: players may split this album or list it under a guest artist." });
             picturesHeader = rows.Count;
             rows.Add(new Row { Header = true, Text = "Songs with more than one embedded picture", Detail = Count(Result.MultiplePictures.Count) });
             if (Result.MultiplePictures.Count == 0) rows.Add(new Row { Text = "No song has more than one embedded picture." });
@@ -264,6 +276,7 @@ namespace AlbumArtTool
             Rows = rows; list.ItemsSource = rows; show.IsEnabled = false;
             summary.Text = Summary();
             SetCard(titlesCount, titlesDetail, Result.MissingTitles.Count, "song", "Players show the filename instead of a title.", "Every song has a title.");
+            SetCard(albumArtistsCount, albumArtistsDetail, Result.MissingAlbumArtists.Count, "song", "Players may split these albums or file them under a guest.", "Every song has an album artist.");
             int covers = Result.MultiplePictures.Count(t => t.CoverPictures > 1);
             SetCard(picturesCount, picturesDetail, Result.MultiplePictures.Count, "song", covers > 0 ? covers + " with several covers: players may show any of them." : "Extra pictures make files larger.", "One picture per song.");
             SetCard(bitrateCount, bitrateDetail, albums.Count, "album", Count(Result.LowBitrate.Count) + " below " + limit + " kbps · " + (measureStatus.Length > 0 ? measureStatus : basis), "Nothing below " + limit + " kbps.");
@@ -272,8 +285,9 @@ namespace AlbumArtTool
             fill.IsEnabled = fillTitles != null && Result.MissingTitles.Count > 0;
             onePicture.IsEnabled = fixPictures != null && Result.MultiplePictures.Count > 0;
             // A card with nothing to fix shows no fix.
+            fillArtists.IsEnabled = fillAlbumArtists != null && Result.MissingAlbumArtists.Count > 0; fillArtists.IsVisible = Result.MissingAlbumArtists.Count > 0;
             fill.IsVisible = Result.MissingTitles.Count > 0; onePicture.IsVisible = Result.MultiplePictures.Count > 0; replace.IsVisible = albums.Count > 0;
-            save.IsEnabled = Result.MissingTitles.Count + Result.MultiplePictures.Count + Result.LowBitrate.Count > 0;
+            save.IsEnabled = Result.MissingTitles.Count + Result.MissingAlbumArtists.Count + Result.MultiplePictures.Count + Result.LowBitrate.Count > 0;
         }
 
         private static void SetCard(TextBlock metric, TextBlock detail, int count, string noun, string found, string clean)
