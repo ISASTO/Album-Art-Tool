@@ -2,79 +2,55 @@ name: explore
 on: { push: { branches: [ytm-explore] } }
 jobs:
   probe:
-    strategy: { matrix: { os: [ubuntu-latest, windows-latest] } }
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
-      - uses: denoland/setup-deno@v2
-        with: { deno-version: v2.x }
       - shell: bash
         run: |
-          pip install -q "yt-dlp[default]"
-          yt-dlp --version
-          echo "=== SEARCH via yt-dlp"
-          yt-dlp --flat-playlist -J "https://music.youtube.com/search?q=100+gecs+snake+eyes#albums" > search.json || true
-          python -c "import json;d=json.load(open('search.json'));print(json.dumps({k:d.get(k) for k in ['_type','title','extractor']}));[print(json.dumps(e)[:700]) for e in d.get('entries',[])[:4]]" || true
-          URL=$(python -c "import json;d=json.load(open('search.json'));print(d['entries'][0]['url'])" || true)
-          echo "=== ALBUM $URL"
-          yt-dlp --flat-playlist -J "$URL" > album.json || true
-          python -c "import json;d=json.load(open('album.json'));print(json.dumps({k:d.get(k) for k in ['_type','id','title','extractor','webpage_url','channel','uploader','artists','album','release_year','description'] }))[:1500];[print(json.dumps(e)[:600]) for e in d.get('entries',[])[:3]]" || true
-          VID=$(python -c "import json;d=json.load(open('album.json'));print(d['entries'][0]['id'])" || true)
-          echo "=== FORMATS $VID"
-          yt-dlp -F "https://music.youtube.com/watch?v=$VID" 2>&1 | tail -25 || true
-          echo "=== JSON track $VID"
-          yt-dlp -J --no-playlist "https://music.youtube.com/watch?v=$VID" > track.json 2>err.txt || true; tail -5 err.txt
-          python -c "import json;d=json.load(open('track.json'));print(json.dumps({k:d.get(k) for k in ['id','title','track','artist','artists','album','album_artist','release_year','duration','track_number']}))" || true
-          echo "=== DOWNLOAD test"
-          yt-dlp -f bestaudio -o "dl.%(ext)s" "https://music.youtube.com/watch?v=$VID" 2>&1 | tail -6 || true
-          ls -la dl.* || true
-          echo "=== INNERTUBE search"
-          curl -s -X POST "https://music.youtube.com/youtubei/v1/search?prettyPrint=false" -H "Content-Type: application/json" -H "Origin: https://music.youtube.com" -H "User-Agent: Mozilla/5.0" \
-            -d '{"context":{"client":{"clientName":"WEB_REMIX","clientVersion":"1.20251015.01.00","hl":"en","gl":"US"}},"query":"100 gecs snake eyes","params":"EgWKAQIYAWoMEA4QChADEAQQCRAF"}' > it_search.json
-          python - <<'PY'
-          import json
-          d=json.load(open('it_search.json'))
-          print(list(d.keys()))
-          def walk(o,path,out):
+          cat > probe.py <<'PY'
+          import json, urllib.request, re, sys
+          CTX={"client":{"clientName":"WEB_REMIX","clientVersion":"1.20251015.01.00","hl":"en","gl":"US"}}
+          def call(ep, body):
+              body=dict(body); body["context"]=CTX
+              req=urllib.request.Request("https://music.youtube.com/youtubei/v1/"+ep+"?prettyPrint=false", data=json.dumps(body).encode(), headers={"Content-Type":"application/json","Origin":"https://music.youtube.com","User-Agent":"Mozilla/5.0"})
+              return json.load(urllib.request.urlopen(req))
+          def walk(o,key,out):
               if isinstance(o,dict):
                   for k,v in o.items():
-                      if k=='musicResponsiveListItemRenderer': out.append((path,v))
-                      walk(v,path+'/'+k,out)
+                      if k==key: out.append(v)
+                      walk(v,key,out)
               elif isinstance(o,list):
-                  for i,v in enumerate(o): walk(v,path+'[%d]'%i,out)
-          out=[];walk(d,'',out)
-          print('items',len(out)); 
-          for p,v in out[:3]:
-              print(p)
-              print(json.dumps({'flex':[ [r.get('text') for r in c['musicResponsiveListItemFlexColumnRenderer']['text'].get('runs',[])] for c in v.get('flexColumns',[])],
-                'nav':v.get('navigationEndpoint',{}).get('browseEndpoint'),'thumb':v.get('thumbnail',{}).get('musicThumbnailRenderer',{}).get('thumbnail',{}).get('thumbnails',[{}])[-1]})[:900])
+                  for v in o: walk(v,key,out)
+              return out
+          def runs(t): return [r.get("text") for r in (t or {}).get("runs",[])]
+          for q in ["Camera Obscura My Maudlin Career","Yeule Glitch Princess","Kanye West Donda"]:
+              d=call("search",{"query":q,"params":"EgWKAQIYAWoMEA4QChADEAQQCRAF"})
+              items=walk(d,"musicResponsiveListItemRenderer",[])
+              print("== SEARCH",q,len(items))
+              for it in items[:3]:
+                  fc=[runs(c["musicResponsiveListItemFlexColumnRenderer"]["text"]) for c in it.get("flexColumns",[])]
+                  print("  ",fc, it.get("navigationEndpoint",{}).get("browseEndpoint",{}).get("browseId"))
+              bid=items[0]["navigationEndpoint"]["browseEndpoint"]["browseId"]
+              a=call("browse",{"browseId":bid})
+              h=walk(a,"musicResponsiveHeaderRenderer",[])[0]
+              print("  HEADER", {k:runs(h.get(k)) for k in ["title","subtitle","straplineTextOne","secondSubtitle"]})
+              print("  micro", a.get("microformat",{}).get("microformatDataRenderer",{}).get("urlCanonical"))
+              tracks=walk(a.get("contents"),"musicResponsiveListItemRenderer",[])
+              print("  tracks",len(tracks))
+              for t in tracks[:4]+tracks[-1:]:
+                  fc=[runs(c["musicResponsiveListItemFlexColumnRenderer"]["text"]) for c in t.get("flexColumns",[])]
+                  fx=[runs(c["musicResponsiveListItemFixedColumnRenderer"]["text"]) for c in t.get("fixedColumns",[])]
+                  we=walk(t,"watchEndpoint",[])
+                  vt=[w.get("watchEndpointMusicSupportedConfigs",{}).get("watchEndpointMusicConfig",{}).get("musicVideoType") for w in we]
+                  print("    idx",runs(t.get("index")),"flex",fc,"fixed",fx,"pid",t.get("playlistItemData"),"vt",vt, "flexnav", [walk(c,"watchEndpoint",[]) and walk(c,"watchEndpoint",[])[0].get("videoId") for c in t.get("flexColumns",[])][:1])
+              s=json.dumps(a); print("  ATV count", s.count("MUSIC_VIDEO_TYPE_ATV"), "OMV", s.count("MUSIC_VIDEO_TYPE_OMV"), "counterpart" in s)
+          # next endpoint for an OMV item, to find the audio counterpart
+          d=call("next",{"videoId":"NNpmfkBcPwg","playlistId":"OLAK5uy_lRQlA5HmGHloTKr_XvsRsyB8964iwV8jo"})
+          s=json.dumps(d); print("NEXT keys", list(d.keys()), "counterpart" in s)
+          cp=walk(d,"counterpart",[])
+          print("COUNTERPART", json.dumps(cp[:1])[:1500])
+          pr=walk(d,"playlistPanelVideoRenderer",[])
+          for p in pr[:3]: print("PANEL", runs(p.get("title")), p.get("videoId"), runs(p.get("lengthText")), walk(p,"musicVideoType",[])[:1])
           PY
-          BID=$(python -c "
-          import json
-          d=json.load(open('it_search.json'))
-          s=json.dumps(d); import re; m=re.search(r'MPREb_[A-Za-z0-9_-]+',s); print(m.group(0) if m else '')")
-          echo "=== INNERTUBE browse $BID"
-          curl -s -X POST "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false" -H "Content-Type: application/json" -H "Origin: https://music.youtube.com" -H "User-Agent: Mozilla/5.0" \
-            -d "{\"context\":{\"client\":{\"clientName\":\"WEB_REMIX\",\"clientVersion\":\"1.20251015.01.00\",\"hl\":\"en\",\"gl\":\"US\"}},\"browseId\":\"$BID\"}" > it_album.json
-          python - <<'PY'
-          import json,re
-          d=json.load(open('it_album.json'))
-          print(list(d.keys()))
-          s=json.dumps(d); print('OLAK', re.findall(r'OLAK5uy_[A-Za-z0-9_-]+',s)[:2])
-          def walk(o,path,out,key):
-              if isinstance(o,dict):
-                  for k,v in o.items():
-                      if k==key: out.append((path,v))
-                      walk(v,path+'/'+k,out,key)
-              elif isinstance(o,list):
-                  for i,v in enumerate(o): walk(v,path+'[%d]'%i,out,key)
-          for key in ['musicResponsiveHeaderRenderer','musicDetailHeaderRenderer']:
-              out=[];walk(d,'',out,key)
-              for p,v in out[:1]:
-                  print(key,p); print(json.dumps(v)[:2500])
-          out=[];walk(d,'',out,'musicResponsiveListItemRenderer')
-          print('tracks',len(out))
-          for p,v in out[:2]:
-              print(p); print(json.dumps(v)[:1800])
-          PY
+          python probe.py
