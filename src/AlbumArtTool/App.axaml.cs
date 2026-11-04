@@ -36,21 +36,27 @@ namespace AlbumArtTool
                 Task.Run(UpdateInstaller.CleanOldWorkspaces);
                 desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
                 desktop.Exit += (s, e) => ScanCache.Flush();
-                desktop.MainWindow = new MainWindow(ResolveRoot(Arguments));
+                string root = ResolveRoot(Arguments, out bool firstRun);
+                desktop.MainWindow = new MainWindow(root, firstRun: firstRun);
             }
             base.OnFrameworkInitializationCompleted();
         }
 
         // A folder on the command line wins. A portable copy keeps the original behavior of
         // opening the folder it was placed in; an installed copy reopens the last library.
-        internal static string ResolveRoot(string[] args)
+        internal static string ResolveRoot(string[] args) => ResolveRoot(args, out _);
+
+        /// <summary>The folder to open. First run: an installed copy that has never scanned a folder (it shows Welcome instead of scanning).</summary>
+        internal static string ResolveRoot(string[] args, out bool firstRun)
         {
+            firstRun = false;
             if (args.Length > 0 && Directory.Exists(args[0])) return Path.GetFullPath(args[0]);
             string baseDirectory = AppContext.BaseDirectory;
             bool installed = File.Exists(Path.Combine(baseDirectory, "unins000.exe"));
             if (!installed) return baseDirectory;
             string last = AppSettings.LastFolder;
             if (last != null) return last;
+            firstRun = true;
             string music = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
             return Directory.Exists(music) ? music : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         }

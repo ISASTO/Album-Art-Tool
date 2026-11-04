@@ -24,6 +24,8 @@ namespace AlbumArtTool.Ui
         internal const string Download = "M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z";
         internal const string Open = "M14,3V5H17.59L7.76,14.83L9.17,16.24L19,6.41V10H21V3M19,19H5V5H12V3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V12H19V19Z";
 
-        internal static readonly string[] All = { Undo, Refresh, Stop, Folder, Settings, Queue, Album, Artist, Health, Organize, Activity, Search, Duplicates, Check, Warning, Add, Delete, Download, Open };
+        internal const string Keyboard = "M19,10H17V8H19M19,13H17V11H19M16,10H14V8H16M16,13H14V11H16M16,17H8V15H16M7,10H5V8H7M7,13H5V11H7M8,11H10V13H8M8,8H10V10H8M11,11H13V13H11M11,8H13V10H11M20,5H4C2.89,5 2,5.89 2,7V17A2,2 0 0,0 4,19H20A2,2 0 0,0 22,17V7C22,5.89 21.1,5 20,5Z";
+
+        internal static readonly string[] All = { Undo, Refresh, Stop, Folder, Settings, Queue, Album, Artist, Health, Organize, Activity, Search, Duplicates, Check, Warning, Add, Delete, Download, Open, Keyboard };
     }
 }

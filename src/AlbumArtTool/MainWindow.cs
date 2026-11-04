@@ -55,7 +55,7 @@ namespace AlbumArtTool
         private readonly TextBlock coverCaption = Kit.Label("Drop a cover image here", Kit.Tiny, cls: "muted");
         private readonly TextBlock detail = Kit.Label("", Kit.Tiny, cls: "muted");
         private readonly TextBlock selectedPath = Kit.Label("", 11.33, cls: "muted");
-        private readonly TextBlock empty = Kit.Label("Scanning your music…", 16, cls: "muted");
+        private readonly EmptyState empty = new EmptyState();
         private readonly TextBlock status = Kit.Label("Ready", Kit.Small, cls: "muted");
         private readonly ProgressBar progress = new ProgressBar { Minimum = 0, Maximum = 100, Margin = new Thickness(6, 0, 8, 0) };
         private readonly TextBlock progressPercent = Kit.Label("", Kit.Small);
@@ -86,7 +86,7 @@ namespace AlbumArtTool
             }
         }
 
-        internal MainWindow(string root, bool autoScan = true, ICoverSearch onlineService = null)
+        internal MainWindow(string root, bool autoScan = true, ICoverSearch onlineService = null, bool firstRun = false)
         {
             coverSearch = onlineService ?? new CoverSearchService();
             online = new CoverSearchPanel(coverSearch) { UseCover = ApplyOnlineCoverAsync };
@@ -153,7 +153,8 @@ namespace AlbumArtTool
             AddHandler(KeyUpEvent, (s, e) => lastModifiers = e.KeyModifiers, RoutingStrategies.Tunnel);
             SetBusy(false);
             SwitchView(View.Missing);
-            if (autoScan) Opened += async (s, e) => await ScanAsync();
+            if (firstRun) ShowWelcome();
+            else if (autoScan) Opened += async (s, e) => await ScanAsync();
         }
 
         private KeyModifiers lastModifiers;
@@ -169,6 +170,14 @@ namespace AlbumArtTool
             if (control && e.Key == Key.F) { if (current != Page.Albums && current != Page.Artists) Navigate(Page.Albums); search.Focus(); e.Handled = true; }
             else if (control && e.Key >= Key.D1 && e.Key <= Key.D5) { Navigate(new[] { Page.Albums, Page.Artists, Page.Health, Page.Organize, Page.Activity }[e.Key - Key.D1]); e.Handled = true; }
             else if (control && e.Key == Key.OemComma) { Navigate(Page.Settings); e.Handled = true; }
+            else if (e.Key == Key.F1) { ShowShortcuts(); e.Handled = true; }
+            else if (control && e.Key == Key.O && !busy) { _ = ChangeFolderAsync(); e.Handled = true; }
+            else if (control && e.Key == Key.Enter && !(e.Source is TextBox) && (current == Page.Albums || current == Page.Artists))
+            {
+                if (showingArtists) { if (applyArtist.IsEnabled) _ = ApplyArtistAsync(); }
+                else if (apply.IsEnabled) _ = ApplyAsync();
+                e.Handled = true;
+            }
             else if (e.Key == Key.F5 && !busy) { _ = ScanAsync((e.KeyModifiers & KeyModifiers.Shift) != 0); e.Handled = true; }
             else if (control && e.Key == Key.Z && undo.IsEnabled && !(e.Source is TextBox)) { _ = UndoAsync(); e.Handled = true; }
             else if (e.Key == Key.Escape && pending != null && !busy) { ShowSelection(); e.Handled = true; }
@@ -187,7 +196,8 @@ namespace AlbumArtTool
             search.Width = 300; search.Margin = new Thickness(3, 0, 0, 0);
             var tabs = Kit.Grid("*,Auto", "Auto").Add(chips.Cell(0, 0), search.Cell(0, 1));
             tabs.Margin = new Thickness(0, 0, 0, 10);
-            empty.TextAlignment = TextAlignment.Center; empty.TextWrapping = TextWrapping.Wrap; empty.HorizontalAlignment = HorizontalAlignment.Center; empty.Margin = new Thickness(35);
+            empty.Margin = new Thickness(30);
+            empty.Show(Icons.Refresh, "Scanning your music…", "Albums appear when the scan finishes.");
             var listHost = new Panel(); listHost.Children.Add(albums); listHost.Children.Add(empty);
             var listLayout = Kit.Grid("*", "57,*").Add(BuildLibraryToolbar().Cell(0, 0), listHost.Cell(1, 0));
             var listPanel = Kit.Frost(listLayout, new Thickness(8, 10, 8, 10)); listPanel.Margin = new Thickness(0, 0, 16, 0);
@@ -214,7 +224,9 @@ namespace AlbumArtTool
             titles.Children.Add(pageTitle); titles.Children.Add(pageSubtitle);
             pageTitle.Named("Page title");
             var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
-            foreach (var b in new[] { closePage, undo }) { b.Height = 34; actions.Children.Add(b); }
+            var help = Kit.IconButton(Icons.Keyboard, "", "ghost").Named("Keyboard shortcuts").Tip("Keyboard shortcuts (F1).");
+            help.Click += (s, e) => ShowShortcuts();
+            foreach (var b in new[] { closePage, undo, help }) { b.Height = 34; actions.Children.Add(b); }
             var header = Kit.Grid("*,Auto", "Auto").Add(titles.Cell(0, 0), actions.Cell(0, 1));
             header.Margin = new Thickness(0, 0, 0, 14);
 
@@ -294,11 +306,12 @@ namespace AlbumArtTool
             if (current == Page.Albums) UpdateHeader();
             empty.IsVisible = visible.Count == 0;
             albums.IsVisible = !empty.IsVisible;
-            empty.Text = query.Length > 0 ? "No albums match your search." : !hasScanned ? "Scan a folder to find your albums." :
-                library.Albums.Count == 0 ? "No supported music files found.\nClick the folder above to choose the one containing your albums." : view == View.Missing ?
-                "Every album has cover art.\nOpen Has art to change a cover." : "No album has cover art yet.\nStart with Missing art.";
-            if (visible.Count == 0 && library.Albums.Count > 0 && (showingArtists || albumFilter.SelectedIndex == 1))
-                empty.Text = "No albums match this filter.\nChoose All albums in this view to review other artists.";
+            if (query.Length > 0) empty.Show(Icons.Search, "No albums match “" + query + "”", "Try part of a title, an artist or a folder name.", "Clear search", () => search.Text = "");
+            else if (!hasScanned) empty.Show(Icons.Album, "Scan a folder to find your albums", "Albums appear here once the music folder has been scanned.", "Choose music folder…", () => _ = ChangeFolderAsync());
+            else if (library.Albums.Count == 0) empty.Show(Icons.Folder, "No music found in this folder", "Choose the folder that holds your albums. MP3, FLAC, M4A, Ogg, Opus, WMA, WAV and AIFF files are found in every subfolder.", "Choose music folder…", () => _ = ChangeFolderAsync());
+            else if (showingArtists || albumFilter.SelectedIndex == 1) empty.Show(Icons.Artist, "No albums match this filter", "Every album's track artists already match its main artist.", "Show all albums", () => albumFilter.SelectedIndex = 0);
+            else if (view == View.Missing) empty.Show(Icons.Check, "Every album has cover art", "Open Has art to replace or standardize a cover.", "Show albums with art", () => SwitchView(View.HasArt));
+            else empty.Show(Icons.Album, "No album has cover art yet", "Start with the albums that are missing art.", "Show missing art", () => SwitchView(View.Missing));
             ShowSelection();
             if (previousImage != null && albums.SelectedAlbum?.Key == previousKey) SetPendingImage(previousImage);
         }
@@ -416,7 +429,7 @@ namespace AlbumArtTool
             online.SetActive(!value && !showingArtists);
             if (value && !edit)
             {
-                empty.Text = "Scanning your music…\nAlbums appear when the scan finishes.";
+                empty.Show(Icons.Refresh, "Scanning your music…", "Albums appear when the scan finishes.");
                 albums.IsVisible = false; empty.IsVisible = true;
             }
             UpdateIssues();
@@ -458,7 +471,7 @@ namespace AlbumArtTool
                 RefreshAlbums();
             }
             catch (Exception e) { issues.Add(e.Message); status.Text = "Scan could not finish. See Issues."; RefreshAlbums(); }
-            finally { SetBusy(false); ShowSelection(); }
+            finally { SetBusy(false); ShowSelection(); FinishFirstRun(); }
         }
 
         internal Task ApplyAsync()
