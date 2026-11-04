@@ -97,7 +97,8 @@ namespace AlbumArtTool
             if (page == Page.Albums && showingArtists) { if (!busy) SwitchView(view); return; }
             if (page == Page.Artists && !showingArtists) { if (!busy) SwitchArtists(); return; }
             if (page == Page.Health && !EnsureHealth()) return;
-            if (page == Page.Organize) EnsureOrganize();
+            // The sidebar returns to the folder Organize was last on (New music after Tidy up), switchable on the page.
+            if (page == Page.Organize) EnsureOrganize(organizePage != null && organizePage.WorksOnNewMusic ? organizePage.Root : null);
             if (page == Page.AddMusic) EnsureAddMusic().Refresh();
             if (page == Page.Settings) EnsureSettings().Refresh();
             if (page == Page.YouTube && youtubePage == null) return;
@@ -131,7 +132,7 @@ namespace AlbumArtTool
                 case Page.Health: pageTitle.Text = "Library health"; pageSubtitle.Text = "Based on the last scan. Nothing changes until you choose a fix and apply it."; break;
                 case Page.Organize:
                     pageTitle.Text = "Organize";
-                    pageSubtitle.Text = organizePage != null && !string.Equals(organizePage.Root, Root, StringComparison.OrdinalIgnoreCase) && string.Equals(organizePage.Root, Management.AddMusic.Folder, StringComparison.OrdinalIgnoreCase)
+                    pageSubtitle.Text = organizePage != null && organizePage.WorksOnNewMusic
                         ? "Tidy up New music before it joins your library: pick your preset, preview, apply, then go back to Add music."
                         : "Choose what to change in " + Kit.MiddleEllipsis(organizePage?.Root ?? Root, 60) + ". Every change is previewed first and every original is backed up.";
                     break;
@@ -178,12 +179,14 @@ namespace AlbumArtTool
                     value => { maintenanceRunning = value; UpdateQueueControls(); },
                     library ? async root => { lastEdit = null; Root = root; await ScanAsync(); } : _ => { addMusicPage?.Refresh(); return Task.CompletedTask; },
                     () => Navigate(Page.Settings));
+                organizePage.SwitchFolder = f => ShowOrganize(f);
                 AddPage(organizePage);
             }
+            organizePage.SetFolders(Root, Management.AddMusic.Folder);
             return organizePage;
         }
 
-        private readonly Button renameArtist = Kit.IconButton(Icons.Artist, "Rename an artist…", "ghost");
+        private readonly Button renameArtist = Kit.IconButton(Icons.Artist, "Rename artists…", "ghost");
         private RenameArtistWindow renameWindow;
 
         /// <summary>The rename dialog; its Preview opens Organize with the rename on its own.</summary>
@@ -198,7 +201,7 @@ namespace AlbumArtTool
             return window;
         }
 
-        private Task RenameAsync(OrganizePage page, string from, string to, bool both) { ShowPage(Page.Organize); return page.PreviewArtistRename(from, to, both); }
+        private Task RenameAsync(OrganizePage page, string[] from, string to, bool both) { ShowPage(Page.Organize); return page.PreviewArtistRename(from, to, both); }
 
         private AddMusicPage addMusicPage;
         internal AddMusicPage AddMusicView => addMusicPage;

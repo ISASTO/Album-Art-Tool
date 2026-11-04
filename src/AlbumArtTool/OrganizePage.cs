@@ -148,7 +148,19 @@ namespace AlbumArtTool
             cancelRename.Click += (s, e) => { SetRename(null, null, true); InvalidatePlan(); UpdatePresetState(); };
             renameBanner = new Border { Child = Kit.Grid("*,Auto", "Auto").Add(renameText.Cell(0, 0), cancelRename.Cell(0, 1)), CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 8), Margin = new Thickness(0, 0, 0, 8), IsVisible = false };
             renameBanner.Brush(Border.BackgroundProperty, "BadgeWarning");
-            var layout = Kit.Grid("*", "Auto,Auto,Auto,Auto,Auto,*,Auto,Auto").Add(presets.Cell(0, 0), saveRow.Cell(1, 0), renameBanner.Cell(2, 0), optionsCard.Cell(3, 0),
+            // Which folder this works on: the music folder, or New music before it joins the library.
+            libraryTarget.Named("Organize the music folder").Tip("Work on your music folder: every option and preset changes the songs in your library.");
+            newTarget.Named("Organize New music").Tip("Work on the New music folder (your downloads from Add music) before they join the library.");
+            libraryTarget.Click += (s, e) => { if (!IsWorking && libraryFolder != null) SwitchFolder?.Invoke(libraryFolder); };
+            newTarget.Click += (s, e) => { if (!IsWorking && newMusicFolder != null) SwitchFolder?.Invoke(newMusicFolder); };
+            var targets = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+            targets.Children.Add(libraryTarget); targets.Children.Add(newTarget);
+            folderText.Named("Organize folder"); folderText.Margin = new Thickness(12, 0, 0, 0);
+            var folderLabel = Kit.Caption("Folder"); folderLabel.Margin = new Thickness(2, 0, 12, 0);
+            var target = Kit.Grid("Auto,Auto,*", "Auto").Add(folderLabel.Cell(0, 0), targets.Cell(0, 1), folderText.Cell(0, 2));
+            target.Margin = new Thickness(0, 0, 0, 8);
+            var top = new StackPanel(); top.Children.Add(target); top.Children.Add(presets);
+            var layout = Kit.Grid("*", "Auto,Auto,Auto,Auto,Auto,*,Auto,Auto").Add(top.Cell(0, 0), saveRow.Cell(1, 0), renameBanner.Cell(2, 0), optionsCard.Cell(3, 0),
                 state.Cell(4, 0), table.Cell(5, 0), progress.Cell(6, 0), actions.Cell(7, 0));
             Content = layout;
             preview.Click += async (s, e) => await PreviewAsync(); apply.Click += async (s, e) => await ApplyAsync();
@@ -161,6 +173,23 @@ namespace AlbumArtTool
         }
 
         internal string Root => root;
+
+        private readonly Button libraryTarget = Kit.IconButton(Icons.Folder, "Music folder", "chip"), newTarget = Kit.IconButton(Icons.AddMusic, "New music", "chip");
+        private readonly TextBlock folderText = Kit.Label("", Kit.Small, cls: "muted");
+        private string libraryFolder, newMusicFolder;
+        /// <summary>Opens Organize on another folder (set by the main window).</summary>
+        internal Action<string> SwitchFolder;
+
+        /// <summary>The two folders Organize can work on; the one this page works on is highlighted.</summary>
+        internal void SetFolders(string library, string newMusic)
+        {
+            libraryFolder = library; newMusicFolder = newMusic;
+            bool isNew = newMusic != null && string.Equals(root, newMusic, StringComparison.OrdinalIgnoreCase);
+            bool isLibrary = library != null && string.Equals(root, library, StringComparison.OrdinalIgnoreCase);
+            libraryTarget.Classes.Set("selected", isLibrary); newTarget.Classes.Set("selected", isNew);
+            folderText.Text = Kit.MiddleEllipsis(root, 70); folderText.Tip(root);
+        }
+        internal bool WorksOnNewMusic => newMusicFolder != null && string.Equals(root, newMusicFolder, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>Called when the page is shown: picks up an FFmpeg set up in Settings meanwhile.</summary>
         internal void Refresh() { if (!IsWorking) { encoder = Management.Encoder.Find(); UpdateEncoder(); } }
@@ -318,20 +347,25 @@ namespace AlbumArtTool
         private readonly TextBlock renameText = Kit.Label("", Kit.Body);
         private readonly Button cancelRename = Kit.Button("Cancel rename", "link");
         private Border renameBanner;
-        private string renameFrom, renameTo;
+        private string[] renameFrom;
+        private string renameTo;
         private bool renameAlbumArtists = true;
-        internal string RenameFrom => renameFrom;
+        internal string[] RenameFrom => renameFrom;
 
-        private void SetRename(string from, string to, bool albumArtists)
+        private void SetRename(IEnumerable<string> from, string to, bool albumArtists)
         {
-            renameFrom = string.IsNullOrWhiteSpace(from) ? null : from.Trim(); renameTo = to?.Trim(); renameAlbumArtists = albumArtists;
+            var names = from?.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.Trim()).ToArray();
+            renameFrom = names == null || names.Length == 0 ? null : names; renameTo = to?.Trim(); renameAlbumArtists = albumArtists;
             renameBanner.IsVisible = renameFrom != null;
-            renameText.Text = renameFrom == null ? "" : "Renaming the artist “" + renameFrom + "” to “" + renameTo + "” in every song's Artist" + (albumArtists ? " and Album Artist" : "") +
+            string list = renameFrom == null ? "" : renameFrom.Length == 1 ? "the artist “" + renameFrom[0] + "”" : renameFrom.Length + " artists (" + string.Join(", ", renameFrom.Select(n => "“" + n + "”")) + ")";
+            renameText.Text = renameFrom == null ? "" : "Renaming " + list + " to “" + renameTo + "” in every song's Artist" + (albumArtists ? " and Album Artist" : "") +
                 " tag. This is a big change: review the list, then Apply. Originals are backed up and Preview Undo restores them.";
         }
 
-        /// <summary>Previews renaming an artist across the whole library (on its own, with every other option cleared).</summary>
-        internal Task PreviewArtistRename(string from, string to, bool albumArtists)
+        /// <summary>Previews renaming artists across the whole folder (on its own, with every other option cleared).</summary>
+        internal Task PreviewArtistRename(string from, string to, bool albumArtists) => PreviewArtistRename(new[] { from }, to, albumArtists);
+
+        internal Task PreviewArtistRename(IEnumerable<string> from, string to, bool albumArtists)
         {
             if (IsWorking) return Task.CompletedTask;
             applyingPreset = true;
@@ -427,7 +461,7 @@ namespace AlbumArtTool
         {
             IsWorking = value;
             foreach (var check in optionBoxes.Values) check.IsEnabled = !value;
-            foreach (Control control in new Control[] { preview, undo, presetChips, savePreset, deletePreset, confirmSave, presetName }) control.IsEnabled = !value;
+            foreach (Control control in new Control[] { preview, undo, presetChips, savePreset, deletePreset, confirmSave, presetName, libraryTarget, newTarget }) control.IsEnabled = !value;
             stop.IsEnabled = value; progress.IsVisible = value; UpdateApply(); UpdatePresetState();
             hint.IsVisible = rows.Count == 0 && !value;
         }
@@ -458,7 +492,7 @@ namespace AlbumArtTool
             encoder = Management.Encoder.Find(); UpdateEncoder();
             var options = new LibraryOptions { Root = root, BackupRoot = BackupSettings.Root, EncoderPath = encoder, Convert = convert.On(), ConvertOtherLossy = compatibility.On(),
                 Square = square.On(), Shrink = shrink.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On(), TitleFromFilename = titleFromName.On(), Id3v23 = id3v23.On(),
-                AlbumArtistFromArtist = albumArtist.On(), RenameArtistFrom = renameFrom, RenameArtistTo = renameTo, RenameAlbumArtists = renameAlbumArtists };
+                AlbumArtistFromArtist = albumArtist.On(), RenameArtistsFrom = renameFrom, RenameArtistTo = renameTo, RenameAlbumArtists = renameAlbumArtists };
             source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
             SetWorking(true); exclusive(true); SetRows(new List<FileRow>()); plan = null; undoJournal = null;
             try

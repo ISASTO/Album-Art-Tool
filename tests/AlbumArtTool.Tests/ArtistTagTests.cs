@@ -39,7 +39,7 @@ internal static partial class Tests
         using (var file = TagLib.File.Create(solo)) Assert(file.Tag.AlbumArtists.Length == 0, "Undo removes the filled album artist again");
 
         // Renaming an artist everywhere, whatever its letter case; guests keep their credit.
-        options = Options(root, NewFolder("artist-rename-backups")); options.RenameArtistFrom = "benee"; options.RenameArtistTo = "BENEE ✿";
+        options = Options(root, NewFolder("artist-rename-backups")); options.RenameArtistsFrom = new[] { "benee" }; options.RenameArtistTo = "BENEE ✿";
         plan = LibraryPlanner.Build(options, CancellationToken.None);
         var renames = plan.Actions.Where(a => a.HasWork).ToList();
         Assert(renames.Count == 3 && renames.Single(a => a.Source == guest).NewArtists.SequenceEqual(new[] { "BENEE ✿", "Grouplove" }) &&
@@ -50,6 +50,10 @@ internal static partial class Tests
         Assert(LibraryRunner.Undo(journal, CancellationToken.None) == 3, "the rename can be undone");
         using (var file = TagLib.File.Create(tagged)) Assert(file.Tag.FirstPerformer == "Benee", "Undo restores the original spelling");
 
+        options.RenameArtistsFrom = new[] { "BENEE", "Grouplove" }; options.RenameArtistTo = "One Name";
+        plan = LibraryPlanner.Build(options, CancellationToken.None);
+        Assert(plan.Actions.Single(a => a.Source == guest).NewArtists.SequenceEqual(new[] { "One Name" }) && plan.Actions.Count(a => a.HasWork) == 3, "several artists can become one name");
+        options.RenameArtistsFrom = new[] { "benee" }; options.RenameArtistTo = "BENEE ✿";
         options.RenameAlbumArtists = false;
         plan = LibraryPlanner.Build(options, CancellationToken.None);
         Assert(plan.Actions.Where(a => a.HasWork).All(a => a.NewAlbumArtists == null), "album artists can be left as they are");
@@ -73,11 +77,13 @@ internal static partial class Tests
             Click(Named<Button>(window, "Artists"));
             Assert(Named<Button>(window, "Rename an artist").IsVisible, "Artists offers renaming an artist everywhere");
             var dialog = window.ShowRenameArtist(); await Settle();
+            dialog.Fill(new[] { "benee", "Grouplove" }, "One Name", true); await Settle();
+            Assert(dialog.Choices.Count(c => c.Checked) == 2 && Named<TextBlock>(dialog, "Rename summary").Text.Contains("“Grouplove” become “One Name”"), "several artists can be ticked to become one name: " + Named<TextBlock>(dialog, "Rename summary").Text);
+            Shot(dialog, "rename-artists.png");
             dialog.Fill("benee", "BENEE ✿", true); await Settle();
             Assert(Named<TextBlock>(dialog, "Rename summary").Text.StartsWith("Changes 3 songs in ") && Named<TextBlock>(dialog, "Rename warning").Text.StartsWith("This is a big change"),
                 "the rename says how many songs change and warns first: " + Named<TextBlock>(dialog, "Rename summary").Text);
             Assert(dialog.Count("BENEE", false).Songs == 3, "names match whatever their letter case");
-            Shot(dialog, "rename-artist.png");
             Click(ButtonStarting(dialog, "Preview changes to 3 songs"));
             await Until(() => !window.Organize.IsWorking && window.Organize.CurrentPlan != null && window.Organize.RenameFrom != null, "the rename is previewed in Organize", 20000);
             Assert(window.CurrentPage == MainWindow.Page.Organize && window.Organize.CurrentPlan.Actions.Count(a => a.HasWork) == 3 && Named<TextBlock>(window, "Artist rename").IsEffectivelyVisible,

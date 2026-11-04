@@ -25,8 +25,8 @@ namespace AlbumArtTool.Management
         public bool TitleFromFilename { get; set; }
         /// <summary>Fill missing Album Artist tags from the song's (main) artist.</summary>
         public bool AlbumArtistFromArtist { get; set; }
-        /// <summary>Rename an artist everywhere: every Artist (and, with RenameAlbumArtists, Album Artist) entry equal to RenameArtistFrom becomes RenameArtistTo.</summary>
-        public string RenameArtistFrom { get; set; }
+        /// <summary>Rename artists everywhere: every Artist (and, with RenameAlbumArtists, Album Artist) entry matching one of RenameArtistsFrom becomes RenameArtistTo.</summary>
+        public string[] RenameArtistsFrom { get; set; }
         public string RenameArtistTo { get; set; }
         public bool RenameAlbumArtists { get; set; } = true;
         public bool Duplicates { get; set; }
@@ -297,20 +297,22 @@ namespace AlbumArtTool.Management
                         row.NewAlbumArtists = new[] { artist }; row.AlbumArtistFilled = true;
                         AddReason(row, "Missing Album Artist tag → \"" + artist + "\" (from the artist).");
                     }
-                    if (!string.IsNullOrWhiteSpace(options.RenameArtistFrom) && !string.IsNullOrWhiteSpace(options.RenameArtistTo))
+                    if (options.RenameArtistsFrom != null && options.RenameArtistsFrom.Any(n => !string.IsNullOrWhiteSpace(n)) && !string.IsNullOrWhiteSpace(options.RenameArtistTo))
                     {
-                        string from = ArtistRules.Normalize(options.RenameArtistFrom), to = options.RenameArtistTo.Trim();
+                        var from = new HashSet<string>(options.RenameArtistsFrom.Where(n => !string.IsNullOrWhiteSpace(n)).Select(ArtistRules.Normalize), StringComparer.Ordinal);
+                        string to = options.RenameArtistTo.Trim();
                         string[] Swap(string[] names)
                         {
-                            if (names == null || !names.Any(n => ArtistRules.Normalize(n) == from)) return null;
-                            return names.Select(n => ArtistRules.Normalize(n) == from ? to : n).Distinct(StringComparer.Ordinal).ToArray();
+                            if (names == null || !names.Any(n => from.Contains(ArtistRules.Normalize(n)))) return null;
+                            return names.Select(n => from.Contains(ArtistRules.Normalize(n)) ? to : n).Distinct(StringComparer.Ordinal).ToArray();
                         }
+                        string fromText = string.Join(", ", options.RenameArtistsFrom.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.Trim()));
                         var artists = Swap(track.Performers);
                         var albumArtists = options.RenameAlbumArtists ? Swap(row.NewAlbumArtists ?? track.AlbumArtists) : null;
                         if (artists != null && !artists.SequenceEqual(track.Performers, StringComparer.Ordinal)) row.NewArtists = artists;
                         if (albumArtists != null && !albumArtists.SequenceEqual(row.NewAlbumArtists ?? track.AlbumArtists, StringComparer.Ordinal)) row.NewAlbumArtists = albumArtists;
                         if (row.NewArtists != null || albumArtists != null && row.NewAlbumArtists == albumArtists)
-                            AddReason(row, "Artist " + options.RenameArtistFrom.Trim() + " → " + to + (row.NewArtists != null && albumArtists != null ? " (artist and album artist)" : row.NewArtists != null ? " (artist)" : " (album artist)") + ".");
+                            AddReason(row, "Artist " + fromText + " → " + to + (row.NewArtists != null && albumArtists != null ? " (artist and album artist)" : row.NewArtists != null ? " (artist)" : " (album artist)") + ".");
                     }
                     if (options.TitleFromFilename && !track.HasTitleTag)
                     {
