@@ -157,16 +157,24 @@ namespace AlbumArtTool.Management
                 var audio = Find(track);
                 if (audio == null) { await Ask(who + " " + title); audio = Find(track); }
                 if (audio == null) { await Ask(title + " " + AlbumTitle(album.Title) + " " + who); audio = Find(track); }
-                if (audio != null)
-                {
-                    track.ReplacedVideoId = track.VideoId; track.VideoId = audio.VideoId; track.MusicVideo = false;
-                    if (audio.Duration > TimeSpan.Zero) track.Duration = audio.Duration;
-                    if (audio.AlbumBrowseId != album.BrowseId) track.AlbumTitle = audio.AlbumTitle;
-                }
-                else track.VideoOnly = true;
+                if (audio == null) { await Ask(who + " " + AlbumTitle(album.Title) + " " + title); audio = Find(track); }
+                if (audio != null) Use(track, audio);
                 progress?.Report((++done, videos.Count));
             }
+            // Later searches often surface songs an earlier one missed.
+            foreach (var track in videos.Where(t => t.MusicVideo))
+            {
+                var audio = Find(track);
+                if (audio != null) Use(track, audio); else track.VideoOnly = true;
+            }
             album.AudioResolved = true;
+
+            void Use(YtmTrack track, YtmTrack audio)
+            {
+                track.ReplacedVideoId = track.VideoId; track.VideoId = audio.VideoId; track.MusicVideo = false;
+                if (audio.Duration > TimeSpan.Zero) track.Duration = audio.Duration;
+                if (audio.AlbumBrowseId != album.BrowseId) track.AlbumTitle = audio.AlbumTitle;
+            }
         }
 
         private static bool ArtistMatches(string found, string wanted) =>

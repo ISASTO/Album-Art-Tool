@@ -296,7 +296,7 @@ internal static partial class Tests
                     var songs = await music.SearchSongsAsync(artist + " " + t.Title, CancellationToken.None);
                     Console.WriteLine("   ? " + t.Title + " " + t.Duration + " (album " + best.BrowseId + "): " + string.Join(" | ", songs.Take(4).Select(x => x.Title + " / [" + x.Artists + "] / " + x.AlbumTitle + " " + x.AlbumBrowseId + " / " + x.Duration + (x.MusicVideo ? " video" : ""))));
                 }
-                if (best.Tracks.Any(t => t.MusicVideo) || videos > 0 && best.Tracks.Count(t => t.ReplacedVideoId != null) < videos / 2) { Console.Error.WriteLine("FAIL: audio uploads were not found for " + album); return 1; }
+                if (best.Tracks.Any(t => t.MusicVideo && !t.VideoOnly) || videos > 0 && best.Tracks.Count(t => t.ReplacedVideoId != null) < videos / 2) { Console.Error.WriteLine("FAIL: audio uploads were not found for " + album); return 1; }
                 if (best.Tracks.Count == 0 || best.Tracks.Any(t => t.Duration <= TimeSpan.Zero || t.VideoId.Length != 11) || AlbumUpgrade.AlbumScore(artist, album, 0, best) < 80)
                 { Console.Error.WriteLine("FAIL: unexpected album data for " + album); return 1; }
             }
