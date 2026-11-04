@@ -290,6 +290,11 @@ internal static partial class Tests
                 await AlbumUpgrade.ResolveAudioAsync(music, best, artist, CancellationToken.None);
                 Console.WriteLine("   " + videos + " music-video entries → " + best.Tracks.Count(t => t.ReplacedVideoId != null) + " audio uploads found, " + best.Tracks.Count(t => t.VideoOnly) + " video only");
                 foreach (var t in best.Tracks.Take(4)) Console.WriteLine("   " + t.Index + ". " + t.Title + " " + t.Duration + (t.ReplacedVideoId != null ? " (audio upload " + t.VideoId + " instead of video " + t.ReplacedVideoId + (t.AlbumTitle.Length > 0 ? ", from " + t.AlbumTitle : "") + ")" : t.VideoOnly ? " (video only)" : "") + " " + t.Url);
+                foreach (var t in best.Tracks.Where(t => t.VideoOnly).Take(3))
+                {
+                    var songs = await music.SearchSongsAsync(artist + " " + t.Title, CancellationToken.None);
+                    Console.WriteLine("   ? " + t.Title + " " + t.Duration + " (album " + best.BrowseId + "): " + string.Join(" | ", songs.Take(4).Select(x => x.Title + " / [" + x.Artists + "] / " + x.AlbumTitle + " " + x.AlbumBrowseId + " / " + x.Duration + (x.MusicVideo ? " video" : ""))));
+                }
                 if (best.Tracks.Any(t => t.MusicVideo) || videos > 0 && best.Tracks.Count(t => t.ReplacedVideoId != null) < videos / 2) { Console.Error.WriteLine("FAIL: audio uploads were not found for " + album); return 1; }
                 if (best.Tracks.Count == 0 || best.Tracks.Any(t => t.Duration <= TimeSpan.Zero || t.VideoId.Length != 11) || AlbumUpgrade.AlbumScore(artist, album, 0, best) < 80)
                 { Console.Error.WriteLine("FAIL: unexpected album data for " + album); return 1; }
