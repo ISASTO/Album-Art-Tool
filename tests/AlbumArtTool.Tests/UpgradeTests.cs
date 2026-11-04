@@ -100,7 +100,7 @@ internal static partial class Tests
         requested?.Add(url);
         Directory.CreateDirectory(folder);
         string path = Path.Combine(folder, url.Substring(url.LastIndexOf('=') + 1) + ".m4a");
-        Encoder.Run(Encoder.Find(), new[] { "-v", "error", "-nostdin", "-y", "-f", "lavfi", "-i", "sine=frequency=523:duration=" + seconds(url).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        Encoder.Run(Encoder.Find(), new[] { "-v", "error", "-nostdin", "-y", "-f", "lavfi", "-i", "sine=frequency=523:duration=" + Math.Max(0.5, seconds(url)).ToString(System.Globalization.CultureInfo.InvariantCulture),
             "-ac", "2", "-c:a", "aac", "-b:a", "160k", path }, token, timeoutSeconds: 120);
         progress?.Invoke(1);
         return path;
@@ -119,7 +119,7 @@ internal static partial class Tests
         var hashes = new[] { mp3, m4a, clash }.ToDictionary(p => p, CoverEditor.Hash);
         string Remote(Track t) => Path.GetFileNameWithoutExtension(t.Path).Replace(" ", "");
         var pairings = scanned.Where(t => !t.Path.EndsWith("Honey in the Sun.mp3")).Select(t => new TrackPairing { Local = t, Low = true, Selected = true, LocalKbps = 96, Quality = PairQuality.Exact,
-            Remote = new YtmTrack { Title = t.Title, VideoId = Remote(t), Duration = TimeSpan.FromSeconds(Math.Round(t.Duration.TotalSeconds)) } }).ToList();
+            Remote = new YtmTrack { Title = t.Title, VideoId = Remote(t), Duration = TimeSpan.FromSeconds(Math.Max(1, Math.Round(t.Duration.TotalSeconds))) } }).ToList();
         var seconds = pairings.ToDictionary(p => p.Remote.Url, p => p.Remote.Duration.TotalSeconds);
         var requested = new List<string>();
         var options = Options(root, NewFolder("upgrade-run-backups")); options.Download = FakeDownload(url => seconds[url], requested);
@@ -175,7 +175,7 @@ internal static partial class Tests
             var tracks = window.Library.Albums.SelectMany(a => a.Tracks).OrderBy(t => t.Number).ToList();
             var fake = new FakeYouTubeMusic();
             var listing = new YtmAlbum { BrowseId = "MPREb_LDR08NYXGuN", Title = "Glitch Princess", Artist = "yeule", Kind = "Album", Year = "2022", ThumbnailUrl = "https://yt3.googleusercontent.com/x=w544-h544-l90-rj",
-                Tracks = tracks.Select((t, i) => new YtmTrack { Index = i + 1, Title = t.Title, VideoId = "v" + i, Duration = TimeSpan.FromSeconds(Math.Round(t.Duration.TotalSeconds) + (i == 2 ? 20 : 0)) }).ToList() };
+                Tracks = tracks.Select((t, i) => new YtmTrack { Index = i + 1, Title = t.Title, VideoId = "v" + i, Duration = TimeSpan.FromSeconds(Math.Max(1, Math.Round(t.Duration.TotalSeconds)) + (i == 2 ? 20 : 0)) }).ToList() };
             listing.TrackCount = listing.Tracks.Count;
             var decoy = new YtmAlbum { BrowseId = "MPREb_other", Title = "softscars", Artist = "yeule", Kind = "Album", Year = "2023", Tracks = new List<YtmTrack>() };
             fake.Results = q => new List<YtmAlbum> { decoy, listing };
