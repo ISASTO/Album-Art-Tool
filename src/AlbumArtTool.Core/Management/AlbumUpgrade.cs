@@ -130,17 +130,33 @@ namespace AlbumArtTool.Management
         {
             if (album.AudioResolved || album.Tracks == null) return;
             var videos = album.Tracks.Where(t => t.MusicVideo).ToList();
+            if (videos.Count == 0) { album.AudioResolved = true; return; }
+            string who = string.IsNullOrWhiteSpace(album.Artist) ? artist : album.Artist;
+            // Every audio upload seen in any search goes into one pool: a search for one song often returns others from
+            // the same album, and "artist album" alone usually lists most of the album's audio uploads.
+            var pool = new List<YtmTrack>();
+            var asked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            async System.Threading.Tasks.Task Ask(string query)
+            {
+                query = query.Trim();
+                if (query.Length == 0 || !asked.Add(query)) return;
+                pool.AddRange((await music.SearchSongsAsync(query, token).ConfigureAwait(true)).Where(song => !song.MusicVideo));
+                await System.Threading.Tasks.Task.Delay(120, token).ConfigureAwait(true);
+            }
+            YtmTrack Find(YtmTrack track) => pool.Where(song => TitleSimilarity(song.Title, track.Title) >= 0.9 &&
+                    (song.AlbumBrowseId == album.BrowseId || ArtistMatches(song.Artists, who) && track.Duration > TimeSpan.Zero && song.Duration > TimeSpan.Zero &&
+                        Math.Abs((song.Duration - track.Duration).TotalSeconds) <= 2))
+                .OrderByDescending(song => song.AlbumBrowseId == album.BrowseId)
+                .ThenBy(song => Math.Abs((song.Duration - track.Duration).TotalSeconds)).FirstOrDefault();
+            await Ask(who + " " + AlbumTitle(album.Title));
             int done = 0;
             foreach (var track in videos)
             {
                 token.ThrowIfCancellationRequested();
-                string who = string.IsNullOrWhiteSpace(album.Artist) ? artist : album.Artist;
-                var songs = await music.SearchSongsAsync((who + " " + TitleCleanup.Clean(track.Title)).Trim(), token).ConfigureAwait(true);
-                var audio = songs.Where(song => !song.MusicVideo && TitleSimilarity(song.Title, track.Title) >= 0.9 &&
-                        (Similarity(song.Artists, who) >= 0.6 || Contains(song.Artists, who) || Contains(who, song.Artists)) &&
-                        (song.AlbumBrowseId == album.BrowseId || track.Duration > TimeSpan.Zero && song.Duration > TimeSpan.Zero && Math.Abs((song.Duration - track.Duration).TotalSeconds) <= 2))
-                    .OrderByDescending(song => song.AlbumBrowseId == album.BrowseId)
-                    .ThenBy(song => Math.Abs((song.Duration - track.Duration).TotalSeconds)).FirstOrDefault();
+                string title = TitleCleanup.Clean(track.Title);
+                var audio = Find(track);
+                if (audio == null) { await Ask(who + " " + title); audio = Find(track); }
+                if (audio == null) { await Ask(title + " " + AlbumTitle(album.Title) + " " + who); audio = Find(track); }
                 if (audio != null)
                 {
                     track.ReplacedVideoId = track.VideoId; track.VideoId = audio.VideoId; track.MusicVideo = false;
@@ -149,10 +165,12 @@ namespace AlbumArtTool.Management
                 }
                 else track.VideoOnly = true;
                 progress?.Report((++done, videos.Count));
-                await System.Threading.Tasks.Task.Delay(120, token).ConfigureAwait(true);
             }
             album.AudioResolved = true;
         }
+
+        private static bool ArtistMatches(string found, string wanted) =>
+            Similarity(found, wanted) >= 0.6 || Contains(found, wanted) || Contains(wanted, found);
 
         /// <summary>Titles compared without featured-artist credits, punctuation, accents or letter case.</summary>
         public static double TitleSimilarity(string first, string second) => Similarity(TitleCleanup.Clean(first ?? ""), TitleCleanup.Clean(second ?? ""));

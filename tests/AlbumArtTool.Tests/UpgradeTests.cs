@@ -119,7 +119,8 @@ internal static partial class Tests
             q.EndsWith("Toxic") ? new List<YtmTrack> { new YtmTrack { Title = "Toxic", Artists = "Britney Spears", VideoId = "britney0001", Duration = TimeSpan.FromSeconds(199) },
                 new YtmTrack { Title = "Toxic", Artists = "Ashnikko", VideoId = "toxicvideo1", Duration = TimeSpan.FromSeconds(185), MusicVideo = true } } : new List<YtmTrack>() };
         AlbumUpgrade.ResolveAudioAsync(fake, album, "Ashnikko", CancellationToken.None).GetAwaiter().GetResult();
-        Assert(album.AudioResolved && fake.SongQueries.SequenceEqual(new[] { "Ashnikko Daisy", "Ashnikko Toxic" }), "only the music-video entries are looked up");
+        Assert(album.AudioResolved && fake.SongQueries.First() == "Ashnikko DEMIDEVIL" && fake.SongQueries.Contains("Ashnikko Daisy") && fake.SongQueries.Contains("Ashnikko Toxic") &&
+            !fake.SongQueries.Any(q => q.Contains("Clitoris")), "the album is searched once, then only the music-video entries not yet found: " + string.Join(" | ", fake.SongQueries));
         Assert(album.Tracks[0].VideoId == "oYXVYiEV40I" && album.Tracks[0].ReplacedVideoId == "6i01tOMgBDU" && !album.Tracks[0].MusicVideo && album.Tracks[0].AlbumTitle == "Daisy",
             "a music video is replaced by the artist's audio upload of the same song and length (here from the single)");
         Assert(album.Tracks[1].VideoOnly && album.Tracks[1].VideoId == "VpAUThB0fJE", "another artist's song or another music video is never used; the track is marked video-only");
@@ -231,7 +232,7 @@ internal static partial class Tests
                     Duration = TimeSpan.FromSeconds(Math.Max(1, Math.Round(t.Duration.TotalSeconds)) + (i == 2 ? 20 : 0)) }).ToList() };
             // Track 1 is listed as its music video; song search finds the artist's audio upload of it (on the same album).
             var audioUpload = new YtmTrack { Title = listing.Tracks[0].Title, Artists = "yeule", VideoId = "a0", Duration = listing.Tracks[0].Duration, AlbumBrowseId = listing.BrowseId, AlbumTitle = "Glitch Princess" };
-            fake.Songs = q => q.EndsWith(audioUpload.Title, StringComparison.Ordinal) ? new List<YtmTrack> { audioUpload } : new List<YtmTrack>();
+            fake.Songs = q => q.Contains(audioUpload.Title) ? new List<YtmTrack> { audioUpload } : new List<YtmTrack>();
             listing.TrackCount = listing.Tracks.Count;
             var decoy = new YtmAlbum { BrowseId = "MPREb_other", Title = "softscars", Artist = "yeule", Kind = "Album", Year = "2023", Tracks = new List<YtmTrack>() };
             fake.Results = q => new List<YtmAlbum> { decoy, listing };
@@ -247,7 +248,7 @@ internal static partial class Tests
             Assert(state.Pairs.Count == 3 && state.Pairs.Take(2).All(p => p.Selected && p.Quality == PairQuality.Exact) && !state.Pairs[2].Selected && state.Pairs[2].Quality == PairQuality.Different,
                 "low songs with an exact match are checked; the one whose length differs is not");
             Assert(state.Status.StartsWith("2 of 3 low songs matched"), "the album shows how many low songs are ready: " + state.Status);
-            Assert(fake.SongQueries.Count == 1 && state.Pairs[0].Remote.VideoId == "a0" && state.Pairs[0].Remote.ReplacedVideoId == "v0" && !state.Pairs[0].Remote.MusicVideo,
+            Assert(fake.SongQueries.Count >= 1 && state.Pairs[0].Remote.VideoId == "a0" && state.Pairs[0].Remote.ReplacedVideoId == "v0" && !state.Pairs[0].Remote.MusicVideo,
                 "the music-video entry is swapped for the artist's audio upload before anything is offered");
             Assert(Named<Avalonia.Controls.TextBlock>(upgrade, "Selected album").Text == "yeule — Glitch Princess", "the selected album is shown");
             await upgrade.ChooseAsync(decoy); await Settle();
