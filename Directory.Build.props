@@ -1,7 +1,7 @@
 <Project>
   <!-- Shared by the app, its core library, the tests and the legacy update bridge. -->
   <PropertyGroup>
-    <Version>3.8.1</Version>
+    <Version>3.9.0</Version>
     <Product>Music Library Manager</Product>
     <Company>ISASTO</Company>
     <Copyright>Copyright (c) ISASTO</Copyright>

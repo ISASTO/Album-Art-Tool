@@ -186,7 +186,12 @@ internal static partial class Tests
         Assert(!Appearance.IsDark && Appearance.Mode == ThemeMode.Light && Named<Button>(settings, "Appearance: Light").Classes.Contains("selected") &&
             !Named<Button>(settings, "Appearance: Match Windows").Classes.Contains("selected"), "Settings switches the appearance and shows the choice");
         Assert(ReferenceEquals(window.ShowSettings(), settings) && window.CurrentPage == MainWindow.Page.Settings, "Settings is one page, reused");
+        var slider = Named<Slider>(settings, "Downloads at once");
+        Assert(slider.Value == 5 && Named<TextBlock>(settings, "Downloads at once value").Text == "5 songs", "Settings shows five downloads at once by default");
+        slider.Value = 7;
+        Assert(AddMusic.Parallel == 7 && Named<TextBlock>(settings, "Downloads at once value").Text == "7 songs", "the slider saves the number of downloads at once");
         Shot(window, "settings.png");
+        AddMusic.Parallel = AddMusic.DefaultParallel;
         window.Navigate(MainWindow.Page.Albums);
         Appearance.SetDark(dark);
         Assert(Appearance.IsDark == dark && AppSettings.ReadDark() == dark, "switching back restores the original appearance");

@@ -147,7 +147,7 @@ internal static partial class Tests
     /// <summary>Makes a stand-in for a YouTube Music download: an AAC file of the given length.</summary>
     internal static Func<string, string, CancellationToken, Action<double>, string> FakeDownload(Func<string, double> seconds, List<string> requested = null) => (url, folder, token, progress) =>
     {
-        requested?.Add(url);
+        if (requested != null) lock (requested) requested.Add(url);
         Directory.CreateDirectory(folder);
         string path = Path.Combine(folder, url.Substring(url.LastIndexOf('=') + 1) + ".m4a");
         Encoder.Run(Encoder.Find(), new[] { "-v", "error", "-nostdin", "-y", "-f", "lavfi", "-i", "sine=frequency=523:duration=" + Math.Max(0.5, seconds(url)).ToString(System.Globalization.CultureInfo.InvariantCulture),

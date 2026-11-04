@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
@@ -27,6 +28,8 @@ namespace AlbumArtTool
             downloadEncoder = Kit.Button("Download"), chooseEncoder = Kit.Button("Choose…"), downloadDownloader = Kit.Button("Download"),
             chooseCookies = Kit.Button("Choose…"), checkNow = Kit.Button("Check for updates");
         private readonly TextBlock message = Kit.Label("", Kit.Small, cls: "muted");
+        private readonly Slider parallel = new Slider { Minimum = 1, Maximum = AddMusic.MaxParallel, TickFrequency = 1, IsSnapToTickEnabled = true, TickPlacement = TickPlacement.BottomRight, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 360, HorizontalAlignment = HorizontalAlignment.Left, MinWidth = 260 };
+        private readonly TextBlock parallelValue = Kit.Label("", Kit.Body, true);
         private CancellationTokenSource downloads;
         internal bool IsWorking { get; private set; }
         internal Action<ProcessStartInfo> StartExplorer = info => { using (Process.Start(info)) { } };
@@ -64,6 +67,21 @@ namespace AlbumArtTool
             var sections = new StackPanel { Spacing = 12 };
             sections.Children.Add(Section("Appearance", Row("Theme", themes)));
             sections.Children.Add(Section("Library", Row("Music folder", folderValue, changeMusic), Row("Backups", backupValue, changeBackup, openBackup)));
+            // Add music: how many songs download at once.
+            parallel.Value = AddMusic.Parallel;
+            parallel.Named("Downloads at once").Tip("How many songs Add music downloads at the same time, from 1 to " + AddMusic.MaxParallel + ". More is faster on a quick connection; " +
+                "fewer is gentler if YouTube starts asking you to confirm you're not a bot. A change applies to the next song that starts. Remembered on this PC, also after updates.");
+            parallel.PropertyChanged += (s, e) =>
+            {
+                if (e.Property != Slider.ValueProperty) return;
+                int value = (int)Math.Round(parallel.Value);
+                parallelValue.Text = value == 1 ? "1 song" : value + " songs";
+                if (value != AddMusic.Parallel) AddMusic.Parallel = value;
+            };
+            parallelValue.Text = AddMusic.Parallel == 1 ? "1 song" : AddMusic.Parallel + " songs";
+            parallelValue.Named("Downloads at once value"); parallelValue.Width = 64; parallelValue.Margin = new Thickness(10, 0, 0, 0);
+            var parallelRow = Kit.Grid("140,*,Auto", "40").Add(Kit.Label("Downloads at once", Kit.Body).Cell(0, 0), parallel.Cell(0, 1), parallelValue.Cell(0, 2));
+            sections.Children.Add(Section("Add music", parallelRow));
             sections.Children.Add(Section("Helper programs", Row("FFmpeg", encoderValue, downloadEncoder, chooseEncoder), Row("yt-dlp", downloaderValue, downloadDownloader), Row("YouTube cookies", cookiesValue, chooseCookies)));
             sections.Children.Add(Section("Updates", Row("Version", versionValue, checkNow)));
             sections.Children.Add(message);

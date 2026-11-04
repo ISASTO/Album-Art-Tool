@@ -32,6 +32,11 @@ internal static partial class Tests
             Assert(AppSettings.SaveTheme(mode, theme) && AppSettings.ReadTheme(theme) == mode, "the " + mode + " appearance is saved and read back");
         File.WriteAllText(theme, "light"); Assert(AppSettings.ReadTheme(theme) == ThemeMode.Light && !AppSettings.ReadDark(theme), "older saved light/dark choices are still read");
 
+        Assert(AddMusic.Parallel == AddMusic.DefaultParallel && AddMusic.DefaultParallel == 5, "five songs download at once unless changed");
+        AddMusic.Parallel = 8; Assert(AddMusic.Parallel == 8 && File.ReadAllText(AddMusic.ParallelFile).Trim() == "8", "the number of downloads at once is saved on this PC");
+        AddMusic.Parallel = 25; Assert(AddMusic.Parallel == 10, "at most ten downloads at once");
+        File.WriteAllText(AddMusic.ParallelFile, "zero"); Assert(AddMusic.Parallel == 5, "an unreadable setting falls back to five");
+        File.Delete(AddMusic.ParallelFile);
         Assert(Kit.MiddleEllipsis(@"C:\Users\isaac\Music", 60) == @"C:\Users\isaac\Music", "short paths are shown in full");
         string shortened = Kit.MiddleEllipsis(@"C:\Users\isaac\OneDrive - Personal\Music\Library\Albums\Jazz", 40);
         Assert(shortened.StartsWith(@"C:\…\") && shortened.EndsWith(@"Albums\Jazz") && shortened.Length <= 40, "long paths keep the drive and last folders: " + shortened);
