@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using System.IO;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -12,7 +14,10 @@ namespace AlbumArtTool
 {
     internal sealed partial class MainWindow
     {
-        private readonly Button queueButton = Kit.IconButton(Icons.Queue, "Queue (0)", "ghost");
+        private readonly ObservableCollection<string> issueLines = new ObservableCollection<string>();
+        private readonly TextBlock lastChange = Kit.Label("Nothing to undo yet in this session.", Kit.Body), problemsSummary = Kit.Label("", Kit.Small, cls: "muted");
+        private readonly Button undoFromActivity = Kit.IconButton(Icons.Undo, "Undo last change"), openOrganizeUndo = Kit.Button("Undo an Organize run…", "link"),
+            openBackups = Kit.IconButton(Icons.Folder, "Open backups", "ghost");
         private readonly Queue<CoverJob> waitingJobs = new Queue<CoverJob>();
         private readonly HashSet<string> queuedAlbums = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> queueHistory = new List<string>();
@@ -21,8 +26,7 @@ namespace AlbumArtTool
         private bool queueRunning;
         private int jobsFinished, jobsWithIssues;
         private Task queueTask = Task.CompletedTask;
-        private Window queueWindow;
-        private Button clearWaiting;
+        private readonly Button clearWaiting = Kit.Button("Clear waiting jobs");
         internal int QueuedCount => waitingJobs.Count + (currentJob == null ? 0 : 1);
         internal Task QueueCompletion => queueTask;
 
@@ -125,6 +129,9 @@ namespace AlbumArtTool
 
         private void UpdateQueueControls()
         {
+            undoFromActivity.IsEnabled = !busy && !queueRunning && !maintenanceRunning && lastEdit != null && lastEdit.Entries.Count > 0;
+            lastChange.Text = lastEdit != null && lastEdit.Entries.Count > 0 ? "Last change: " + (lastEditedFolder ?? "") + " · " + lastEdit.Entries.Count + (lastEdit.Entries.Count == 1 ? " file" : " files") : "Nothing to undo yet in this session.";
+            lastChange.Tip(lastChange.Text);
             browse.IsEnabled = !busy && !queueRunning && !maintenanceRunning;
             scan.IsEnabled = !maintenanceRunning && !writing && (!queueRunning || busy);
             undo.IsEnabled = !busy && !queueRunning && !maintenanceRunning && lastEdit != null && lastEdit.Entries.Count > 0;
@@ -146,9 +153,7 @@ namespace AlbumArtTool
 
         private void UpdateQueueDisplay()
         {
-            queueButton.SetText("Queue (" + QueuedCount + ")" + (queueRunning ? " · working" : jobsFinished > 0 ? " · " + jobsFinished + " finished" : ""));
-            queueButton.Tip("View work in progress, waiting albums, and recent results. Waiting jobs can be cleared.");
-            if (queueWindow == null) return;
+            UpdateBadges();
             var lines = new List<string>();
             if (currentJob != null) lines.Add(currentJob.Phase + " · " + currentJob.Name);
             foreach (var job in waitingJobs) lines.Add("Waiting · " + job.Name);
@@ -168,22 +173,61 @@ namespace AlbumArtTool
             UpdateQueueControls();
         }
 
-        private void ShowQueue()
+        private void ShowQueue() => Navigate(Page.Activity);
+
+        // Activity: the work queue and recent results on the left, Undo and problems on the right.
+        private Control BuildActivityPage()
         {
-            if (queueWindow != null) { queueWindow.Activate(); return; }
-            var window = queueWindow = new Window { Title = "Album work queue", Width = 720, Height = 350, MinWidth = 500, MinHeight = 250, WindowStartupLocation = WindowStartupLocation.CenterOwner };
             var list = new ListBox { ItemsSource = queueLines, Classes = { "grid" } }.Named("Queued albums and recent results");
             list.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<string>((line, scope) =>
-                new TextBlock { Text = line, Margin = new Thickness(12, 0), Height = 36, VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(0, 9, 0, 0) });
-            clearWaiting = Kit.Button("Clear waiting jobs");
-            clearWaiting.Width = 165; clearWaiting.HorizontalAlignment = HorizontalAlignment.Right;
+                new TextBlock { Text = line, Margin = new Thickness(12, 0), Height = 34, VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(0, 8, 0, 0), TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis });
+            clearWaiting.HorizontalAlignment = HorizontalAlignment.Left; clearWaiting.Padding = new Thickness(14, 2); clearWaiting.Height = 32; clearWaiting.Margin = new Thickness(0, 8, 0, 0);
             clearWaiting.Click += (s, e) => ClearWaitingJobs();
-            var card = Kit.Frost(list, new Thickness(10));
-            var layout = Kit.Grid("*", "*,50").Add(card.Cell(0, 0), clearWaiting.Cell(1, 0));
-            layout.Margin = new Thickness(14);
-            Kit.Prepare(window, layout);
-            window.Closed += (s, e) => { queueWindow = null; clearWaiting = null; };
-            UpdateQueueDisplay(); window.Show(this);
+            clearWaiting.Tip("Remove the albums still waiting in the queue. The album being updated now finishes safely.");
+            var queueTitle = Kit.Caption("Queue and recent results"); queueTitle.Margin = new Thickness(0, 0, 0, 8);
+            var queueCard = Kit.Frost(Kit.Grid("*", "Auto,*,Auto").Add(queueTitle.Cell(0, 0), Kit.Inset(list).Cell(1, 0), clearWaiting.Cell(2, 0)), new Thickness(14, 12, 14, 12), 14);
+            queueCard.Margin = new Thickness(0, 0, 14, 0);
+
+            undoFromActivity.Named("Undo from Activity").Tip("Restore the files from your most recent cover or artist edit in this session, byte for byte (Ctrl+Z).");
+            undoFromActivity.Click += async (s, e) => await UndoAsync();
+            undoFromActivity.HorizontalAlignment = HorizontalAlignment.Left; undoFromActivity.Padding = new Thickness(14, 2); undoFromActivity.Height = 32;
+            openOrganizeUndo.Tip("Organize keeps a journal of its last run, even after restarting the app. Open Organize and click Preview Undo to choose what to restore.");
+            openOrganizeUndo.Click += (s, e) => Navigate(Page.Organize);
+            openBackups.Tip("Open the PC backup folder in File Explorer. Each run's originals, journal.json and report.csv are kept there.");
+            openBackups.Click += (s, e) =>
+            {
+                try { Directory.CreateDirectory(BackupSettings.Root); StartExplorer(new System.Diagnostics.ProcessStartInfo(BackupSettings.Root) { UseShellExecute = true }); }
+                catch (Exception ex) { status.Text = "Could not open the backup folder: " + ex.Message; }
+            };
+            lastChange.TextWrapping = Avalonia.Media.TextWrapping.Wrap; lastChange.MaxLines = 2;
+            var undoStack = new StackPanel { Spacing = 6 };
+            undoStack.Children.Add(Kit.Caption("Undo"));
+            undoStack.Children.Add(lastChange); undoStack.Children.Add(undoFromActivity);
+            var more = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+            more.Children.Add(openOrganizeUndo); more.Children.Add(openBackups);
+            undoStack.Children.Add(more);
+            var undoCard = Kit.Frost(undoStack, new Thickness(14, 12, 14, 12), 14);
+
+            var problems = new ListBox { ItemsSource = issueLines, Classes = { "grid" } }.Named("Problems from the last scan or edit");
+            problems.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<string>((line, scope) =>
+            {
+                var text = new TextBlock { Text = line, Margin = new Thickness(12, 7), TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+                ToolTip.SetTip(text, line);
+                return text;
+            });
+            var problemsTitle = Kit.Caption("Problems"); problemsTitle.Margin = new Thickness(0, 0, 0, 2);
+            problemsSummary.Margin = new Thickness(0, 0, 0, 8);
+            var problemsCard = Kit.Frost(Kit.Grid("*", "Auto,Auto,*").Add(problemsTitle.Cell(0, 0), problemsSummary.Cell(1, 0), Kit.Inset(problems).Cell(2, 0)), new Thickness(14, 12, 14, 12), 14);
+            problemsCard.Margin = new Thickness(0, 14, 0, 0);
+            var right = Kit.Grid("*", "Auto,*").Add(undoCard.Cell(0, 0), problemsCard.Cell(1, 0));
+            return Kit.Grid("1.2*,*", "*").Add(queueCard.Cell(0, 0), right.Cell(0, 1));
+        }
+
+        private void SyncIssues()
+        {
+            if (issueLines.Count == issues.Count && issueLines.SequenceEqual(issues)) return;
+            issueLines.Clear(); foreach (string issue in issues) issueLines.Add(issue);
+            problemsSummary.Text = issues.Count == 0 ? "No problems in the last scan or edit." : issues.Count + (issues.Count == 1 ? " file" : " files") + " could not be read or changed. Each line says why.";
         }
     }
 }

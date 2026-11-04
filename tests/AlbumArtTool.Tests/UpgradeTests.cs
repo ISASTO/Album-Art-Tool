@@ -257,7 +257,7 @@ internal static partial class Tests
             Assert(ReferenceEquals(state.Chosen, listing) && state.SelectedCount == 2, "switching back restores the matches");
             var replaceAlbum = Named<Avalonia.Controls.Button>(upgrade, "Replace checked songs in this album");
             Assert(replaceAlbum.Text() == "Replace 2 songs", "the button says how many songs will be replaced");
-            Shot(upgrade, "youtube-music-upgrade.png");
+            Shot(window, "youtube-music-upgrade.png");
             var before = tracks.ToDictionary(t => t.Path, t => CoverEditor.Hash(t.Path));
             Click(replaceAlbum);
             await Until(() => !upgrade.IsWorking && upgrade.LastJournal != null, "replacement finishes", 60000); await Settle(100);
@@ -269,7 +269,7 @@ internal static partial class Tests
             Click(undo);
             await Until(() => !upgrade.IsWorking && upgrade.LastJournal == null, "undo finishes", 30000); await Settle(100);
             Assert(before.All(p => CoverEditor.Hash(p.Key) == p.Value) && state.Pairs.Take(2).All(p => !p.Replaced && p.Selected), "Undo restores the originals and the songs can be replaced again");
-            upgrade.Close();
+            Assert(window.CloseYouTube() && window.YouTube == null && window.CurrentPage != MainWindow.Page.YouTube, "the YouTube Music page closes when nothing is running");
         }
         finally { window.Close(); }
     }

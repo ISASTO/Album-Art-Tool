@@ -143,9 +143,9 @@ internal static partial class Tests
         await Until(() => Appearance.TransitionsRunning == 0, "the settings appearance change finishes", 2000);
         Assert(!Appearance.IsDark && Appearance.Mode == ThemeMode.Light && Named<Button>(settings, "Appearance: Light").Classes.Contains("selected") &&
             !Named<Button>(settings, "Appearance: Match Windows").Classes.Contains("selected"), "Settings switches the appearance and shows the choice");
-        Assert(ReferenceEquals(window.ShowSettings(), settings), "the Settings button reuses the open window");
-        Shot(settings, "settings.png");
-        settings.Close();
+        Assert(ReferenceEquals(window.ShowSettings(), settings) && window.CurrentPage == MainWindow.Page.Settings, "Settings is one page, reused");
+        Shot(window, "settings.png");
+        window.Navigate(MainWindow.Page.Albums);
         Appearance.SetDark(dark);
         Assert(Appearance.IsDark == dark && AppSettings.ReadDark() == dark, "switching back restores the original appearance");
     }
@@ -220,7 +220,11 @@ internal static partial class Tests
             SelectAt(list, 1); window.StageImage(localImage);
             var localJob = window.ApplyAsync();
             Assert(window.QueuedCount == 3 && !folderJob.IsCompleted && !localJob.IsCompleted, "multiple albums queue immediately behind active work");
-            Assert(ButtonStarting(window, "Queue (").Text() == "Queue (3) · working", "the queue button shows waiting work");
+            Assert(window.Badge(MainWindow.Page.Activity) == "3", "the Activity page shows how much work is queued");
+            window.Navigate(MainWindow.Page.Activity);
+            Assert(Named<ListBox>(window, "Queued albums and recent results").ItemCount >= 3 && ButtonStarting(window, "Clear waiting jobs").IsEnabled, "Activity lists the queue and can clear waiting jobs");
+            Shot(window, "activity.png");
+            window.Navigate(MainWindow.Page.Albums);
             await window.ApplyOnlineCoverAsync(SelectAt(list, 2).Key, new CoverCandidate { Source = "Duplicate", ImageUrl = "gated" });
             Assert(window.QueuedCount == 3, "duplicate clicks cannot queue the same album twice");
             SelectAt(list, 3); window.StageImage(nextImage);
@@ -278,15 +282,15 @@ internal static partial class Tests
         {
             await window.ScanAsync();
             var list = window.Albums;
-            Click(ButtonStarting(window, "Track artists ("));
+            Click(Named<Button>(window, "Artists"));
             Assert(list.AlbumCount == 2, "artist cleanup tab finds eligible albums regardless of whether they have covers");
             var filter = Named<ComboBox>(window, "Album filter"); var sort = Named<ComboBox>(window, "Album sort order");
             Click(ButtonStarting(window, "Has art ("));
             Assert(filter.SelectedIndex == 0 && list.AlbumCount > 0, "the existing-art tab starts on All albums instead of inheriting artist cleanup");
-            Click(ButtonStarting(window, "Track artists ("));
+            Click(Named<Button>(window, "Artists"));
             Click(ButtonStarting(window, "Missing art ("));
             Assert(filter.SelectedIndex == 0, "the missing-art tab also resets the inherited artist filter");
-            Click(ButtonStarting(window, "Track artists ("));
+            Click(Named<Button>(window, "Artists"));
             filter.SelectedIndex = 0; Assert(list.AlbumCount == 3, "all albums can be reviewed including manually specified artist names");
             sort.SelectedIndex = 2;
             Assert(list.AlbumAt(0).ArtistChangeCount > 0 && list.AlbumAt(2).ArtistChangeCount == 0, "artist changes first sort promotes eligible albums");
@@ -330,11 +334,11 @@ internal static partial class Tests
             await Until(() => list.AlbumCount == 2, "Undo returns the album to the cleanup filter");
             Assert(ScanAlbum(target).ArtistChangeCount == 1, "Undo restores guest credits");
             await window.FindDuplicatesAsync();
-            var dialog = window.OwnedWindows.OfType<DuplicateWindow>().Single();
+            var dialog = window.Duplicates;
+            Assert(window.CurrentPage == MainWindow.Page.Health && window.Health.ShowingDuplicates, "Find duplicates opens Health on the duplicates view");
             Assert(dialog.Result.Songs.Any(g => g.Confirmed) && dialog.Result.Albums.Any(g => g.Confirmed), "duplicate window shows confirmed songs and album copies");
             Assert(dialog.Nodes.Any(n => n.Text.StartsWith("Confirmed album copies") && n.Children.All(c => c.Path != null)), "duplicate groups list the folders to open");
-            Shot(dialog, "duplicates.png");
-            dialog.Close();
+            Shot(window, "duplicates.png");
         }
         finally { service.Release.TrySetResult(true); window.ClearWaitingJobs(); await window.QueueCompletion; window.Close(); }
     }
@@ -346,12 +350,13 @@ internal static partial class Tests
         window.Show();
         try
         {
-            var button = ButtonStarting(window, "Check library");
+            var button = Named<Button>(window, "Health");
             Assert(!button.IsEnabled, "tag checks wait for a library scan");
             await window.ScanAsync();
             Assert(!Named<Button>(window, "Show issues").IsVisible, "the issues button only appears when there are issues");
             Click(button); await Settle();
-            var dialog = window.OwnedWindows.OfType<LibraryCheckWindow>().Single();
+            var dialog = window.Health;
+            Assert(window.CurrentPage == MainWindow.Page.Health && dialog.IsVisible, "the Health page opens with both checks");
             Assert(dialog.Result.MissingTitles.Count == 2 && dialog.Result.MultiplePictures.Count == 2, "the tag check window opens with both checks");
             Assert(Named<TextBlock>(dialog, "Tag check summary").Text.StartsWith("2 missing a Title tag · 2 with several embedded pictures (1 with several covers)"), "the summary counts each finding");
             Assert(dialog.Rows.Count(r => r.Header) == 3 && dialog.Rows.Count(r => r.Path != null) == 4 + dialog.Result.LowBitrateAlbums().Count, "results are grouped under the three checks");
@@ -371,30 +376,29 @@ internal static partial class Tests
             var fill = Named<Button>(dialog, "Fill titles from filenames");
             Assert(fill.IsEnabled, "songs missing titles can be filled from their filenames");
             Click(fill);
-            LibraryManagerWindow manager = null;
+            OrganizePage manager = null;
             for (int i = 0; i < 300 && (manager == null || manager.IsWorking || manager.CurrentPlan == null); i++)
-            { await Settle(30); manager = window.OwnedWindows.OfType<LibraryManagerWindow>().SingleOrDefault(); }
+            { await Settle(30); manager = window.CurrentPage == MainWindow.Page.Organize ? window.Organize : null; }
             var filled = manager.CurrentPlan.Actions.Where(a => a.TitleFromName).OrderBy(a => a.NewTitle).Select(a => a.NewTitle).ToArray();
             Assert(filled.SequenceEqual(new[] { "blank", "no title" }) && manager.CurrentPlan.Actions.Where(a => a.HasWork).All(a => a.TitleFromName && !a.Convert && !a.Square && !a.Archive && !a.Move),
                 "the fill button previews only filename titles for the songs missing one");
             Assert(Named<CheckBox>(manager, "Fill missing Title tags from filenames").IsChecked == true && Controls(manager.OptionsPanel).OfType<CheckBox>().Count(c => c.IsChecked == true) == 1,
                 "the manager opens with just the title fill selected");
-            manager.Close(); await Settle();
+            window.Navigate(MainWindow.Page.Health); await Settle();
             Click(Named<Button>(dialog, "Fix embedded pictures"));
             manager = null;
             for (int i = 0; i < 300 && (manager == null || manager.IsWorking || manager.CurrentPlan == null); i++)
-            { await Settle(30); manager = window.OwnedWindows.OfType<LibraryManagerWindow>().SingleOrDefault(); }
+            { await Settle(30); manager = window.CurrentPage == MainWindow.Page.Organize ? window.Organize : null; }
             var fixes = manager.CurrentPlan.Actions.Where(a => a.HasWork).ToArray();
             Assert(fixes.Count(a => a.SinglePicture) == dialog.Result.MultiplePictures.Count && fixes.All(a => (a.SinglePicture || a.Shrink) && a.NewTitle == null && !a.Convert && !a.Move),
                 "the picture button previews keeping one picture for exactly the songs with several");
-            manager.Close(); await Settle();
+            window.Navigate(MainWindow.Page.Health); await Settle();
             SetFilenameTitle(Path.Combine(root, "03 - no title.mp3"), "Now titled");
             await window.ScanAsync();
             Click(ButtonStarting(dialog, "Check again"));
             Assert(dialog.Result.MissingTitles.Count == 1, "checking again uses the latest scan");
-            Shot(dialog, "tag-checks.png");
-            Assert(ReferenceEquals(window.CheckTags(), dialog), "the button reuses the open window");
-            dialog.Close();
+            Shot(window, "tag-checks.png");
+            Assert(ReferenceEquals(window.CheckTags(), dialog), "Health is one page, reused");
         }
         finally { window.Close(); }
     }
@@ -402,8 +406,8 @@ internal static partial class Tests
     private static async Task UpdateGui(MainWindow window)
     {
         var settings = window.ShowSettings(); await Settle();
-        Assert(Named<Button>(settings, "Check for updates").IsEnabled && Named<Button>(window, "Settings").IsVisible, "updates are checked from Settings, opened from the header");
-        settings.Close();
+        Assert(Named<Button>(settings, "Check for updates").IsEnabled && Named<Button>(window, "Settings").IsVisible, "updates are checked from Settings, opened from the sidebar");
+        window.Navigate(MainWindow.Page.Albums);
         window.CreateUpdateService = () => new UpdateService(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(ReleaseJson("v1.0.0", new byte[32])) }));
         await window.GetUpdatesAsync();
         var dialog = window.UpdateWindow;
@@ -468,8 +472,8 @@ internal static partial class Tests
         string root = NewFolder("manager-gui"), backups = NewFolder("manager-gui-backups"), folder = Path.Combine(root, "BENEE", "BENEE", "2020", "Hey u x"); Directory.CreateDirectory(folder);
         string file = CopyTrack(folder, "01 - Happen to Me.flac", "Hey u x", "BENEE"); AddRectangleArt(file); SetFilenameTitle(file, "Happen to Me");
         File.Copy(file, Path.Combine(folder, "01 - Happen to Me (1).flac"));
-        var form = new LibraryManagerWindow(root, () => true, _ => { }, _ => Task.CompletedTask);
-        form.Show();
+        var form = new OrganizePage(root, () => true, _ => { }, _ => Task.CompletedTask);
+        var host = Host(form);
         try
         {
             BackupSettings.Root = backups;
@@ -519,7 +523,7 @@ internal static partial class Tests
             await form.PreviewAsync();
             Assert(form.CurrentPlan.Actions.Any(a => a.Rename && a.Convert && a.Target.EndsWith("Happen to Me.mp3")), "manager previews Title filenames together with conversion, cropping, duplicates and folder organization");
             Assert(ButtonStarting(form, "Apply selected changes").IsEnabled && !form.IsWorking, "manager exposes an explicit reviewable Apply action after preview");
-            Shot(form, "library-manager.png");
+            Shot(host, "library-manager.png");
             form.SetWorkingForTest(true);
             bool checkedBefore = form.Rows[0].IsChecked; form.SetRowChecked(0, !checkedBefore);
             Assert(form.Rows[0].IsChecked == checkedBefore, "running management keeps preview rows readable while locking selected changes");
@@ -531,15 +535,15 @@ internal static partial class Tests
             await form.ApplyAsync();
             Assert(File.Exists(file) && !File.Exists(Path.Combine(root, "BENEE", "Hey u x", "Happen to Me.mp3")), "manager Undo restores the original library");
         }
-        finally { if (form.IsWorking) form.SetWorkingForTest(false); form.Close(); }
+        finally { if (form.IsWorking) form.SetWorkingForTest(false); host.Close(); }
     }
 
     private static async Task AlbumCleanupGui()
     {
         string root = NewFolder("album-cleanup-gui"), album = Path.Combine(root, "Example artist", "A multi-disc album");
         DiscTrack(Path.Combine(album, "Disc 1"), "one.mp3", 1, 1, "One (feat. Guest)"); DiscTrack(Path.Combine(album, "Disc 2"), "two.mp3", 2, 1, "Two");
-        var form = new LibraryManagerWindow(root, () => true, _ => { }, _ => Task.CompletedTask);
-        form.Show();
+        var form = new OrganizePage(root, () => true, _ => { }, _ => Task.CompletedTask);
+        var host = Host(form);
         try
         {
             foreach (var box in Controls(form.OptionsPanel).OfType<CheckBox>()) box.IsChecked = false;
@@ -550,11 +554,20 @@ internal static partial class Tests
             Assert(form.CurrentPlan.Actions.Count(a => a.MergeDiscs) == 2 && form.CurrentPlan.Actions.Any(a => a.NewTitle == "One"), "the manager exposes both opt-in album operations in one preview");
             form.SetRowChecked(0, false); Assert(form.CheckedCount == 0 && !ButtonStarting(form, "Apply selected changes").IsEnabled, "clearing one merge row clears the complete album");
             form.SetRowChecked(0, true); Assert(form.CheckedCount == 2, "selecting a merge row selects the complete album");
-            Shot(form, "album-cleanup-options.png");
+            Shot(host, "album-cleanup-options.png");
             await form.ApplyAsync();
             using (var file = TagLib.File.Create(Path.Combine(album, "one.mp3")))
                 Assert(file.Tag.Title == "One" && file.Tag.TrackCount == 2 && file.Tag.DiscCount == 1, "the manager applies its previewed title and disc tags");
         }
-        finally { form.Close(); }
+        finally { host.Close(); }
+    }
+
+    // Pages are tested on their own in a plain window.
+    private static Window Host(Control page)
+    {
+        var window = new Window { Width = 1100, Height = 780 };
+        Kit.Prepare(window, new Border { Child = page, Padding = new Thickness(20) });
+        window.Show();
+        return window;
     }
 }
