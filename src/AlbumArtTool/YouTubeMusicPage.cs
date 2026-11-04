@@ -22,7 +22,7 @@ namespace AlbumArtTool
     // Replaces low-bitrate songs with fresh downloads from YouTube Music: every listed album is searched automatically,
     // each of your songs is paired with its YouTube Music track by title and length, and checked songs are downloaded
     // (best free stream), saved as MP3 320 with your own tags and cover, and swapped in with a backup and Undo.
-    internal sealed class UpgradeWindow : Window
+    internal sealed class YouTubeMusicPage : UserControl
     {
         internal sealed class AlbumState
         {
@@ -49,6 +49,7 @@ namespace AlbumArtTool
         private readonly Func<string, Task> refreshLibrary;
         private readonly Action<ProcessStartInfo> open;
         private readonly IYouTubeMusic music;
+        private readonly bool ownsMusic;
         private readonly Func<string, string, CancellationToken, Action<double>, string> download;
         private readonly int limit;
         private readonly LibraryCheckResult checkResult;
@@ -81,10 +82,10 @@ namespace AlbumArtTool
         internal LibraryJournal LastJournal => lastJournal;
         internal string StatusText => status.Text;
 
-        internal UpgradeWindow(string musicRoot, IReadOnlyList<Album> library, LibraryCheckResult result, Func<bool> ready, Action<bool> setExclusive, Func<string, Task> refresh,
+        internal YouTubeMusicPage(string musicRoot, IReadOnlyList<Album> library, LibraryCheckResult result, Func<bool> ready, Action<bool> setExclusive, Func<string, Task> refresh,
             Action<ProcessStartInfo> openLink, IYouTubeMusic youtube = null, Func<string, string, CancellationToken, Action<double>, string> fetch = null)
         {
-            root = musicRoot; canStart = ready; exclusive = setExclusive; refreshLibrary = refresh; open = openLink; music = youtube ?? new YouTubeMusic(); download = fetch;
+            root = musicRoot; canStart = ready; exclusive = setExclusive; refreshLibrary = refresh; open = openLink; music = youtube ?? new YouTubeMusic(); ownsMusic = youtube == null; download = fetch;
             limit = result.LowBitrateLimit; checkResult = result;
             foreach (var pair in result.MeasuredSeconds) lengths[pair.Key] = TimeSpan.FromSeconds(pair.Value);
             states = result.LowBitrateAlbums().Select(low =>
@@ -95,15 +96,11 @@ namespace AlbumArtTool
             }).ToList();
             var kbps = new Func<Track, int>(result.Bitrate);
             Kbps = kbps;
-            Title = "Replace low-quality songs"; Width = 1180; Height = 740; MinWidth = 980; MinHeight = 600;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-
-            // Header
-            var title = Kit.Label("Replace low-quality songs from YouTube Music", 20, true);
+            // Header (the page title is shown by the main window)
             var intro = Kit.Label("Each album below is matched on YouTube Music automatically. Checked songs are downloaded at YouTube Music's best free quality (Opus, about 130–160 kbps) " +
                 "and saved as MP3 320 with your own tags and cover. Originals are backed up first, and Undo puts them back.", Kit.Body, cls: "muted");
             intro.TextWrapping = TextWrapping.Wrap; intro.TextTrimming = TextTrimming.None;
-            var header = new StackPanel { Spacing = 4 }; header.Children.Add(title); header.Children.Add(intro);
+            var header = new StackPanel { Spacing = 4 };
 
             // Tools banner (only when something is missing)
             toolText.TextWrapping = TextWrapping.Wrap; toolText.TextTrimming = TextTrimming.None;
@@ -162,7 +159,7 @@ namespace AlbumArtTool
             searchRow.Margin = new Thickness(0, 14, 0, 4); table.Margin = new Thickness(0, 8, 0, 0);
             var leftCard = Kit.Frost(left, new Thickness(8, 12, 8, 8)); var rightCard = Kit.Frost(right, new Thickness(16, 14, 16, 12));
             leftCard.Margin = new Thickness(0, 0, 10, 0);
-            var body = Kit.Grid("330,*", "*").Add(leftCard.Cell(0, 0), rightCard.Cell(0, 1)); body.Margin = new Thickness(0, 12, 0, 0);
+            var body = Kit.Grid("330,*", "*").Add(leftCard.Cell(0, 0), rightCard.Cell(0, 1));
 
             // Footer
             status.Named("Replacement status"); status.TextWrapping = TextWrapping.Wrap; status.MaxLines = 2;
@@ -183,18 +180,29 @@ namespace AlbumArtTool
             footer.Margin = new Thickness(0, 12, 0, 0); status.Margin = new Thickness(2, 0, 16, 0);
 
             var layout = Kit.Grid("*", "Auto,Auto,*,Auto").Add(header.Cell(0, 0), toolsCard.Cell(1, 0), body.Cell(2, 0), footer.Cell(3, 0));
-            layout.Margin = new Thickness(20, 16, 20, 16);
-            Kit.Prepare(this, layout);
+            Content = layout;
             UpdateTools();
-            Opened += (s, e) =>
-            {
-                if (states.Count > 0) albumList.SelectedIndex = 0;
-                Searching = SearchAllAsync(closing.Token);
-                toolUpdate = UpdateYtDlpAsync(closing.Token);
-            };
-            Closing += (s, e) => { if (IsWorking) { e.Cancel = true; status.Text = "Replacements are running. Click Stop first; the song in progress finishes safely."; } };
-            Closed += (s, e) => { closing.Cancel(); if (youtube == null) music.Dispose(); };
             if (states.Count == 0) status.Text = "No albums have low-bitrate songs at this threshold.";
+        }
+
+        private bool started;
+
+        /// <summary>Starts matching every album on YouTube Music (once, when the page is first shown).</summary>
+        internal void Start()
+        {
+            if (started) return;
+            started = true;
+            if (states.Count > 0) albumList.SelectedIndex = 0;
+            Searching = SearchAllAsync(closing.Token);
+            toolUpdate = UpdateYtDlpAsync(closing.Token);
+        }
+
+        /// <summary>Stops searches when the page is closed. Refused (false) while songs are being replaced.</summary>
+        internal bool Shutdown(bool force = false)
+        {
+            if (IsWorking && !force) { status.Text = "Replacements are running. Click Stop first; the song in progress finishes safely."; return false; }
+            running?.Cancel(); closing.Cancel(); if (ownsMusic) music.Dispose();
+            return true;
         }
 
         internal Func<Track, int> Kbps { get; }
@@ -265,7 +273,9 @@ namespace AlbumArtTool
             {
                 YtDlp.Cookies = null; UpdateCookiesTip(); status.Text = "Cookies file removed. Downloads are anonymous again."; return;
             }
-            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Choose a cookies.txt exported from a browser signed in to YouTube", AllowMultiple = false,
+            var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+            if (storage == null) return;
+            var files = await storage.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Choose a cookies.txt exported from a browser signed in to YouTube", AllowMultiple = false,
                 FileTypeFilter = new[] { new FilePickerFileType("Cookies file") { Patterns = new[] { "*.txt" } } } });
             string path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
             if (path == null) return;
@@ -641,11 +651,11 @@ namespace AlbumArtTool
 
         private sealed class MatchCard : Border
         {
-            private readonly UpgradeWindow owner;
+            private readonly YouTubeMusicPage owner;
             private readonly Image cover = new Image { Stretch = Stretch.UniformToFill };
             private readonly TextBlock title = Kit.Label("", Kit.Small, true), detail = Kit.Label("", Kit.Tiny, cls: "muted"), score = Kit.Label("", Kit.Tiny);
 
-            internal MatchCard(UpgradeWindow owner)
+            internal MatchCard(YouTubeMusicPage owner)
             {
                 this.owner = owner;
                 Width = 236; Height = 92; Padding = new Thickness(6); CornerRadius = new CornerRadius(12); BorderThickness = new Thickness(1); Cursor = new Cursor(StandardCursorType.Hand);
@@ -677,7 +687,7 @@ namespace AlbumArtTool
         private sealed class PairRow : Border
         {
             internal const string Columns = "34,*,74,*,118";
-            private readonly UpgradeWindow owner;
+            private readonly YouTubeMusicPage owner;
             private readonly CheckBox check = new CheckBox { MinWidth = 0, Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Center };
             private readonly TextBlock local = Cell(), kbps = Cell(), remote = Cell(), length = Cell();
             private TrackPairing pairing;
@@ -686,7 +696,7 @@ namespace AlbumArtTool
 
             private static TextBlock Cell() => new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0), FontSize = 12.5 };
 
-            internal PairRow(UpgradeWindow owner)
+            internal PairRow(YouTubeMusicPage owner)
             {
                 this.owner = owner;
                 Height = 34; Padding = new Thickness(10, 0, 8, 0); Background = Brushes.Transparent;

@@ -14,12 +14,6 @@ namespace AlbumArtTool
 {
     internal sealed partial class MainWindow
     {
-        private readonly Button artistsTab = Kit.Button("Track artists", "chip");
-        private readonly Button findDuplicates = Kit.IconButton(Icons.Duplicates, "Find duplicates…", "ghost");
-        private readonly Button checkTags = Kit.IconButton(Icons.Health, "Check library…", "ghost");
-        private LibraryCheckWindow checkWindow;
-        private readonly Button manageLibrary = Kit.IconButton(Icons.Organize, "Organize…", "ghost");
-        private LibraryManagerWindow managerWindow;
         private bool maintenanceRunning;
         private readonly ComboBox albumFilter = new ComboBox(), albumSort = new ComboBox();
         private readonly TextBox mainArtist = new TextBox();
@@ -30,7 +24,6 @@ namespace AlbumArtTool
         private List<ArtistRow> artistRows = new List<ArtistRow>();
         private Control artistPanel, coverPanel;
         private bool showingArtists, refreshingArtist, changingAlbumView;
-        private DuplicateWindow duplicatesWindow;
 
         internal sealed class ArtistRow
         {
@@ -50,12 +43,6 @@ namespace AlbumArtTool
             albumFilter.SelectedIndex = albumSort.SelectedIndex = 0;
             albumFilter.SelectionChanged += (s, e) => { if (!busy && !changingAlbumView) RefreshAlbums(); };
             albumSort.SelectionChanged += (s, e) => { if (!busy && !changingAlbumView) RefreshAlbums(); };
-            findDuplicates.Click += async (s, e) => await FindDuplicatesAsync();
-            checkTags.Click += (s, e) => CheckTags();
-            checkTags.Tip("List songs missing a Title tag, songs with more than one embedded picture, and albums with low-bitrate songs, each with a fix.");
-            findDuplicates.Tip("Find confirmed duplicate songs and album copies by comparing their audio, not just their names.");
-            manageLibrary.Tip("Convert, standardize, tidy and reorganize the whole library with presets. Every change is previewed first and can be undone.");
-            manageLibrary.Click += (s, e) => ShowLibraryManager();
             var showLabel = Kit.Label("SHOW", cls: "caption"); var sortLabel = Kit.Label("SORT BY", cls: "caption");
             showLabel.Margin = sortLabel.Margin = new Thickness(8, 0, 0, 0);
             return Kit.Grid("*,*", "18,*").Add(showLabel.Cell(0, 0), sortLabel.Cell(0, 1), albumFilter.Cell(1, 0), albumSort.Cell(1, 1));
@@ -131,13 +118,14 @@ namespace AlbumArtTool
             showingArtists = true;
             SetViewFilter(1);
             StyleTabs(); RefreshAlbums();
+            ShowPage(Page.Artists);
         }
 
         private void StyleTabs()
         {
-            foreach (var tab in new[] { missingTab, existingTab, allTab, artistsTab })
+            foreach (var tab in new[] { missingTab, existingTab, allTab })
             {
-                bool selected = tab == artistsTab ? showingArtists : !showingArtists && (tab == missingTab ? view == View.Missing : tab == existingTab ? view == View.HasArt : view == View.All);
+                bool selected = tab == missingTab ? view == View.Missing : tab == existingTab ? view == View.HasArt : view == View.All;
                 tab.Classes.Set("selected", selected);
             }
             if (coverPanel != null) coverPanel.IsVisible = !showingArtists;
@@ -197,62 +185,44 @@ namespace AlbumArtTool
 
         private void UpdateLibraryTools()
         {
-            artistsTab.IsEnabled = albumFilter.IsEnabled = albumSort.IsEnabled = !busy;
-            findDuplicates.IsEnabled = !busy && !maintenanceRunning && hasScanned && library.Albums.Count > 0;
-            checkTags.IsEnabled = !busy && hasScanned && library.Albums.Count > 0;
+            albumFilter.IsEnabled = albumSort.IsEnabled = !busy;
+            UpdateBadges();
             if (showingArtists) UpdateArtistPreview();
         }
 
-        private LibraryManagerWindow ShowLibraryManager()
-        {
-            if (managerWindow != null) { managerWindow.Activate(); return managerWindow; }
-            managerWindow = new LibraryManagerWindow(Root,
-                () => !busy && !queueRunning && !maintenanceRunning && pending == null && (duplicatesWindow == null || !duplicatesWindow.IsScanning),
-                value => { maintenanceRunning = value; UpdateQueueControls(); },
-                async root => { lastEdit = null; Root = root; await ScanAsync(); }, () => ShowSettings());
-            managerWindow.Closed += (s, e) => managerWindow = null;
-            managerWindow.Show(this);
-            return managerWindow;
-        }
-
-        private UpgradeWindow upgradeWindow;
         internal ScanResult Library => library;
-        internal UpgradeWindow UpgradeWindowForTest => upgradeWindow;
+        internal YouTubeMusicPage YouTube => youtubePage;
         internal Online.IYouTubeMusic YouTubeMusicForTest;
         internal Func<string, string, System.Threading.CancellationToken, Action<double>, string> DownloadForTest;
 
-        internal UpgradeWindow ShowUpgrade(LibraryCheckResult result)
+        /// <summary>Opens the YouTube Music page for the low-bitrate albums of a library check (or returns to the open one).</summary>
+        internal YouTubeMusicPage ShowUpgrade(LibraryCheckResult result)
         {
-            if (upgradeWindow != null) { upgradeWindow.Activate(); return upgradeWindow; }
-            var window = upgradeWindow = new UpgradeWindow(Root, library.Albums.ToArray(), result,
-                () => !busy && !queueRunning && !maintenanceRunning && pending == null && (duplicatesWindow == null || !duplicatesWindow.IsScanning),
+            if (youtubePage != null) { ShowPage(Page.YouTube); return youtubePage; }
+            youtubePage = new YouTubeMusicPage(Root, library.Albums.ToArray(), result,
+                () => !busy && !queueRunning && !maintenanceRunning && pending == null && (healthPage == null || !healthPage.IsScanning),
                 value => { maintenanceRunning = value; UpdateQueueControls(); },
                 async root => { lastEdit = null; Root = root; await ScanAsync(); },
                 info => StartExplorer(info), YouTubeMusicForTest, DownloadForTest);
-            window.Closed += (s, e) => { if (upgradeWindow == window) upgradeWindow = null; };
-            window.Show(this);
-            return window;
+            AddPage(youtubePage);
+            nav[Page.YouTube].Button.IsVisible = true;
+            ShowPage(Page.YouTube);
+            return youtubePage;
         }
 
-        internal LibraryCheckWindow CheckTags()
+        /// <summary>Shows Library health (checking again when the library changed). Null until a scan has found albums.</summary>
+        internal HealthPage CheckTags()
         {
-            if (checkWindow != null) { checkWindow.Check(); checkWindow.Activate(); return checkWindow; }
-            if (busy || library.Albums.Count == 0) return null;
-            var window = checkWindow = new LibraryCheckWindow(() => library.Albums.ToArray(), info => StartExplorer(info), () => ShowLibraryManager().PreviewTitleFill(), () => ShowLibraryManager().PreviewArtworkFix(), result => { ShowUpgrade(result); return Task.CompletedTask; });
-            window.Closed += (s, e) => { if (checkWindow == window) checkWindow = null; };
-            window.Show(this);
-            return window;
+            if (busy || !EnsureHealth()) return null;
+            ShowPage(Page.Health);
+            return healthPage;
         }
 
         internal async Task FindDuplicatesAsync()
         {
-            if (duplicatesWindow != null) { duplicatesWindow.Activate(); return; }
-            if (busy || maintenanceRunning || library.Albums.Count == 0) return;
-            var window = new DuplicateWindow(library.Albums.ToArray(), () => library.Albums.ToArray(), info => StartExplorer(info));
-            duplicatesWindow = window;
-            window.Closed += (s, e) => { if (duplicatesWindow == window) duplicatesWindow = null; };
-            window.Show(this);
-            await window.ScanAsync();
+            if (busy || maintenanceRunning || library.Albums.Count == 0 || !EnsureHealth()) return;
+            ShowPage(Page.Health);
+            await healthPage.FindDuplicatesAsync();
         }
     }
 }

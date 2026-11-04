@@ -225,20 +225,4 @@ namespace AlbumArtTool
             finally { SetWorking(false); Refresh(); }
         }
     }
-
-    internal sealed class SettingsWindow : Window
-    {
-        internal SettingsPanel Panel { get; }
-
-        internal SettingsWindow(SettingsPanel panel)
-        {
-            Panel = panel;
-            Title = "Settings"; Width = 720; Height = 600; MinWidth = 620; MinHeight = 460;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            var title = Kit.Label("Settings", 20, true); title.Margin = new Thickness(2, 0, 0, 12);
-            var layout = Kit.Grid("*", "Auto,*").Add(title.Cell(0, 0), panel.Cell(1, 0));
-            layout.Margin = new Thickness(20, 16, 20, 16);
-            Kit.Prepare(this, layout);
-        }
-    }
 }

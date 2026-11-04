@@ -17,9 +17,10 @@ using AlbumArtTool.Ui;
 
 namespace AlbumArtTool
 {
-    // Lists songs without a Title tag and songs with more than one embedded picture.
-    // Works from the main window's scan, so it opens instantly and never changes a file.
-    internal sealed class LibraryCheckWindow : Window
+    // Library health: songs without a Title tag, songs with several embedded pictures, albums with
+    // low-bitrate songs and duplicate copies. Works from the main window's scan and never changes a file;
+    // each card hands its fix to the page that makes it (Organize or YouTube Music).
+    internal sealed class HealthPage : UserControl
     {
         private readonly Func<Album[]> currentAlbums;
         private readonly Action<ProcessStartInfo> openFolder;
@@ -36,6 +37,14 @@ namespace AlbumArtTool
         private readonly TextBlock titlesCount = Metric(), picturesCount = Metric(), bitrateCount = Metric();
         private readonly TextBlock titlesDetail = Detail(), picturesDetail = Detail(), bitrateDetail = Detail();
         private int titlesHeader, picturesHeader, bitrateHeader;
+        private readonly TextBlock duplicatesCount = Metric(), duplicatesDetail = Detail();
+        private readonly Button findDuplicates = Kit.Button("Find duplicates");
+        private readonly Button findingsTab = Kit.Button("Findings", "chip"), duplicatesTab = Kit.Button("Duplicates", "chip");
+        private readonly Panel content = new Panel();
+        private Control findingsView;
+        private readonly Func<bool> canFindDuplicates;
+        internal DuplicatePanel Duplicates { get; private set; }
+        internal bool IsScanning => Duplicates != null && Duplicates.IsScanning;
         internal LibraryCheckResult Result { get; private set; }
         internal IReadOnlyList<Row> Rows { get; private set; } = Array.Empty<Row>();
         /// <summary>The bitrate measurement started by the last check (completed when there is nothing to measure).</summary>
@@ -49,12 +58,10 @@ namespace AlbumArtTool
             internal bool Header, Folder;
         }
 
-        internal LibraryCheckWindow(Func<Album[]> albums, Action<ProcessStartInfo> openFolder, Func<Task> fillTitles = null, Func<Task> fixPictures = null, Func<LibraryCheckResult, Task> replaceLow = null)
+        internal HealthPage(Func<Album[]> albums, Action<ProcessStartInfo> openFolder, Func<Task> fillTitles = null, Func<Task> fixPictures = null, Func<LibraryCheckResult, Task> replaceLow = null, Func<bool> canFindDuplicates = null)
         {
             currentAlbums = albums; this.openFolder = openFolder; this.fillTitles = fillTitles; this.fixPictures = fixPictures; this.replaceLow = replaceLow;
-            Title = "Check library"; Width = 1000; Height = 640; MinWidth = 900; MinHeight = 500;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            var subtitle = Kit.Label("Based on the last scan. Nothing changes until you choose a fix and apply it.", Kit.Body, cls: "muted");
+            this.canFindDuplicates = canFindDuplicates ?? (() => true);
             summary.Named("Tag check summary"); summary.Classes.Add("muted"); summary.FontSize = Kit.Small;
             foreach (int kbps in LibraryChecks.BitrateChoices) threshold.Items.Add("Below " + kbps + " kbps");
             threshold.SelectedIndex = Array.IndexOf(LibraryChecks.BitrateChoices, LibraryChecks.DefaultLowBitrate);
@@ -71,49 +78,106 @@ namespace AlbumArtTool
             save.Click += async (s, e) => await SaveAsync();
             show.IsEnabled = false; show.Click += (s, e) => ShowSelected();
             show.Tip("Highlights the selected song in File Explorer, or opens the selected album's folder.");
-            Closed += (s, e) => measuring?.Cancel();
+            findDuplicates.Named("Find duplicates").Tip("Compare every song's audio to find confirmed duplicate songs and album copies, plus possible copies that share tags and length. Nothing is deleted.");
+            findDuplicates.Click += async (s, e) => await FindDuplicatesAsync();
+            findingsTab.Named("Show findings").Tip("Songs and albums found by the three checks.");
+            duplicatesTab.Named("Show duplicates").Tip("Duplicate songs and album copies from the last duplicate scan.");
+            findingsTab.Click += (s, e) => ShowView(false);
+            duplicatesTab.Click += (s, e) => { if (Duplicates == null) _ = FindDuplicatesAsync(); else ShowView(true); };
             fill.Named("Fill titles from filenames").Tip("Opens Organize with only \"Fill missing titles from filenames\" selected and previews the changes. Nothing is written until you apply them.");
             fill.Click += async (s, e) => { if (this.fillTitles != null) await this.fillTitles(); };
             onePicture.Named("Fix embedded pictures").Tip("Opens Organize with only \"One front cover per song\" selected (one " + Artwork.EmbedSide + " px JPEG front cover per song) and previews the changes. Nothing is written until you apply them.");
             onePicture.Click += async (s, e) => { if (this.fixPictures != null) await this.fixPictures(); };
-            replace.Named("Replace from YouTube Music").Tip("Opens a window that finds each low-bitrate album on YouTube Music and replaces the low songs with fresh downloads (best free stream, saved as MP3 320 with your tags and cover). " +
+            replace.Named("Replace from YouTube Music").Tip("Opens a page that finds each low-bitrate album on YouTube Music and replaces the low songs with fresh downloads (best free stream, saved as MP3 320 with your tags and cover). " +
                 "Nothing is replaced until you check songs and click Replace; originals are backed up and can be restored.");
             replace.IsEnabled = false;
             replace.Click += async (s, e) => { if (this.replaceLow != null && Result != null) await this.replaceLow(Result); };
-            threshold.Width = double.NaN; threshold.HorizontalAlignment = HorizontalAlignment.Stretch; threshold.Margin = new Thickness(0, 0, 6, 0);
-            var bitrateActions = Kit.Grid("130,*", "Auto").Add(threshold.Cell(0, 0), replace.Cell(0, 1));
-            var cards = Kit.Grid("*,*,1.35*", "Auto").Add(
-                Card("Missing titles", titlesCount, titlesDetail, fill, () => titlesHeader).Cell(0, 0),
-                Card("Extra embedded pictures", picturesCount, picturesDetail, onePicture, () => picturesHeader).Cell(0, 1),
-                Card("Low bitrate", bitrateCount, bitrateDetail, bitrateActions, () => bitrateHeader).Cell(0, 2));
-            cards.Margin = new Thickness(-5, 10, -5, 6);
+            threshold.Width = 150; threshold.MinHeight = 24; threshold.FontSize = 11.5; threshold.Margin = new Thickness(0, -4, 0, 0);
+            var cards = Kit.Grid("*,*,1.25*,*", "Auto").Add(
+                Card("Missing titles", titlesCount, titlesDetail, fill, () => ShowFindings(titlesHeader)).Cell(0, 0),
+                Card("Extra pictures", picturesCount, picturesDetail, onePicture, () => ShowFindings(picturesHeader)).Cell(0, 1),
+                Card("Low bitrate", bitrateCount, bitrateDetail, replace, () => ShowFindings(bitrateHeader), threshold).Cell(0, 2),
+                Card("Duplicates", duplicatesCount, duplicatesDetail, findDuplicates, () => { if (Duplicates != null) ShowView(true); }).Cell(0, 3));
+            cards.Margin = new Thickness(-5, 0, -5, 10);
+            duplicatesCount.Text = "Not checked"; duplicatesDetail.Text = "Compares audio, not just names.";
             var buttons = Kit.Grid("Auto,Auto,*,Auto", "*").Add(refresh.Cell(0, 0), save.Cell(0, 1), show.Cell(0, 3));
             foreach (var b in new[] { refresh, save, show }) { b.Margin = new Thickness(3, 8, 3, 0); b.Padding = new Thickness(14, 2); b.Height = 34; }
             var table = Kit.Inset(list); table.Margin = new Thickness(0, 4, 0, 0);
-            var layout = Kit.Grid("*", "Auto,Auto,Auto,*,Auto").Add(subtitle.Cell(0, 0), cards.Cell(1, 0), summary.Cell(2, 0), table.Cell(3, 0), buttons.Cell(4, 0));
-            layout.Margin = new Thickness(18, 14, 18, 12);
-            Kit.Prepare(this, layout);
+            findingsView = Kit.Grid("*", "Auto,*,Auto").Add(summary.Cell(0, 0), table.Cell(1, 0), buttons.Cell(2, 0));
+            content.Children.Add(findingsView);
+            var tabs = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new Thickness(0, 0, 0, 6) };
+            tabs.Children.Add(findingsTab); tabs.Children.Add(duplicatesTab);
+            var layout = Kit.Grid("*", "Auto,Auto,*").Add(cards.Cell(0, 0), tabs.Cell(1, 0), content.Cell(2, 0));
+            Content = layout;
+            ShowView(false);
             Check();
+        }
+
+        private Window Owner => TopLevel.GetTopLevel(this) as Window;
+        internal void Stop() { measuring?.Cancel(); Duplicates?.Stop(); }
+        internal bool ShowingDuplicates => Duplicates != null && Duplicates.IsVisible;
+
+        private void ShowView(bool duplicates)
+        {
+            duplicates &= Duplicates != null;
+            findingsView.IsVisible = !duplicates;
+            if (Duplicates != null) Duplicates.IsVisible = duplicates;
+            findingsTab.Classes.Set("selected", !duplicates); duplicatesTab.Classes.Set("selected", duplicates);
+        }
+
+        private void ShowFindings(int header)
+        {
+            ShowView(false);
+            if (header >= 0 && header < Rows.Count) { list.ScrollIntoView(Rows[Rows.Count - 1]); list.ScrollIntoView(Rows[header]); }
+        }
+
+        /// <summary>Shows the duplicates view and scans (again) from the latest library scan.</summary>
+        internal async Task FindDuplicatesAsync()
+        {
+            if (IsScanning) { ShowView(true); return; }
+            if (!canFindDuplicates()) { duplicatesDetail.Text = "Wait for the current scan or task to finish."; return; }
+            if (Duplicates == null)
+            {
+                Duplicates = new DuplicatePanel(currentAlbums(), currentAlbums, openFolder);
+                content.Children.Add(Duplicates);
+            }
+            ShowView(true);
+            findDuplicates.IsEnabled = false; duplicatesCount.Text = "Checking…"; duplicatesCount.Classes.Set("positive", false);
+            try { await Duplicates.ScanAsync(); }
+            finally { findDuplicates.IsEnabled = true; UpdateDuplicatesCard(); }
+        }
+
+        private void UpdateDuplicatesCard()
+        {
+            var result = Duplicates?.Result;
+            findDuplicates.SetText(result == null ? "Find duplicates" : "Scan again");
+            if (result == null) { duplicatesCount.Text = "Not checked"; duplicatesDetail.Text = "The scan was stopped before it finished."; return; }
+            int confirmed = result.Songs.Count(g => g.Confirmed) + result.Albums.Count(g => g.Confirmed);
+            int possible = result.Songs.Count(g => !g.Confirmed) + result.Albums.Count(g => !g.Confirmed);
+            duplicatesCount.Text = confirmed + possible == 0 ? "All good" : Count(confirmed + possible, "group");
+            duplicatesCount.Classes.Set("positive", confirmed + possible == 0);
+            duplicatesDetail.Text = confirmed + possible == 0 ? "No copies found." : confirmed + " confirmed · " + possible + " possible";
         }
 
         private static TextBlock Metric() => Kit.Label("", 22, true);
         private static TextBlock Detail() { var d = Kit.Label("", Kit.Small, cls: "muted"); d.Margin = new Thickness(0, 0, 0, 8); return d; }
 
-        // Clicking a card scrolls the list to that check's findings.
-        private Control Card(string title, TextBlock metric, TextBlock detail, Control action, Func<int> header)
+        // Clicking a card shows that check's findings.
+        private Control Card(string title, TextBlock metric, TextBlock detail, Button action, Action select, Control option = null)
         {
             var stack = new StackPanel { Spacing = 2 };
-            stack.Children.Add(Kit.Caption(title)); stack.Children.Add(metric); stack.Children.Add(detail); stack.Children.Add(action);
-            if (action is Button b) { b.HorizontalAlignment = HorizontalAlignment.Left; b.Padding = new Thickness(14, 2); b.Height = 32; b.Margin = new Thickness(0); }
-            else foreach (var child in ((Grid)action).Children.OfType<Button>()) { child.Height = 32; child.Margin = new Thickness(0); }
+            var top = Kit.Grid("*,Auto", "Auto").Add(Kit.Caption(title).Cell(0, 0));
+            if (option != null) top.Add(option.Cell(0, 1));
+            stack.Children.Add(top); stack.Children.Add(metric); stack.Children.Add(detail); stack.Children.Add(action);
+            action.HorizontalAlignment = HorizontalAlignment.Left; action.Padding = new Thickness(14, 2); action.Height = 32; action.Margin = new Thickness(0);
+            detail.TextWrapping = TextWrapping.Wrap; detail.MaxLines = 2; detail.MinHeight = 32;
             var card = Kit.Frost(stack, new Thickness(14, 12, 14, 12), 14);
             card.Margin = new Thickness(5, 0);
             card.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
             card.PointerPressed += (s, e) =>
             {
                 if (e.Source is Visual v && v.FindAncestorOfType<Button>(true) != null || e.Source is Visual c && c.FindAncestorOfType<ComboBox>(true) != null) return;
-                int index = header();
-                if (index >= 0 && index < Rows.Count) { list.ScrollIntoView(Rows[Rows.Count - 1]); list.ScrollIntoView(Rows[index]); }
+                select();
             };
             return card;
         }
@@ -207,6 +271,8 @@ namespace AlbumArtTool
             replace.IsEnabled = replaceLow != null && albums.Count > 0 && (measureStatus.Length == 0 || measureStatus.StartsWith("header", StringComparison.Ordinal));
             fill.IsEnabled = fillTitles != null && Result.MissingTitles.Count > 0;
             onePicture.IsEnabled = fixPictures != null && Result.MultiplePictures.Count > 0;
+            // A card with nothing to fix shows no fix.
+            fill.IsVisible = Result.MissingTitles.Count > 0; onePicture.IsVisible = Result.MultiplePictures.Count > 0; replace.IsVisible = albums.Count > 0;
             save.IsEnabled = Result.MissingTitles.Count + Result.MultiplePictures.Count + Result.LowBitrate.Count > 0;
         }
 
@@ -231,18 +297,20 @@ namespace AlbumArtTool
             if (!(list.SelectedItem is Row { Path: string path } row)) return;
             string arguments = row.Folder ? Updates.UpdateInstaller.QuoteArgument(path) : "/select," + Updates.UpdateInstaller.QuoteArgument(path);
             try { openFolder(new ProcessStartInfo("explorer.exe", arguments) { UseShellExecute = true }); }
-            catch (Exception e) { _ = Dialogs.ShowMessage(this, "Could not open folder", e.Message); }
+            catch (Exception e) { _ = Dialogs.ShowMessage(Owner, "Could not open folder", e.Message); }
         }
 
         private async Task SaveAsync()
         {
-            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+            if (storage == null) return;
+            var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
             { Title = "Save library check report", SuggestedFileName = "music-library-check.csv", DefaultExtension = "csv",
               FileTypeChoices = new[] { new FilePickerFileType("CSV report") { Patterns = new[] { "*.csv" } } } });
             string path = file?.TryGetLocalPath();
             if (path == null) return;
             try { File.WriteAllText(path, LibraryChecks.Csv(Result), new UTF8Encoding(true)); }
-            catch (Exception e) { await Dialogs.ShowMessage(this, "Could not save report", e.Message); }
+            catch (Exception e) { await Dialogs.ShowMessage(Owner, "Could not save report", e.Message); }
         }
     }
 }

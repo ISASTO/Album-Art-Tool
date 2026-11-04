@@ -18,8 +18,8 @@ namespace AlbumArtTool
         internal Func<UpdateService> CreateUpdateService = () => new UpdateService();
         internal Version InstalledVersion;
         internal Func<string, string, System.Diagnostics.Process> LaunchInstaller = UpdateInstaller.Launch;
-        internal bool CanInstallUpdate => !busy && !writing && !queueRunning && !maintenanceRunning && (managerWindow == null || !managerWindow.IsWorking) && pending == null &&
-            (duplicatesWindow == null || !duplicatesWindow.IsScanning);
+        internal bool CanInstallUpdate => !busy && !writing && !queueRunning && !maintenanceRunning && (organizePage == null || !organizePage.IsWorking) && pending == null &&
+            (healthPage == null || !healthPage.IsScanning) && (youtubePage == null || !youtubePage.IsWorking) && (settingsPage == null || !settingsPage.IsWorking);
         internal Window UpdateWindow => updateWindow;
 
         internal async Task GetUpdatesAsync()

@@ -111,9 +111,9 @@ internal static partial class Tests
             "MP3 and FLAC copies remain confirmed after artwork changes");
         Assert(changes.Last().Completed == 4 && changes.Last().Total == 4, "duplicate progress finishes with an exact checked/total counter");
         Assert(tagged.Songs.All(g => g.Tracks.All(t => !t.Path.Contains(".album-art-backups"))), "duplicate scan excludes artwork backups");
-        string report = DuplicateWindow.Csv(tagged);
+        string report = DuplicatePanel.Csv(tagged);
         Assert(report.Contains("Confirmed") && report.Contains(first) && report.Contains("Same complete set"), "report includes paths, confirmation and album match basis");
-        Assert(DuplicateWindow.Csv(new DuplicateResult { Issues = { "=cmd|' /C calc'!A0" } }).Contains("\"'=cmd"), "report cells cannot start spreadsheet formulas");
+        Assert(DuplicatePanel.Csv(new DuplicateResult { Issues = { "=cmd|' /C calc'!A0" } }).Contains("\"'=cmd"), "report cells cannot start spreadsheet formulas");
         string[] hashes = library.Albums.SelectMany(x => x.Tracks).Select(t => CoverEditor.Hash(t.Path)).ToArray();
         scanner.Scan(library.Albums, CancellationToken.None);
         Assert(hashes.SequenceEqual(library.Albums.SelectMany(x => x.Tracks).Select(t => CoverEditor.Hash(t.Path))), "duplicate scan never changes music files");

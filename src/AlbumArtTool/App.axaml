@@ -7,6 +7,7 @@
       <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Dark">
           <SolidColorBrush x:Key="Canvas" Color="#13171F"/>
+          <SolidColorBrush x:Key="Sidebar" Color="#161B25"/>
           <SolidColorBrush x:Key="Surface" Color="#202633"/>
           <SolidColorBrush x:Key="Input" Color="#191F29"/>
           <SolidColorBrush x:Key="Inset" Color="#1B212C"/>
@@ -84,6 +85,7 @@
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
           <SolidColorBrush x:Key="Canvas" Color="#F1F4FA"/>
+          <SolidColorBrush x:Key="Sidebar" Color="#F7F9FD"/>
           <SolidColorBrush x:Key="Surface" Color="#FDFEFF"/>
           <SolidColorBrush x:Key="Input" Color="#F6F8FC"/>
           <SolidColorBrush x:Key="Inset" Color="#F1F4F9"/>
@@ -335,6 +337,34 @@
       <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
     </Style>
     <Style Selector="Button.link:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <!-- Sidebar pages. -->
+    <Style Selector="Button.nav">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+      <Setter Property="FontSize" Value="13.33"/>
+      <Setter Property="Height" Value="38"/>
+      <Setter Property="Padding" Value="12,0,8,0"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="CornerRadius" Value="9"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="Button.nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button.nav.selected">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="Button.nav.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="Button.nav:disabled /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent"/>
     </Style>
     <Style Selector="TextBlock.title"><Setter Property="FontSize" Value="20"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
