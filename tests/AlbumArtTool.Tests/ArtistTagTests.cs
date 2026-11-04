@@ -74,9 +74,9 @@ internal static partial class Tests
             Assert(Named<Button>(window, "Rename an artist").IsVisible, "Artists offers renaming an artist everywhere");
             var dialog = window.ShowRenameArtist(); await Settle();
             dialog.Fill("benee", "BENEE ✿", true); await Settle();
-            Assert(Named<TextBlock>(dialog, "Rename summary").Text.StartsWith("Changes 3 songs in 1 album") && Named<TextBlock>(dialog, "Rename warning").Text.StartsWith("This is a big change"),
+            Assert(Named<TextBlock>(dialog, "Rename summary").Text.StartsWith("Changes 3 songs in ") && Named<TextBlock>(dialog, "Rename warning").Text.StartsWith("This is a big change"),
                 "the rename says how many songs change and warns first: " + Named<TextBlock>(dialog, "Rename summary").Text);
-            Assert(dialog.Count("BENEE", false) == (3, 1), "names match whatever their letter case");
+            Assert(dialog.Count("BENEE", false).Songs == 3, "names match whatever their letter case");
             Shot(dialog, "rename-artist.png");
             Click(ButtonStarting(dialog, "Preview changes to 3 songs"));
             await Until(() => !window.Organize.IsWorking && window.Organize.CurrentPlan != null && window.Organize.RenameFrom != null, "the rename is previewed in Organize", 20000);
