@@ -157,7 +157,9 @@ namespace AlbumArtTool
             targets.Children.Add(libraryTarget); targets.Children.Add(newTarget);
             folderText.Named("Organize folder"); folderText.Margin = new Thickness(12, 0, 0, 0);
             var folderLabel = Kit.Caption("Folder"); folderLabel.Margin = new Thickness(2, 0, 12, 0);
-            var target = Kit.Grid("Auto,Auto,*", "Auto").Add(folderLabel.Cell(0, 0), targets.Cell(0, 1), folderText.Cell(0, 2));
+            renameHere.Named("Rename artists in this folder").Tip("Change one or more artist names to a single name in every song of the folder shown here. The change is previewed in this list before anything is written.");
+            renameHere.Click += (s, e) => { if (!IsWorking) RenameArtists?.Invoke(root); };
+            var target = Kit.Grid("Auto,Auto,*,Auto", "Auto").Add(folderLabel.Cell(0, 0), targets.Cell(0, 1), folderText.Cell(0, 2), renameHere.Cell(0, 3));
             target.Margin = new Thickness(0, 0, 0, 8);
             var top = new StackPanel(); top.Children.Add(target); top.Children.Add(presets);
             var layout = Kit.Grid("*", "Auto,Auto,Auto,Auto,Auto,*,Auto,Auto").Add(top.Cell(0, 0), saveRow.Cell(1, 0), renameBanner.Cell(2, 0), optionsCard.Cell(3, 0),
@@ -179,6 +181,9 @@ namespace AlbumArtTool
         private string libraryFolder, newMusicFolder;
         /// <summary>Opens Organize on another folder (set by the main window).</summary>
         internal Action<string> SwitchFolder;
+        /// <summary>Opens the rename-artists dialog for this page's folder (set by the main window).</summary>
+        internal Action<string> RenameArtists;
+        private readonly Button renameHere = Kit.IconButton(Icons.Artist, "Rename artists…", "ghost");
 
         /// <summary>The two folders Organize can work on; the one this page works on is highlighted.</summary>
         internal void SetFolders(string library, string newMusic)
@@ -461,7 +466,7 @@ namespace AlbumArtTool
         {
             IsWorking = value;
             foreach (var check in optionBoxes.Values) check.IsEnabled = !value;
-            foreach (Control control in new Control[] { preview, undo, presetChips, savePreset, deletePreset, confirmSave, presetName, libraryTarget, newTarget }) control.IsEnabled = !value;
+            foreach (Control control in new Control[] { preview, undo, presetChips, savePreset, deletePreset, confirmSave, presetName, libraryTarget, newTarget, renameHere }) control.IsEnabled = !value;
             stop.IsEnabled = value; progress.IsVisible = value; UpdateApply(); UpdatePresetState();
             hint.IsVisible = rows.Count == 0 && !value;
         }

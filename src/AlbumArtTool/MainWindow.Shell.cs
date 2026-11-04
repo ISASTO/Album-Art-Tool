@@ -180,6 +180,7 @@ namespace AlbumArtTool
                     library ? async root => { lastEdit = null; Root = root; await ScanAsync(); } : _ => { addMusicPage?.Refresh(); return Task.CompletedTask; },
                     () => Navigate(Page.Settings));
                 organizePage.SwitchFolder = f => ShowOrganize(f);
+                organizePage.RenameArtists = f => _ = ShowRenameArtistAsync(f);
                 AddPage(organizePage);
             }
             organizePage.SetFolders(Root, Management.AddMusic.Folder);
@@ -190,12 +191,28 @@ namespace AlbumArtTool
         private RenameArtistWindow renameWindow;
 
         /// <summary>The rename dialog; its Preview opens Organize with the rename on its own.</summary>
-        internal RenameArtistWindow ShowRenameArtist()
+        internal RenameArtistWindow ShowRenameArtist() => ShowRenameArtist(Root, library.Albums);
+
+        /// <summary>Rename artists in another folder (New music): its songs are read first, then the same dialog opens.</summary>
+        internal async Task<RenameArtistWindow> ShowRenameArtistAsync(string folder)
+        {
+            if (string.Equals(folder, Root, StringComparison.OrdinalIgnoreCase)) return ShowRenameArtist();
+            if (renameWindow != null) { renameWindow.Activate(); return renameWindow; }
+            status.Text = "Reading the songs in " + Kit.MiddleEllipsis(folder, 50) + "…";
+            ScanResult scan;
+            try { scan = await Task.Run(() => scanner.Scan(folder, System.Threading.CancellationToken.None, useCache: false)); }
+            catch (Exception e) { status.Text = "Could not read " + folder + ": " + e.Message; return null; }
+            status.Text = scan.Albums.Count == 0 ? "There are no songs in " + Kit.MiddleEllipsis(folder, 50) + " to rename." : "Ready";
+            return ShowRenameArtist(folder, scan.Albums);
+        }
+
+        private RenameArtistWindow ShowRenameArtist(string folder, List<Album> albums)
         {
             if (renameWindow != null) { renameWindow.Activate(); return renameWindow; }
-            if (busy || library.Albums.Count == 0) return null;
-            var window = renameWindow = new RenameArtistWindow(library.Albums);
-            window.Start = (from, to, both) => _ = RenameAsync(EnsureOrganize(Root), from, to, both);
+            if (busy || albums.Count == 0) return null;
+            bool newMusic = !string.Equals(folder, Root, StringComparison.OrdinalIgnoreCase);
+            var window = renameWindow = new RenameArtistWindow(albums, folderName: newMusic ? "New music" : null);
+            window.Start = (from, to, both) => _ = RenameAsync(EnsureOrganize(folder), from, to, both);
             window.Closed += (s, e) => { if (renameWindow == window) renameWindow = null; };
             window.Show(this);
             return window;
@@ -215,6 +232,7 @@ namespace AlbumArtTool
             var queue = new Management.DownloadQueue(() => Management.AddMusic.Folder, Management.Encoder.Find, download, music.ThumbnailAsync);
             addMusicPage = new AddMusicPage(music, queue, () => Root, () => !busy && !queueRunning && !maintenanceRunning && (organizePage == null || !organizePage.IsWorking),
                 folder => { ShowOrganize(folder); return Task.CompletedTask; }, async () => { lastEdit = null; await ScanAsync(); }, () => Navigate(Page.Settings), info => StartExplorer(info));
+            addMusicPage.RenameArtists = folder => ShowRenameArtistAsync(folder);
             addMusicPage.Changed += UpdateBadges;
             AddPage(addMusicPage);
             return addMusicPage;

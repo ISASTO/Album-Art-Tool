@@ -211,6 +211,18 @@ internal static partial class Tests
             Click(Named<Button>(window, "Organize New music"));
             Assert(window.Organize.Root == AddMusic.Folder, "and back to New music");
             window.Navigate(MainWindow.Page.AddMusic);
+            Assert(Named<Button>(page, "Rename artists in New music").IsEnabled, "artists can be renamed in New music");
+            var rename = await window.ShowRenameArtistAsync(AddMusic.Folder); await Settle();
+            Assert(Named<TextBlock>(rename, "Rename title").Text == "Rename artists in New music" && rename.Choices.Count == 1 && rename.Choices[0].Songs == 4, "the rename lists only the artists in New music");
+            rename.Fill(new[] { "yeule" }, "Yeule", true); await Settle();
+            Click(ButtonStarting(rename, "Preview changes to 4 songs"));
+            await Until(() => window.Organize != null && !window.Organize.IsWorking && window.Organize.CurrentPlan != null && window.Organize.RenameFrom != null, "the New music rename is previewed", 20000);
+            Assert(window.Organize.Root == AddMusic.Folder && window.Organize.CurrentPlan.Actions.Count(a => a.HasWork) == 4, "the rename is planned in New music only");
+            await window.Organize.ApplyAsync();
+            using (var file = TagLib.File.Create(Path.Combine(AddMusic.Folder, "yeule", "softscars", "01 - x w x.mp3")))
+                Assert(file.Tag.FirstPerformer == "Yeule" && file.Tag.FirstAlbumArtist == "Yeule", "the downloaded songs get the new artist name before joining the library");
+            Assert(File.Exists(Path.Combine(root, "Someone", "Older", "one.mp3")) && window.Library.Albums.All(a => a.Artist != "Yeule"), "the library itself is untouched");
+            window.Navigate(MainWindow.Page.AddMusic);
             await page.MergeAsync();
             await Until(() => window.Library.Albums.Any(a => a.Title == "Glitch Princess"), "the added albums appear in the library", 15000);
             Assert(File.Exists(Path.Combine(root, "yeule", "softscars", "01 - x w x.mp3")) && AddMusic.Waiting(AddMusic.Folder).Count == 0 && Named<TextBlock>(page, "Add to library status").Text.StartsWith("4 files added"),
