@@ -17,7 +17,7 @@ using AlbumArtTool.Ui;
 
 namespace AlbumArtTool
 {
-    internal sealed class LibraryManagerWindow : Window
+    internal sealed class OrganizePage : UserControl
     {
         private readonly string root;
         private readonly Func<bool> canStart;
@@ -68,11 +68,9 @@ namespace AlbumArtTool
             internal bool RequestChecked(bool value) => Toggle == null || Toggle(this, value);
         }
 
-        internal LibraryManagerWindow(string musicRoot, Func<bool> ready, Action<bool> setExclusive, Func<string, Task> refresh, Action openSettings = null)
+        internal OrganizePage(string musicRoot, Func<bool> ready, Action<bool> setExclusive, Func<string, Task> refresh, Action openSettings = null)
         {
             root = musicRoot; canStart = ready; exclusive = setExclusive; refreshLibrary = refresh; this.openSettings = openSettings;
-            Title = "Organize library"; Width = 1000; Height = 720; MinWidth = 960; MinHeight = 660;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
             optionBoxes = new Dictionary<string, CheckBox>
             {
                 [OrganizePresets.Convert] = convert, [OrganizePresets.Compatibility] = compatibility, [OrganizePresets.Square] = square, [OrganizePresets.Shrink] = shrink,
@@ -87,8 +85,6 @@ namespace AlbumArtTool
             id3v23.Named("Standardize MP3 tags to ID3v2.3");
             organize.Named("Organize into Artist / Album folders"); duplicates.Named("Remove confirmed duplicates"); archive.Named("Move old tool backups off the player");
             AddTips();
-            var subtitle = Kit.Label("Choose what to change in " + Kit.MiddleEllipsis(root, 70) + ". Nothing changes until you preview and apply, and every original is backed up.", Kit.Body, cls: "muted");
-            subtitle.Tip(root);
 
             // Presets
             presetChips.Named("Organize presets");
@@ -106,7 +102,7 @@ namespace AlbumArtTool
             var presetActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
             presetActions.Children.Add(savePreset); presetActions.Children.Add(deletePreset);
             var presets = Kit.Grid("Auto,*,Auto", "Auto").Add(presetLabel.Cell(0, 0), presetChips.Cell(0, 1), presetActions.Cell(0, 2));
-            presets.Margin = new Thickness(0, 10, 0, 6);
+            presets.Margin = new Thickness(0, 0, 0, 6);
             presetName.Margin = new Thickness(0, 0, 6, 0);
             var save = Kit.Grid("*,120,90", "34").Add(presetName.Cell(0, 0), confirmSave.Cell(0, 1), cancelSave.Cell(0, 2));
             save.Margin = new Thickness(0, 0, 0, 6);
@@ -141,19 +137,24 @@ namespace AlbumArtTool
             var table = Kit.Inset(Kit.Grid("*", "Auto,*").Add(headerBar.Cell(0, 0), files.Cell(1, 0))); table.Padding = new Thickness(0);
             table.Margin = new Thickness(0, 6, 0, 0);
             progress.Named("Library management progress"); progress.IsVisible = false;
-            var layout = Kit.Grid("*", "Auto,Auto,Auto,Auto,Auto,*,Auto,Auto").Add(subtitle.Cell(0, 0), presets.Cell(1, 0), saveRow.Cell(2, 0), optionsCard.Cell(3, 0),
-                state.Cell(4, 0), table.Cell(5, 0), progress.Cell(6, 0), actions.Cell(7, 0));
-            layout.Margin = new Thickness(18, 14, 18, 12);
-            Kit.Prepare(this, layout);
+            var layout = Kit.Grid("*", "Auto,Auto,Auto,Auto,*,Auto,Auto").Add(presets.Cell(0, 0), saveRow.Cell(1, 0), optionsCard.Cell(2, 0),
+                state.Cell(3, 0), table.Cell(4, 0), progress.Cell(5, 0), actions.Cell(6, 0));
+            Content = layout;
             preview.Click += async (s, e) => await PreviewAsync(); apply.Click += async (s, e) => await ApplyAsync();
             undo.Click += (s, e) => PreviewUndo(); stop.Click += (s, e) => source?.Cancel();
             openBackup.Click += (s, e) => { try { Directory.CreateDirectory(BackupSettings.Root); using (Process.Start(new ProcessStartInfo(BackupSettings.Root) { UseShellExecute = true })) { } } catch (Exception ex) { state.Text = ex.Message; } };
-            Closing += (s, e) => { if (IsWorking) { e.Cancel = true; state.Text = "Task is running. Click Stop; the current file is kept safe before stopping."; } };
-            Activated += (s, e) => { if (!IsWorking) { encoder = Management.Encoder.Find(); UpdateEncoder(); } };
+            AttachedToVisualTree += (s, e) => Refresh();
             try { customPresets = OrganizePresets.LoadCustom(); } catch (Exception) { customPresets = new List<OrganizePreset>(); }
             RebuildPresets();
             encoder = Management.Encoder.Find(); UpdateEncoder(); SetWorking(false);
         }
+
+        internal string Root => root;
+
+        /// <summary>Called when the page is shown: picks up an FFmpeg set up in Settings meanwhile.</summary>
+        internal void Refresh() { if (!IsWorking) { encoder = Management.Encoder.Find(); UpdateEncoder(); } }
+
+        internal void Stop() => source?.Cancel();
 
         private static Control Group(string title, params CheckBox[] boxes)
         {

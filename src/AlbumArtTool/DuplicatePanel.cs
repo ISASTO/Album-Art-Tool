@@ -17,7 +17,7 @@ using AlbumArtTool.Ui;
 
 namespace AlbumArtTool
 {
-    internal sealed class DuplicateWindow : Window
+    internal sealed class DuplicatePanel : UserControl
     {
         private readonly Album[] albums;
         private readonly Func<Album[]> currentAlbums;
@@ -25,7 +25,7 @@ namespace AlbumArtTool
         private readonly TreeView matches = new TreeView();
         private readonly TextBlock message = Kit.Label("", Kit.Body);
         private readonly ProgressBar progress = new ProgressBar { Minimum = 0, Maximum = 100, Margin = new Thickness(0, 3, 0, 6) };
-        private readonly Button scan = Kit.Button("Scan again", "primary"), save = Kit.Button("Save report…"), open = Kit.Button("Open selected folder");
+        private readonly Button scan = Kit.IconButton(Icons.Refresh, "Scan again", "ghost"), save = Kit.Button("Save report…"), open = Kit.IconButton(Icons.Open, "Open selected folder");
         private CancellationTokenSource source;
         internal DuplicateResult Result { get; private set; }
         internal bool IsScanning { get; private set; }
@@ -39,14 +39,12 @@ namespace AlbumArtTool
             public List<Node> Children { get; } = new List<Node>();
         }
 
-        internal DuplicateWindow(Album[] snapshot, Func<Album[]> latest = null, Action<ProcessStartInfo> openFolder = null)
+        internal DuplicatePanel(Album[] snapshot, Func<Album[]> latest = null, Action<ProcessStartInfo> openFolder = null)
         {
             albums = snapshot; currentAlbums = latest;
             this.openFolder = openFolder ?? (info => { using (Process.Start(info)) { } });
-            Title = "Find duplicates"; Width = 960; Height = 570; MinWidth = 720; MinHeight = 460;
-            WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            var help = Kit.Label("Review song and album copies below. Confirmed matches use file/audio hashes; possible matches use tags and duration. This scanner does not delete files.", Kit.Body, cls: "muted");
-            help.TextWrapping = TextWrapping.Wrap;
+            var help = Kit.Label("Confirmed copies have identical audio; possible copies share tags and length. Nothing is deleted here: remove confirmed copies with Organize › Remove confirmed duplicates.", Kit.Small, cls: "muted");
+            help.TextWrapping = TextWrapping.Wrap; help.TextTrimming = TextTrimming.None;
             message.Named("Duplicate scan status");
             progress.Named("Duplicate scan progress");
             matches.Named("Duplicate songs and albums");
@@ -58,22 +56,27 @@ namespace AlbumArtTool
             }, node => node.Children);
             matches.SelectionChanged += (s, e) => open.IsEnabled = (matches.SelectedItem as Node)?.Path != null;
             scan.Click += async (s, e) => { if (IsScanning) source?.Cancel(); else await ScanAsync(); };
+            scan.Tip("Compare every song again using the latest library scan. Click again while it runs to stop.");
+            save.Tip("Save every duplicate group as a CSV report you can open in Excel.");
+            open.Tip("Open the folder of the selected album copy, or the folder holding the selected song.");
             save.IsEnabled = false; save.Click += async (s, e) => await SaveReportAsync();
             open.IsEnabled = false; open.Click += (s, e) => OpenSelected();
-            foreach (var b in new[] { scan, save, open }) b.Margin = new Thickness(3, 6, 3, 0);
-            var buttons = Kit.Grid("165,180,*,165", "*").Add(scan.Cell(0, 0), save.Cell(0, 1), open.Cell(0, 3));
-            var card = Kit.Frost(Kit.Inset(matches), new Thickness(10)); card.Margin = new Thickness(0, 2, 0, 0);
-            var layout = Kit.Grid("*", "42,45,24,*,45").Add(help.Cell(0, 0), message.Cell(1, 0), progress.Cell(2, 0), card.Cell(3, 0), buttons.Cell(4, 0));
-            layout.Margin = new Thickness(16);
-            Kit.Prepare(this, layout);
-            Closed += (s, e) => source?.Cancel();
+            foreach (var b in new[] { scan, save, open }) { b.Margin = new Thickness(3, 8, 3, 0); b.Padding = new Thickness(14, 2); b.Height = 34; }
+            var buttons = Kit.Grid("Auto,Auto,*,Auto", "*").Add(scan.Cell(0, 0), save.Cell(0, 1), open.Cell(0, 3));
+            message.FontSize = Kit.Small;
+            var table = Kit.Inset(matches); table.Margin = new Thickness(0, 4, 0, 0);
+            var layout = Kit.Grid("*", "Auto,Auto,Auto,*,Auto").Add(help.Cell(0, 0), message.Cell(1, 0), progress.Cell(2, 0), table.Cell(3, 0), buttons.Cell(4, 0));
+            Content = layout;
         }
+
+        internal void Stop() => source?.Cancel();
+        private Window Owner => TopLevel.GetTopLevel(this) as Window;
 
         internal async Task ScanAsync()
         {
             if (IsScanning) return;
             source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
-            IsScanning = true; Result = null; save.IsEnabled = open.IsEnabled = false; scan.Content = "Stop scan";
+            IsScanning = true; Result = null; save.IsEnabled = open.IsEnabled = false; scan.SetText("Stop scan");
             Nodes = Array.Empty<Node>(); matches.ItemsSource = null;
             progress.IsVisible = true; progress.Value = 0; message.Text = "Finding duplicate candidates…";
             var reporter = new Progress<ProgressInfo>(p =>
@@ -93,7 +96,7 @@ namespace AlbumArtTool
             }
             catch (OperationCanceledException) { message.Text = "Duplicate scan stopped. Run it again to compare the whole snapshot."; }
             catch (Exception e) { message.Text = "Duplicate scan could not finish. " + e.Message; }
-            finally { IsScanning = false; scan.Content = "Scan again"; progress.IsVisible = false; }
+            finally { IsScanning = false; scan.SetText("Scan again"); progress.IsVisible = false; }
         }
 
         private void ShowMatches()
@@ -133,18 +136,20 @@ namespace AlbumArtTool
             if (!(matches.SelectedItem is Node { Path: string path })) return;
             string folder = Directory.Exists(path) ? path : Path.GetDirectoryName(path);
             try { openFolder(new ProcessStartInfo(folder) { UseShellExecute = true }); }
-            catch (Exception e) { _ = Dialogs.ShowMessage(this, "Could not open folder", e.Message); }
+            catch (Exception e) { _ = Dialogs.ShowMessage(Owner, "Could not open folder", e.Message); }
         }
 
         private async Task SaveReportAsync()
         {
-            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+            if (storage == null) return;
+            var file = await storage.SaveFilePickerAsync(new FilePickerSaveOptions
             { Title = "Save duplicate report", SuggestedFileName = "music-duplicates.csv", DefaultExtension = "csv",
               FileTypeChoices = new[] { new FilePickerFileType("CSV report") { Patterns = new[] { "*.csv" } } } });
             string path = file?.TryGetLocalPath();
             if (path == null) return;
             try { File.WriteAllText(path, Csv(Result), new UTF8Encoding(true)); }
-            catch (Exception e) { await Dialogs.ShowMessage(this, "Could not save report", e.Message); }
+            catch (Exception e) { await Dialogs.ShowMessage(Owner, "Could not save report", e.Message); }
         }
 
         internal static string Csv(DuplicateResult result)
