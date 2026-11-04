@@ -48,16 +48,17 @@ namespace AlbumArtTool.Management
             return kbps;
         }
 
-        // ffprobe lists every audio packet as "size,duration_time".
+        // ffprobe lists every audio packet's "size=" and "duration_time=" (key=value, so field order does not matter).
         private static (long, double) WithProbe(string probe, string path, CancellationToken token)
         {
             long bytes = 0; double seconds = 0;
-            Encoder.Run(probe, new[] { "-v", "error", "-select_streams", "a:0", "-show_entries", "packet=size,duration_time", "-of", "csv=p=0", path }, token, line =>
+            Encoder.Run(probe, new[] { "-v", "error", "-select_streams", "a:0", "-show_entries", "packet=size,duration_time", "-of", "default=noprint_wrappers=1", path }, token, line =>
             {
-                var parts = line.Split(',');
-                if (parts.Length < 2) return;
-                if (long.TryParse(parts[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long size)) bytes += size;
-                if (double.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double duration)) seconds += duration;
+                int equals = line.IndexOf('=');
+                if (equals <= 0) return;
+                string key = line.Substring(0, equals).Trim(), value = line.Substring(equals + 1).Trim();
+                if (key == "size" && long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long size)) bytes += size;
+                else if (key == "duration_time" && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double duration)) seconds += duration;
             }, timeoutSeconds: 600);
             return (bytes, seconds);
         }

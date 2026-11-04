@@ -371,7 +371,7 @@ internal static partial class Tests
         BitrateProbe.ClearCache();
         LibraryChecks.Verify(result, CancellationToken.None);
         Assert(result.Verified && result.LowBitrate.Single().Path == honest && result.HeaderWrong.Single().Path == lying && result.MeasureIssues.Count == 0,
-            "measuring drops the song whose header lied and keeps the genuinely low one");
+            "measuring drops the song whose header lied and keeps the genuinely low one: measured " + string.Join(", ", result.Measured.Select(m => Path.GetFileName(m.Key) + "=" + m.Value)) + " issues " + string.Join("; ", result.MeasureIssues));
         Assert(Math.Abs(result.Bitrate(tracks["honest.mp3"]) - 64) <= 3 && Math.Abs(result.Measured[lying] - 192) <= 4, "measured " + result.Measured[honest] + " and " + result.Measured[lying] + " kbps");
         var grouped = result.LowBitrateAlbums().Single();
         Assert(grouped.Album == "Verify album" && grouped.Artist == "Verify artist" && grouped.Tracks.Count == 1 && grouped.Folder == root, "low-bitrate songs are grouped by album");
