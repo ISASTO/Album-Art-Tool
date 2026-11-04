@@ -359,6 +359,8 @@ internal static partial class Tests
         int flags = bytes[at + 7], offset = at + 8 + ((flags & 1) != 0 ? 4 : 0);
         Assert((flags & 2) != 0, "the encoder wrote a Xing/Info byte count");
         uint size = (uint)(bytes[offset] << 24 | bytes[offset + 1] << 16 | bytes[offset + 2] << 8 | bytes[offset + 3]) / 4;
+        // Tag readers only trust a VBR "Xing" header (FFmpeg labels CBR files "Info").
+        bytes[at] = (byte)'X'; bytes[at + 1] = (byte)'i'; bytes[at + 2] = (byte)'n'; bytes[at + 3] = (byte)'g';
         bytes[offset] = (byte)(size >> 24); bytes[offset + 1] = (byte)(size >> 16); bytes[offset + 2] = (byte)(size >> 8); bytes[offset + 3] = (byte)size;
         File.WriteAllBytes(lying, bytes);
         var albums = Scanner.Scan(root, CancellationToken.None).Albums;
