@@ -23,6 +23,12 @@ namespace AlbumArtTool
     internal sealed partial class MainWindow : Window
     {
         private readonly Button appearance = Kit.Button("Light mode", "chrome");
+        private void UpdateIssues()
+        {
+            issuesButton.IsVisible = issues.Count > 0;
+            issuesButton.Content = issues.Count == 1 ? "1 issue" : issues.Count + " issues";
+        }
+
         internal Action<ProcessStartInfo> StartExplorer = info => { using (Process.Start(info)) { } };
         private readonly TextBox folder = new TextBox { IsReadOnly = true };
         private readonly TextBox search = new TextBox();
@@ -34,7 +40,8 @@ namespace AlbumArtTool
         private readonly Button apply = Kit.Button("Apply cover", "primary");
         private readonly Button undo = Kit.Button("Undo last change", "chrome");
         private readonly Button openFolder = Kit.Button("Open album folder");
-        private readonly Button issuesButton = Kit.Button("Details");
+        // Only shown when something went wrong, labelled with how many problems there are.
+        private readonly Button issuesButton = Kit.Button("Issues");
         private readonly AlbumList albums = new AlbumList();
         private readonly ICoverSearch coverSearch;
         private readonly CoverSearchPanel online;
@@ -115,6 +122,8 @@ namespace AlbumArtTool
             folderCover.IsCheckedChanged += (s, e) => UpdateApplyButton();
             openFolder.Click += (s, e) => OpenSelectedFolder();
             issuesButton.Click += (s, e) => Dialogs.Issues(this, issues);
+            issuesButton.Named("Show issues").Tip("Files that could not be read or changed during the last scan or edit, with the reason for each.");
+            issuesButton.IsVisible = false; issuesButton.Margin = new Thickness(12, 0, 0, 0); issuesButton.Padding = new Thickness(12, 3, 12, 4);
             DragDrop.SetAllowDrop(coverFrame, true);
             coverFrame.AddHandler(DragDrop.DragOverEvent, (s, e) => e.DragEffects = !busy && albums.SelectedAlbum != null && AlbumList.SingleImagePath(e.Data) != null ? DragDropEffects.Copy : DragDropEffects.None);
             coverFrame.AddHandler(DragDrop.DropEvent, (s, e) => { string path = AlbumList.SingleImagePath(e.Data); if (!busy && path != null) StageImage(path); });
@@ -179,8 +188,9 @@ namespace AlbumArtTool
             status.Named("Operation status and track counter");
             progress.Named("Scan and update progress"); progress.IsVisible = false;
             progressPercent.HorizontalAlignment = HorizontalAlignment.Right; progressPercent.Named("Progress percentage");
-            var progressArea = Kit.Grid("*,47", "*").Add(progress.Cell(0, 0), progressPercent.Cell(0, 1));
-            var bottom = Kit.Grid("*,190,86", "*").Add(status.Cell(0, 0), progressArea.Cell(0, 1), issuesButton.Cell(0, 2));
+            var progressArea = Kit.Grid("*,44", "*").Add(progress.Cell(0, 0), progressPercent.Cell(0, 1));
+            progressArea.Width = 200;
+            var bottom = Kit.Grid("*,Auto,Auto", "*").Add(status.Cell(0, 0), progressArea.Cell(0, 1), issuesButton.Cell(0, 2));
             bottom.Margin = new Thickness(0, 8, 0, 0);
             var outer = Kit.Grid("*", "52,44,52,*,42").Add(header.Cell(0, 0), pathRow.Cell(1, 0), tabs.Cell(2, 0), body.Cell(3, 0), bottom.Cell(4, 0));
             outer.Margin = new Thickness(24, 18, 24, 12);
@@ -375,7 +385,7 @@ namespace AlbumArtTool
                 empty.Text = "Scanning your music…\nAlbums appear when the scan finishes.";
                 albums.IsVisible = false; empty.IsVisible = true;
             }
-            issuesButton.IsEnabled = issues.Count > 0;
+            UpdateIssues();
             UpdateApplyButton(); UpdateLibraryTools();
         }
 
@@ -410,10 +420,10 @@ namespace AlbumArtTool
                 library = result; hasScanned = true; issues.AddRange(result.Issues);
                 if (!result.Cancelled) AppSettings.LastFolder = root;
                 status.Text = (result.Cancelled ? "Scan stopped · " : "") + result.Albums.Count + " albums · " + result.FilesRead + " tracks" +
-                    (issues.Count > 0 ? " · " + issues.Count + " issues (Details)" : " · Drop an image onto an album to get started.");
+                    (issues.Count > 0 ? " · " + issues.Count + (issues.Count == 1 ? " issue" : " issues") : " · Drop an image onto an album to get started.");
                 RefreshAlbums();
             }
-            catch (Exception e) { issues.Add(e.Message); status.Text = "Scan could not finish. See Details."; RefreshAlbums(); }
+            catch (Exception e) { issues.Add(e.Message); status.Text = "Scan could not finish. See Issues."; RefreshAlbums(); }
             finally { SetBusy(false); ShowSelection(); }
         }
 
@@ -444,7 +454,7 @@ namespace AlbumArtTool
                     return Artwork.Normalize(original);
                 }));
             }
-            catch (Exception e) { issues.Add(e.Message); issuesButton.IsEnabled = true; status.Text = "Could not queue this cover. See Details."; return Task.CompletedTask; }
+            catch (Exception e) { issues.Add(e.Message); UpdateIssues(); status.Text = "Could not queue this cover. See Issues."; return Task.CompletedTask; }
         }
 
         internal Task ApplyOnlineCoverAsync(string albumKey, CoverCandidate candidate)
@@ -465,9 +475,9 @@ namespace AlbumArtTool
                 var result = await Task.Run(() => editor.Undo(lastEdit, reporter));
                 issues.AddRange(result.Issues);
                 await RefreshFolderAsync(lastEditedFolder, null);
-                status.Text = result.Restored + " original files restored" + (issues.Count > 0 ? " · Some files could not be restored. See Details." : ".");
+                status.Text = result.Restored + " original files restored" + (issues.Count > 0 ? " · Some files could not be restored. See Issues." : ".");
             }
-            catch (Exception e) { issues.Add(e.Message); status.Text = "Undo could not finish. See Details."; }
+            catch (Exception e) { issues.Add(e.Message); status.Text = "Undo could not finish. See Issues."; }
             finally { SetBusy(false); ShowSelection(); }
         }
 

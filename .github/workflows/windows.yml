@@ -30,6 +30,9 @@ jobs:
         run: dotnet build tests/AlbumArtTool.Tests/AlbumArtTool.Tests.csproj -c Release
       - name: Run tests
         run: ALBUMART_FFMPEG="$(command -v ffmpeg)" dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll "$PWD/TestResults"
+      - name: TEMP print screenshots
+        if: always()
+        run: for f in tag-checks scanning-progress; do echo "SHOT-BEGIN $f"; base64 -w 0 TestResults/$f.png; echo; echo "SHOT-END"; done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
