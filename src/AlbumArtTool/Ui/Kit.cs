@@ -43,7 +43,7 @@ namespace AlbumArtTool.Ui
         internal static Button IconButton(string icon, string text, params string[] classes)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7, VerticalAlignment = VerticalAlignment.Center };
-            row.Children.Add(Icon(icon));
+            row.Children.Add(Glyph(icon));
             if (!string.IsNullOrEmpty(text)) row.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
             var button = new Button { Content = row };
             foreach (string name in classes) button.Classes.Add(name);
@@ -57,7 +57,7 @@ namespace AlbumArtTool.Ui
                 try { icon.Data = StreamGeometry.Parse(data); } catch (Exception) { }
         }
 
-        internal static PathIcon Icon(string data, double size = 14)
+        internal static PathIcon Glyph(string data, double size = 14)
         {
             Geometry geometry = null;
             try { geometry = StreamGeometry.Parse(data); } catch (Exception) { /* A bad icon must never stop a window from opening. */ }

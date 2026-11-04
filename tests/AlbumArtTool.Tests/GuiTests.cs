@@ -97,7 +97,7 @@ internal static partial class Tests
             await ScanningGui(window);
             await window.ScanAsync();
             var list = window.Albums;
-            Assert(Icons.All.All(icon => Kit.Icon(icon).Data != null), "every icon's vector path parses");
+            Assert(Icons.All.All(icon => Kit.Glyph(icon).Data != null), "every icon's vector path parses");
             Assert(list.AlbumCount == 2, "missing tab lists only incomplete albums");
             Assert(ButtonStarting(window, "Missing art (").Text() == "Missing art (2)" && ButtonStarting(window, "Has art (").Text() == "Has art (1)" && ButtonStarting(window, "All (").Text() == "All (3)", "view chips count their albums");
             Click(ButtonStarting(window, "Has art"));
