@@ -14,6 +14,8 @@ namespace AlbumArtTool.Core
         public List<Track> MultiplePictures { get; } = new List<Track>();
         /// <summary>Songs with an artist but no Album Artist tag (players may split their album or file it under the wrong artist).</summary>
         public List<Track> MissingAlbumArtists { get; } = new List<Track>();
+        /// <summary>Songs with an embedded picture larger than 600 px on its longest side, largest first.</summary>
+        public List<Track> LargeCovers { get; } = new List<Track>();
         /// <summary>Lossy songs below the chosen bitrate, lowest first.</summary>
         public List<Track> LowBitrate { get; } = new List<Track>();
         public int LowBitrateLimit { get; set; }
@@ -96,10 +98,13 @@ namespace AlbumArtTool.Core
                 result.TracksChecked++;
                 if (!track.HasTitleTag) result.MissingTitles.Add(track);
                 if (NeedsAlbumArtist(track)) result.MissingAlbumArtists.Add(track);
+                if (track.LargestPicture > Artwork.EmbedSide) result.LargeCovers.Add(track);
                 if (track.PictureCount > 1) result.MultiplePictures.Add(track);
                 if (IsLowBitrate(track, lowBitrate)) result.LowBitrate.Add(track);
             }
             result.MissingTitles.Sort((a, b) => StringComparer.CurrentCultureIgnoreCase.Compare(a.Path, b.Path));
+            var big = result.LargeCovers.OrderByDescending(t => t.LargestPicture).ThenBy(t => t.Path, StringComparer.CurrentCultureIgnoreCase).ToList();
+            result.LargeCovers.Clear(); result.LargeCovers.AddRange(big);
             result.MissingAlbumArtists.Sort((a, b) => StringComparer.CurrentCultureIgnoreCase.Compare(a.Path, b.Path));
             var ordered = result.MultiplePictures.OrderByDescending(t => t.CoverPictures > 1).ThenByDescending(t => t.PictureCount)
                 .ThenBy(t => t.Path, StringComparer.CurrentCultureIgnoreCase).ToList();
@@ -180,6 +185,7 @@ namespace AlbumArtTool.Core
             void Row(string check, Track t) => text.Append(string.Join(",", new[] { check, t.ArtistText, t.AlbumTitle, t.HasTitleTag ? t.Title : "", t.PictureSummary, result.Bitrate(t) > 0 ? result.Bitrate(t).ToString() : "", Format(t), t.Path }.Select(Escape))).Append("\r\n");
             foreach (var track in result.MissingTitles) Row("Missing Title tag", track);
             foreach (var track in result.MissingAlbumArtists) Row("Missing Album Artist tag", track);
+            foreach (var track in result.LargeCovers) Row("Cover larger than " + Artwork.EmbedSide + " px (" + track.LargestPicture + " px)", track);
             foreach (var track in result.MultiplePictures) Row(track.CoverPictures > 1 ? "Several embedded covers" : "Several embedded pictures", track);
             foreach (var track in result.LowBitrate) Row("Below " + result.LowBitrateLimit + " kbps" + (result.Measured.ContainsKey(track.Path) ? " (measured)" : " (header)"), track);
             return text.ToString();

@@ -156,7 +156,7 @@ namespace AlbumArtTool
             if (healthPage == null)
             {
                 healthPage = new HealthPage(() => library.Albums.ToArray(), info => StartExplorer(info), () => ShowOrganize().PreviewTitleFill(), () => ShowOrganize().PreviewArtworkFix(),
-                    result => { ShowUpgrade(result); return Task.CompletedTask; }, () => !busy && !maintenanceRunning && library.Albums.Count > 0, () => ShowOrganize().PreviewAlbumArtistFill());
+                    result => { ShowUpgrade(result); return Task.CompletedTask; }, () => !busy && !maintenanceRunning && library.Albums.Count > 0, () => ShowOrganize().PreviewAlbumArtistFill(), () => ShowOrganize().PreviewShrinkCovers());
                 AddPage(healthPage);
                 healthVersion = libraryVersion;
             }

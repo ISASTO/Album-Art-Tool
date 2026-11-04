@@ -24,7 +24,7 @@ namespace AlbumArtTool
         private readonly Action<bool> exclusive;
         private readonly Func<string, Task> refreshLibrary;
         private readonly CheckBox convert = Kit.Check("Convert lossless to MP3 320", false), compatibility = Kit.Check("Also convert other lossy formats", false),
-            square = Kit.Check("Crop artwork to squares", false), shrink = Kit.Check("One front cover per song (JPEG ≤ " + Artwork.EmbedSide + " px)", false),
+            square = Kit.Check("Crop artwork to squares", false), singleCover = Kit.Check("One front cover per song", false), shrink = Kit.Check("Shrink covers over " + Artwork.EmbedSide + " px to " + Artwork.EmbedSide + " px JPEG", false),
             titleFromName = Kit.Check("Fill missing titles from filenames", false), cleanTitles = Kit.Check("Remove “feat.” credits from titles", false),
             id3v23 = Kit.Check("Standardize MP3 tags to ID3v2.3", false), albumArtist = Kit.Check("Fill missing album artists from the artist", false),
             organize = Kit.Check("Sort into Artist / Album folders", false), rename = Kit.Check("Rename files from their titles", false), combine = Kit.Check("Combine multi-disc albums", false),
@@ -74,14 +74,15 @@ namespace AlbumArtTool
             root = musicRoot; canStart = ready; exclusive = setExclusive; refreshLibrary = refresh; this.openSettings = openSettings;
             optionBoxes = new Dictionary<string, CheckBox>
             {
-                [OrganizePresets.Convert] = convert, [OrganizePresets.Compatibility] = compatibility, [OrganizePresets.Square] = square, [OrganizePresets.Shrink] = shrink,
+                [OrganizePresets.Convert] = convert, [OrganizePresets.Compatibility] = compatibility, [OrganizePresets.Square] = square, [OrganizePresets.Shrink] = shrink, [OrganizePresets.SingleCover] = singleCover,
                 [OrganizePresets.TitleFromName] = titleFromName, [OrganizePresets.CleanTitles] = cleanTitles, [OrganizePresets.Id3v23] = id3v23, [OrganizePresets.AlbumArtistFromArtist] = albumArtist,
                 [OrganizePresets.Organize] = organize, [OrganizePresets.Rename] = rename, [OrganizePresets.Combine] = combine,
                 [OrganizePresets.Duplicates] = duplicates, [OrganizePresets.Archive] = archive,
             };
             convert.Named("Convert lossless to MP3 320"); compatibility.Named("Also convert other lossy formats"); square.Named("Crop artwork to squares");
             rename.Named("Rename song files from Title tags"); combine.Named("Combine multi-disc albums"); cleanTitles.Named("Remove featured artists from titles");
-            shrink.Named("Standardize embedded artwork");
+            shrink.Named("Shrink large covers");
+            singleCover.Named("Standardize embedded artwork");
             titleFromName.Named("Fill missing Title tags from filenames");
             id3v23.Named("Standardize MP3 tags to ID3v2.3");
             albumArtist.Named("Fill missing album artists from the artist");
@@ -117,7 +118,7 @@ namespace AlbumArtTool
             var helperCaption = Kit.Caption("Needs"); helperCaption.Margin = new Thickness(0, 0, 0, 4);
             helper.Children.Add(helperCaption); helper.Children.Add(encoderState); helper.Children.Add(setupEncoder);
             var options = Kit.Grid("*,*,*", "Auto,Auto").Add(
-                Group("Audio", convert, compatibility).Cell(0, 0), Group("Artwork", square, shrink).Cell(0, 1), Group("Cleanup", duplicates, archive).Cell(0, 2),
+                Group("Audio", convert, compatibility).Cell(0, 0), Group("Artwork", square, singleCover, shrink).Cell(0, 1), Group("Cleanup", duplicates, archive).Cell(0, 2),
                 Group("Tags", titleFromName, albumArtist, cleanTitles, id3v23).Cell(1, 0), Group("Files & folders", organize, rename, combine).Cell(1, 1), helper.Cell(1, 2)).Named("Library management options");
             helper.Margin = new Thickness(8, 8, 8, 4);
             optionsPanel = options;
@@ -311,11 +312,12 @@ namespace AlbumArtTool
                 "Filenames are not changed; a clash between discs gets \" (2)\". Each merge is selected or cleared as a whole album in the preview." + safe);
             cleanTitles.Tip("Removes feat. / ft. / featuring credits from Title tags and filenames: \"Song (feat. Guest)\" becomes \"Song\". Brackets, capitalization and trailing credits are all handled.\n\n" +
                 "Version labels such as (Live), (Remix) or (2014 Remaster) stay. Artist tags are not changed. A title is never emptied." + safe);
-            shrink.Tip("Brings every song's embedded artwork to one standard: exactly one picture, in the front-cover slot (ID3 type 3), as a JPEG of at most " +
-                Artwork.EmbedSide + " × " + Artwork.EmbedSide + " at quality " + Artwork.EmbedQuality + ".\n\n" +
+            singleCover.Tip("Keeps exactly one embedded picture per song, in the front-cover slot (ID3 type 3).\n\n" +
                 "When a song has several pictures, the best cover is kept (a front cover first, then an unlabeled picture, then the largest image) and back covers, booklet pages and duplicates are removed. " +
-                "Larger or non-JPEG pictures are re-encoded; smaller pictures are never enlarged; pictures already in that form are left byte for byte. Leftover tag padding is removed, so files really get smaller. " +
-                "Audio and other tags are unchanged." + safe);
+                "A single picture in another slot is moved to the front-cover slot. Its size is not changed unless \"Shrink covers\" is also selected. Leftover tag padding is removed, so files really get smaller." + safe);
+            shrink.Tip("Resizes every embedded picture larger than " + Artwork.EmbedSide + " × " + Artwork.EmbedSide + " (or not a JPEG) to a JPEG of at most " + Artwork.EmbedSide + " px at quality " + Artwork.EmbedQuality + ", keeping its shape.\n\n" +
+                "A 3000 × 3000 PNG becomes a 600 × 600 JPEG. Smaller JPEGs are never enlarged and are left byte for byte. Leftover tag padding is removed, so files really get smaller. " +
+                "Combine with \"One front cover per song\" to also remove extra pictures. Audio and other tags are unchanged." + safe);
             albumArtist.Tip("Gives songs with an Artist but no Album Artist tag an album artist, so players keep each album together under one artist.\n\n" +
                 "The album's main artist is used when the song credits it (guests stay on the Artist tag only); otherwise the song's first artist. Songs that already have an album artist are left alone." + safe);
             titleFromName.Tip("Gives songs without a Title tag their filename as the title, without the extension or a leading track number: \"01 - Song.mp3\" → \"Song\".\n\n" +
@@ -380,7 +382,8 @@ namespace AlbumArtTool
             InvalidatePlan(); UpdatePresetState();
             return PreviewAsync();
         }
-        internal Task PreviewArtworkFix() => PreviewOnly(shrink);
+        internal Task PreviewArtworkFix() => PreviewOnly(singleCover);
+        internal Task PreviewShrinkCovers() => PreviewOnly(shrink);
 
         private Task PreviewOnly(CheckBox option)
         {
@@ -496,7 +499,7 @@ namespace AlbumArtTool
             if (IsWorking || !Ready()) return;
             encoder = Management.Encoder.Find(); UpdateEncoder();
             var options = new LibraryOptions { Root = root, BackupRoot = BackupSettings.Root, EncoderPath = encoder, Convert = convert.On(), ConvertOtherLossy = compatibility.On(),
-                Square = square.On(), Shrink = shrink.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On(), TitleFromFilename = titleFromName.On(), Id3v23 = id3v23.On(),
+                Square = square.On(), Shrink = shrink.On(), SingleCover = singleCover.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On(), TitleFromFilename = titleFromName.On(), Id3v23 = id3v23.On(),
                 AlbumArtistFromArtist = albumArtist.On(), RenameArtistsFrom = renameFrom, RenameArtistTo = renameTo, RenameAlbumArtists = renameAlbumArtists };
             source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
             SetWorking(true); exclusive(true); SetRows(new List<FileRow>()); plan = null; undoJournal = null;

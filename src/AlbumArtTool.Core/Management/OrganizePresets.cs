@@ -22,11 +22,11 @@ namespace AlbumArtTool.Management
     // No reflection-based serializer, so it is safe for the NativeAOT build.
     internal static class OrganizePresets
     {
-        internal const string Convert = "convert", Compatibility = "compatibility", Square = "square", Shrink = "shrink",
+        internal const string Convert = "convert", Compatibility = "compatibility", Square = "square", Shrink = "shrink", SingleCover = "singleCover",
             TitleFromName = "titleFromName", CleanTitles = "cleanTitles", Id3v23 = "id3v23", AlbumArtistFromArtist = "albumArtistFromArtist",
             Organize = "organize", Rename = "rename", Combine = "combine", Duplicates = "duplicates", Archive = "archive";
 
-        internal static readonly string[] Keys = { Convert, Compatibility, Square, Shrink, TitleFromName, AlbumArtistFromArtist, CleanTitles, Id3v23, Organize, Rename, Combine, Duplicates, Archive };
+        internal static readonly string[] Keys = { Convert, Compatibility, Square, SingleCover, Shrink, TitleFromName, AlbumArtistFromArtist, CleanTitles, Id3v23, Organize, Rename, Combine, Duplicates, Archive };
         internal const int MaxName = 40, MaxCustom = 24;
 
         internal static string FilePath => Path.Combine(BackupSettings.AppData, "organize-presets.txt");
@@ -34,9 +34,9 @@ namespace AlbumArtTool.Management
         internal static IReadOnlyList<OrganizePreset> BuiltIn { get; } = new[]
         {
             Make("Tidy tags", "Fill missing titles from filenames and missing album artists from the artist, remove “feat.” credits from titles and standardize MP3 tags to ID3v2.3.", TitleFromName, AlbumArtistFromArtist, CleanTitles, Id3v23),
-            Make("Standardize artwork", "Crop embedded artwork to squares and keep one front cover per song as a JPEG of at most " + Artwork.EmbedSide + " px.", Square, Shrink),
+            Make("Standardize artwork", "Crop embedded artwork to squares, keep one front cover per song and shrink covers over " + Artwork.EmbedSide + " px to a " + Artwork.EmbedSide + " px JPEG.", Square, SingleCover, Shrink),
             Make("Full clean-up", "Convert lossless audio to MP3 320, standardize artwork and tags, remove confirmed duplicates, sort into Artist / Album folders and move old backups off the player.",
-                Convert, Square, Shrink, TitleFromName, AlbumArtistFromArtist, Id3v23, Organize, Duplicates, Archive),
+                Convert, Square, SingleCover, Shrink, TitleFromName, AlbumArtistFromArtist, Id3v23, Organize, Duplicates, Archive),
         };
 
         private static OrganizePreset Make(string name, string description, params string[] options) =>
@@ -60,14 +60,19 @@ namespace AlbumArtTool.Management
             var presets = new List<OrganizePreset>();
             string text = AppSettings.Read(path ?? FilePath);
             if (text == null) return presets;
+            // Before version 2, "shrink" also meant one front cover per song.
+            bool v2 = text.StartsWith("#v2", StringComparison.Ordinal);
             foreach (string line in text.Split('\n'))
             {
+                if (line.StartsWith("#", StringComparison.Ordinal)) continue;
                 int tab = line.IndexOf('\t');
                 if (tab <= 0) continue;
                 string name = CleanName(line.Substring(0, tab));
                 if (name == null || IsReserved(name) || presets.Any(p => p.Name.Equals(name, StringComparison.CurrentCultureIgnoreCase))) continue;
                 var options = line.Substring(tab + 1).Trim().Split(',', StringSplitOptions.RemoveEmptyEntries).Select(o => o.Trim()).Where(o => Keys.Contains(o));
-                presets.Add(new OrganizePreset { Name = name, Options = new HashSet<string>(options, StringComparer.Ordinal) });
+                var set = new HashSet<string>(options, StringComparer.Ordinal);
+                if (!v2 && set.Contains(Shrink)) set.Add(SingleCover);
+                presets.Add(new OrganizePreset { Name = name, Options = set });
                 if (presets.Count == MaxCustom) break;
             }
             return presets;
@@ -76,7 +81,7 @@ namespace AlbumArtTool.Management
         internal static bool SaveCustom(IEnumerable<OrganizePreset> presets, string path = null)
         {
             var lines = presets.Where(p => !p.BuiltIn).Take(MaxCustom).Select(p => CleanName(p.Name) + "\t" + string.Join(",", Keys.Where(p.Options.Contains)));
-            return AppSettings.Write(path ?? FilePath, string.Join("\n", lines));
+            return AppSettings.Write(path ?? FilePath, "#v2\n" + string.Join("\n", lines));
         }
 
         /// <summary>Adds or replaces (same name, ignoring case) a custom preset and saves the list.</summary>

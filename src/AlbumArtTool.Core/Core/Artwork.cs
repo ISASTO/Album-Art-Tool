@@ -183,6 +183,16 @@ namespace AlbumArtTool.Core
         }
 
         /// <summary>Always a quality-88 JPEG of at most 600 px, for covers chosen in the app.</summary>
+        /// <summary>The longest side of the largest picture, read from the image headers only (0 when none can be read).</summary>
+        public static int LargestSide(TagLib.IPicture[] pictures)
+        {
+            int largest = 0;
+            foreach (var picture in pictures ?? Array.Empty<TagLib.IPicture>())
+                try { var size = ReadInfo(picture.Data.Data); largest = Math.Max(largest, Math.Max(size.Width, size.Height)); }
+                catch (Exception e) when (IsImageError(e)) { }
+            return largest;
+        }
+
         public static byte[] EmbedCover(byte[] bytes) => Normalize(bytes, EmbedSide, ImageKind.Jpeg, EmbedQuality);
 
         public static byte[] Thumbnail(byte[] bytes) => Normalize(bytes, 128, ImageKind.Png);
