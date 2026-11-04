@@ -11,6 +11,7 @@ using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using AlbumArtTool.Core;
 using AlbumArtTool.Ui;
 
@@ -26,11 +27,15 @@ namespace AlbumArtTool
         private readonly Func<LibraryCheckResult, Task> replaceLow;
         // One row of equal-weight actions; each tooltip explains what the short label does.
         private readonly Button replace = Kit.Button("Replace from YouTube Music…");
-        private readonly Button fill = Kit.Button("Fill missing titles…"), onePicture = Kit.Button("Fix pictures…");
+        private readonly Button fill = Kit.Button("Fill from filenames…"), onePicture = Kit.Button("Keep one cover…");
         private readonly ListBox list = new ListBox { Classes = { "grid" } };
         private readonly TextBlock summary = Kit.Label("", Kit.Body);
         private readonly ComboBox threshold = new ComboBox { Width = 150, HorizontalAlignment = HorizontalAlignment.Right };
-        private readonly Button refresh = Kit.Button("Check again", "primary"), save = Kit.Button("Save report…"), show = Kit.Button("Show selected");
+        private readonly Button refresh = Kit.IconButton(Icons.Refresh, "Check again", "ghost"), save = Kit.Button("Save report…"), show = Kit.IconButton(Icons.Open, "Show selected");
+        // One summary card per check, each with its own fix.
+        private readonly TextBlock titlesCount = Metric(), picturesCount = Metric(), bitrateCount = Metric();
+        private readonly TextBlock titlesDetail = Detail(), picturesDetail = Detail(), bitrateDetail = Detail();
+        private int titlesHeader, picturesHeader, bitrateHeader;
         internal LibraryCheckResult Result { get; private set; }
         internal IReadOnlyList<Row> Rows { get; private set; } = Array.Empty<Row>();
         /// <summary>The bitrate measurement started by the last check (completed when there is nothing to measure).</summary>
@@ -47,11 +52,10 @@ namespace AlbumArtTool
         internal LibraryCheckWindow(Func<Album[]> albums, Action<ProcessStartInfo> openFolder, Func<Task> fillTitles = null, Func<Task> fixPictures = null, Func<LibraryCheckResult, Task> replaceLow = null)
         {
             currentAlbums = albums; this.openFolder = openFolder; this.fillTitles = fillTitles; this.fixPictures = fixPictures; this.replaceLow = replaceLow;
-            Title = "Check library"; Width = 1000; Height = 570; MinWidth = 950; MinHeight = 420;
+            Title = "Check library"; Width = 1000; Height = 640; MinWidth = 900; MinHeight = 500;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            var help = Kit.Label("Songs without a Title tag show their filename in players. Songs with several embedded pictures can show the wrong cover or carry extra artwork. Albums with low-bitrate lossy songs (measured, not just the file header) may be worth downloading again. Results use the last library scan; nothing is changed.", Kit.Body, cls: "muted");
-            help.TextWrapping = TextWrapping.Wrap; help.TextTrimming = TextTrimming.None;
-            summary.Named("Tag check summary");
+            var subtitle = Kit.Label("Based on the last scan. Nothing changes until you choose a fix and apply it.", Kit.Body, cls: "muted");
+            summary.Named("Tag check summary"); summary.Classes.Add("muted"); summary.FontSize = Kit.Small;
             foreach (int kbps in LibraryChecks.BitrateChoices) threshold.Items.Add("Below " + kbps + " kbps");
             threshold.SelectedIndex = Array.IndexOf(LibraryChecks.BitrateChoices, LibraryChecks.DefaultLowBitrate);
             threshold.Named("Low bitrate threshold").Tip("Albums with lossy songs (MP3, AAC, Ogg, Opus, WMA…) below this bitrate are listed. Lossless files are never listed.\n\n" +
@@ -61,28 +65,57 @@ namespace AlbumArtTool
             list.Named("Tag check results");
             list.ItemTemplate = new FuncDataTemplate<Row>((row, scope) => new RowView(), true);
             list.SelectionChanged += (s, e) => show.IsEnabled = (list.SelectedItem as Row)?.Path != null;
+            refresh.Tip("Check again using the latest library scan (rescan first if you changed files outside the app).");
             refresh.Click += (s, e) => Check();
+            save.Tip("Save every finding as a CSV report you can open in Excel.");
             save.Click += async (s, e) => await SaveAsync();
             show.IsEnabled = false; show.Click += (s, e) => ShowSelected();
             show.Tip("Highlights the selected song in File Explorer, or opens the selected album's folder.");
             Closed += (s, e) => measuring?.Cancel();
-            fill.Named("Fill titles from filenames").Tip("Opens Manage library with only \"Fill missing Title tags from filenames\" selected and previews the changes. Nothing is written until you apply them.");
+            fill.Named("Fill titles from filenames").Tip("Opens Organize with only \"Fill missing titles from filenames\" selected and previews the changes. Nothing is written until you apply them.");
             fill.Click += async (s, e) => { if (this.fillTitles != null) await this.fillTitles(); };
-            onePicture.Named("Fix embedded pictures").Tip("Opens Manage library with only \"Standardize embedded artwork\" selected (one " + Artwork.EmbedSide + " px JPEG front cover per song) and previews the changes. Nothing is written until you apply them.");
+            onePicture.Named("Fix embedded pictures").Tip("Opens Organize with only \"One front cover per song\" selected (one " + Artwork.EmbedSide + " px JPEG front cover per song) and previews the changes. Nothing is written until you apply them.");
             onePicture.Click += async (s, e) => { if (this.fixPictures != null) await this.fixPictures(); };
-            foreach (var b in new[] { refresh, save, fill, onePicture, replace, show }) b.Margin = new Thickness(3, 6, 3, 0);
-            var buttons = Kit.Grid("124,128,*,166,124,224,128", "*").Add(refresh.Cell(0, 0), save.Cell(0, 1), fill.Cell(0, 3), onePicture.Cell(0, 4), replace.Cell(0, 5), show.Cell(0, 6));
-            var card = Kit.Frost(Kit.Inset(list), new Thickness(10)); card.Margin = new Thickness(0, 2, 0, 0);
             replace.Named("Replace from YouTube Music").Tip("Opens a window that finds each low-bitrate album on YouTube Music and replaces the low songs with fresh downloads (best free stream, saved as MP3 320 with your tags and cover). " +
                 "Nothing is replaced until you check songs and click Replace; originals are backed up and can be restored.");
             replace.IsEnabled = false;
             replace.Click += async (s, e) => { if (this.replaceLow != null && Result != null) await this.replaceLow(Result); };
-            var top = Kit.Grid("*,Auto,Auto", "*").Add(summary.Cell(0, 0), Kit.Label("Low bitrate:", Kit.Small, cls: "muted").Cell(0, 1), threshold.Cell(0, 2));
-            threshold.Margin = new Thickness(8, 0, 0, 0);
-            var layout = Kit.Grid("*", "48,36,*,45").Add(help.Cell(0, 0), top.Cell(1, 0), card.Cell(2, 0), buttons.Cell(3, 0));
-            layout.Margin = new Thickness(16);
+            threshold.Width = double.NaN; threshold.HorizontalAlignment = HorizontalAlignment.Stretch; threshold.Margin = new Thickness(0, 0, 6, 0);
+            var bitrateActions = Kit.Grid("130,*", "Auto").Add(threshold.Cell(0, 0), replace.Cell(0, 1));
+            var cards = Kit.Grid("*,*,1.35*", "Auto").Add(
+                Card("Missing titles", titlesCount, titlesDetail, fill, () => titlesHeader).Cell(0, 0),
+                Card("Extra embedded pictures", picturesCount, picturesDetail, onePicture, () => picturesHeader).Cell(0, 1),
+                Card("Low bitrate", bitrateCount, bitrateDetail, bitrateActions, () => bitrateHeader).Cell(0, 2));
+            cards.Margin = new Thickness(-5, 10, -5, 6);
+            var buttons = Kit.Grid("Auto,Auto,*,Auto", "*").Add(refresh.Cell(0, 0), save.Cell(0, 1), show.Cell(0, 3));
+            foreach (var b in new[] { refresh, save, show }) { b.Margin = new Thickness(3, 8, 3, 0); b.Padding = new Thickness(14, 2); b.Height = 34; }
+            var table = Kit.Inset(list); table.Margin = new Thickness(0, 4, 0, 0);
+            var layout = Kit.Grid("*", "Auto,Auto,Auto,*,Auto").Add(subtitle.Cell(0, 0), cards.Cell(1, 0), summary.Cell(2, 0), table.Cell(3, 0), buttons.Cell(4, 0));
+            layout.Margin = new Thickness(18, 14, 18, 12);
             Kit.Prepare(this, layout);
             Check();
+        }
+
+        private static TextBlock Metric() => Kit.Label("", 22, true);
+        private static TextBlock Detail() { var d = Kit.Label("", Kit.Small, cls: "muted"); d.Margin = new Thickness(0, 0, 0, 8); return d; }
+
+        // Clicking a card scrolls the list to that check's findings.
+        private Control Card(string title, TextBlock metric, TextBlock detail, Control action, Func<int> header)
+        {
+            var stack = new StackPanel { Spacing = 2 };
+            stack.Children.Add(Kit.Caption(title)); stack.Children.Add(metric); stack.Children.Add(detail); stack.Children.Add(action);
+            if (action is Button b) { b.HorizontalAlignment = HorizontalAlignment.Left; b.Padding = new Thickness(14, 2); b.Height = 32; b.Margin = new Thickness(0); }
+            else foreach (var child in ((Grid)action).Children.OfType<Button>()) { child.Height = 32; child.Margin = new Thickness(0); }
+            var card = Kit.Frost(stack, new Thickness(14, 12, 14, 12), 14);
+            card.Margin = new Thickness(5, 0);
+            card.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
+            card.PointerPressed += (s, e) =>
+            {
+                if (e.Source is Visual v && v.FindAncestorOfType<Button>(true) != null || e.Source is Visual c && c.FindAncestorOfType<ComboBox>(true) != null) return;
+                int index = header();
+                if (index >= 0 && index < Rows.Count) { list.ScrollIntoView(Rows[Rows.Count - 1]); list.ScrollIntoView(Rows[index]); }
+            };
+            return card;
         }
 
         private sealed class RowView : Border
@@ -126,7 +159,7 @@ namespace AlbumArtTool
             catch (OperationCanceledException) { return; }
             if (!ReferenceEquals(Result, result) || source.IsCancellationRequested) return;
             LibraryChecks.Apply(result, measured);
-            measureStatus = result.Verified ? "" : "header bitrates (set up FFmpeg in Manage library to verify)";
+            measureStatus = result.Verified ? "" : "header bitrates (set up FFmpeg in Settings to verify)";
             ShowRows();
         }
 
@@ -134,10 +167,12 @@ namespace AlbumArtTool
         {
             int limit = Result.LowBitrateLimit;
             var rows = new List<Row>();
+            titlesHeader = rows.Count;
             rows.Add(new Row { Header = true, Text = "Songs missing a Title tag", Detail = Count(Result.MissingTitles.Count) });
             if (Result.MissingTitles.Count == 0) rows.Add(new Row { Text = "Every song has a Title tag." });
             foreach (var t in Result.MissingTitles)
                 rows.Add(new Row { Text = t.Path, Detail = Describe(t), Path = t.Path, Tip = t.Path + "\nShown as: " + Path.GetFileNameWithoutExtension(t.Path) + "\nFilled title would be: " + LibraryChecks.SuggestedTitle(t.Path) });
+            picturesHeader = rows.Count;
             rows.Add(new Row { Header = true, Text = "Songs with more than one embedded picture", Detail = Count(Result.MultiplePictures.Count) });
             if (Result.MultiplePictures.Count == 0) rows.Add(new Row { Text = "No song has more than one embedded picture." });
             foreach (var t in Result.MultiplePictures)
@@ -145,6 +180,7 @@ namespace AlbumArtTool
                     Tip = t.Path + "\n" + t.PictureSummary + (t.CoverPictures > 1 ? "\nSeveral front/unlabeled covers: players may show any of them." : "") });
             var albums = Result.LowBitrateAlbums();
             string basis = Result.Verified ? "measured" : "header";
+            bitrateHeader = rows.Count;
             rows.Add(new Row { Header = true, Text = "Albums with lossy songs below " + limit + " kbps", Detail = Count(albums.Count, "album") + " · " + Count(Result.LowBitrate.Count) });
             if (albums.Count == 0) rows.Add(new Row { Text = Result.Verified ? "No lossy song is really below " + limit + " kbps." : "No lossy song is below " + limit + " kbps." });
             foreach (var album in albums)
@@ -163,11 +199,22 @@ namespace AlbumArtTool
                 rows.Add(new Row { Text = Count(Result.MeasureIssues.Count) + " could not be measured and show their header bitrate", Tip = string.Join("\n", Result.MeasureIssues.Take(40)) });
             Rows = rows; list.ItemsSource = rows; show.IsEnabled = false;
             summary.Text = Summary();
+            SetCard(titlesCount, titlesDetail, Result.MissingTitles.Count, "song", "Players show the filename instead of a title.", "Every song has a title.");
+            int covers = Result.MultiplePictures.Count(t => t.CoverPictures > 1);
+            SetCard(picturesCount, picturesDetail, Result.MultiplePictures.Count, "song", covers > 0 ? covers + " with several covers: players may show any of them." : "Extra pictures make files larger.", "One picture per song.");
+            SetCard(bitrateCount, bitrateDetail, albums.Count, "album", Count(Result.LowBitrate.Count) + " below " + limit + " kbps · " + (measureStatus.Length > 0 ? measureStatus : basis), "Nothing below " + limit + " kbps.");
             // Offered once the bitrates are measured (or known to be header-only), so the list it opens is final.
             replace.IsEnabled = replaceLow != null && albums.Count > 0 && (measureStatus.Length == 0 || measureStatus.StartsWith("header", StringComparison.Ordinal));
             fill.IsEnabled = fillTitles != null && Result.MissingTitles.Count > 0;
             onePicture.IsEnabled = fixPictures != null && Result.MultiplePictures.Count > 0;
             save.IsEnabled = Result.MissingTitles.Count + Result.MultiplePictures.Count + Result.LowBitrate.Count > 0;
+        }
+
+        private static void SetCard(TextBlock metric, TextBlock detail, int count, string noun, string found, string clean)
+        {
+            metric.Text = count == 0 ? "All good" : Count(count, noun);
+            metric.Classes.Set("positive", count == 0);
+            detail.Text = count == 0 ? clean : found; detail.Tip(detail.Text);
         }
 
         private string Summary() => Result.MissingTitles.Count + " missing a Title tag · " + Result.MultiplePictures.Count + " with several embedded pictures (" +

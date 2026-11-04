@@ -13,7 +13,6 @@ namespace AlbumArtTool
 {
     internal sealed partial class MainWindow
     {
-        private readonly Button getUpdates = Kit.Button("Get updates", "chrome");
         private Window updateWindow;
         private bool checkingUpdate, installingUpdate, restartForUpdate;
         internal Func<UpdateService> CreateUpdateService = () => new UpdateService();
@@ -86,7 +85,7 @@ namespace AlbumArtTool
                     message.Text = "Installing version " + release.Version.ToString(3) + ". The app will reopen in your current music folder…";
                     // Re-verify immediately before running it: the file sat on disk while we waited.
                     await Task.Run(() => UpdateService.VerifyInstaller(setup, release.Sha256, release.Version), token);
-                    using (LaunchInstaller(directory, folder.Text)) { }
+                    using (LaunchInstaller(directory, Root)) { }
                     handedOff = true; restartForUpdate = true;
                     Close();
                 }

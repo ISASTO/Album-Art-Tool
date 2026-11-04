@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
@@ -23,7 +24,61 @@ namespace AlbumArtTool.Ui
             return button;
         }
 
-        internal static string Text(this Button button) => button.Content as string ?? "";
+        /// <summary>The button's label, also for icon buttons (icon + text).</summary>
+        internal static string Text(this Button button) => button.Content switch
+        {
+            string text => text,
+            Panel panel => panel.Children.OfType<TextBlock>().LastOrDefault()?.Text ?? "",
+            _ => ""
+        };
+
+        /// <summary>Changes a button's label without removing its icon.</summary>
+        internal static void SetText(this Button button, string text)
+        {
+            if (button.Content is Panel panel && panel.Children.OfType<TextBlock>().LastOrDefault() is TextBlock label) label.Text = text;
+            else button.Content = text;
+        }
+
+        /// <summary>A button with a vector icon and an optional label (icon-only buttons need a Named() and a Tip()).</summary>
+        internal static Button IconButton(string icon, string text, params string[] classes)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7, VerticalAlignment = VerticalAlignment.Center };
+            row.Children.Add(Glyph(icon));
+            if (!string.IsNullOrEmpty(text)) row.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
+            var button = new Button { Content = row };
+            foreach (string name in classes) button.Classes.Add(name);
+            if (string.IsNullOrEmpty(text)) button.Classes.Add("square");
+            return button;
+        }
+
+        internal static void SetIcon(Button button, string data)
+        {
+            if (button.Content is Panel panel && panel.Children.OfType<PathIcon>().FirstOrDefault() is PathIcon icon)
+                try { icon.Data = StreamGeometry.Parse(data); } catch (Exception) { }
+        }
+
+        internal static PathIcon Glyph(string data, double size = 14)
+        {
+            Geometry geometry = null;
+            try { geometry = StreamGeometry.Parse(data); } catch (Exception) { /* A bad icon must never stop a window from opening. */ }
+            return new PathIcon { Data = geometry, Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center };
+        }
+
+        /// <summary>Shortens a path in the middle, keeping the drive/first folder and the last folders: C:\Users\…\Music\Albums.</summary>
+        internal static string MiddleEllipsis(string path, int max = 60)
+        {
+            if (string.IsNullOrEmpty(path) || path.Length <= max) return path ?? "";
+            char separator = path.Contains('\\') ? '\\' : '/';
+            var parts = path.Split(separator);
+            string head = parts.Length > 1 ? parts[0] + separator : "";
+            for (int keep = parts.Length - 1; keep >= 1; keep--)
+            {
+                string tail = string.Join(separator, parts.Skip(parts.Length - keep));
+                string candidate = head + "…" + separator + tail;
+                if (candidate.Length <= max && parts.Length - keep > 1) return candidate;
+            }
+            return "…" + path.Substring(path.Length - (max - 1));
+        }
 
         internal static TextBlock Label(string text, double size = Body, bool bold = false, string cls = null)
         {
@@ -62,6 +117,9 @@ namespace AlbumArtTool.Ui
 
         internal static Border Frost(Control child, Thickness padding, double radius = 18) =>
             new Border { Child = child, Padding = padding, CornerRadius = new CornerRadius(radius), Classes = { "frost" } };
+
+        /// <summary>A small uppercase section label.</summary>
+        internal static TextBlock Caption(string text) => new TextBlock { Text = text.ToUpperInvariant(), Classes = { "caption" }, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
 
         internal static Border Inset(Control child) => new Border { Child = child, Classes = { "inset" } };
 

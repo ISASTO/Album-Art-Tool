@@ -175,7 +175,7 @@ namespace AlbumArtTool
             replaceAlbum.Tip("Downloads the checked songs of this album from YouTube Music and replaces your files with MP3 320 copies (your tags and cover are kept). Originals go to the PC backup folder.");
             replaceAll.Tip("Does the same for every checked song in every album in the list.");
             stop.Tip("Stops after the song in progress. Finished replacements stay and can be undone.");
-            undo.Tip("Puts back the original files replaced in this window, byte for byte. Later, Manage library → Preview Undo can also undo the last run.");
+            undo.Tip("Puts back the original files replaced in this window, byte for byte. Later, Organize → Preview Undo can also undo the last run.");
             UpdateCookiesTip();
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
             foreach (var b in new Control[] { cookies, undo, stop, replaceAll, replaceAlbum }) buttons.Children.Add(b);

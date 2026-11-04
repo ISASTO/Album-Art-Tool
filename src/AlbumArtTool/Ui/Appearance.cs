@@ -24,26 +24,47 @@ namespace AlbumArtTool.Ui
         internal static TimeSpan WipeDuration { get; } = TimeSpan.FromMilliseconds(320);
         internal static int TransitionsRunning { get; private set; }
 
-        internal static void Initialize(Application application) =>
-            application.RequestedThemeVariant = AppSettings.ReadDark() ? ThemeVariant.Dark : ThemeVariant.Light;
+        internal static ThemeMode Mode { get; private set; } = ThemeMode.System;
+
+        internal static void Initialize(Application application)
+        {
+            Mode = AppSettings.ReadTheme();
+            application.RequestedThemeVariant = Variant(Mode);
+            // "Match Windows" follows the system setting live, while the app is open.
+            application.ActualThemeVariantChanged += (s, e) =>
+            {
+                foreach (var window in OpenWindows()) ApplyNativeFrame(window);
+                Changed?.Invoke();
+            };
+        }
+
+        private static ThemeVariant Variant(ThemeMode mode) => mode == ThemeMode.Dark ? ThemeVariant.Dark : mode == ThemeMode.Light ? ThemeVariant.Light : ThemeVariant.Default;
 
         /// <summary>Switches appearance. Returns false only if the preference could not be saved.</summary>
-        internal static bool SetDark(bool dark, bool persist = true, bool animate = false)
+        internal static bool SetDark(bool dark, bool persist = true, bool animate = false) => SetMode(dark ? ThemeMode.Dark : ThemeMode.Light, persist, animate);
+
+        /// <summary>Chooses Match Windows, Light or Dark. Returns false only if the preference could not be saved.</summary>
+        internal static bool SetMode(ThemeMode mode, bool persist = true, bool animate = false)
         {
             var application = Application.Current;
-            if (application != null && dark != IsDark)
+            bool wasDark = IsDark;
+            if (application != null && (mode != Mode || application.RequestedThemeVariant != Variant(mode)))
             {
                 var wipes = new List<Wipe>();
                 if (animate && MotionAllowed)
                     foreach (var window in OpenWindows())
                         try { var wipe = Wipe.Capture(window); if (wipe != null) wipes.Add(wipe); }
                         catch (Exception) { /* No snapshot (e.g. no GPU surface yet): switch without the wipe. */ }
-                application.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
+                Mode = mode;
+                application.RequestedThemeVariant = Variant(mode);
+                bool changed = wasDark != IsDark;
                 foreach (var window in OpenWindows()) ApplyNativeFrame(window);
                 Changed?.Invoke();
-                foreach (var wipe in wipes) wipe.Start();
+                // Match Windows may resolve to the appearance already showing: then there is nothing to sweep.
+                foreach (var wipe in wipes) { if (changed) wipe.Start(); else wipe.Cancel(); }
             }
-            return !persist || AppSettings.SaveDark(dark);
+            Mode = mode;
+            return !persist || AppSettings.SaveTheme(mode);
         }
 
         private static readonly List<Window> windows = new List<Window>();
@@ -135,9 +156,11 @@ namespace AlbumArtTool.Ui
                 Finish();
             }
 
+            internal void Cancel() => Finish();
+
             private void Finish()
             {
-                timer.Stop();
+                timer?.Stop();
                 OverlayLayer.GetOverlayLayer(window)?.Children.Remove(overlay);
                 overlay.Source = null; snapshot.Dispose();
                 TransitionsRunning--;

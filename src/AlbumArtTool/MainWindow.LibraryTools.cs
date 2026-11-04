@@ -14,11 +14,11 @@ namespace AlbumArtTool
 {
     internal sealed partial class MainWindow
     {
-        private readonly Button artistsTab = Kit.Button("Track artists", "tab");
-        private readonly Button findDuplicates = Kit.Button("Find duplicates…");
-        private readonly Button checkTags = Kit.Button("Check library…");
+        private readonly Button artistsTab = Kit.Button("Track artists", "chip");
+        private readonly Button findDuplicates = Kit.IconButton(Icons.Duplicates, "Find duplicates…", "ghost");
+        private readonly Button checkTags = Kit.IconButton(Icons.Health, "Check library…", "ghost");
         private LibraryCheckWindow checkWindow;
-        private readonly Button manageLibrary = Kit.Button("Manage library…", "primary");
+        private readonly Button manageLibrary = Kit.IconButton(Icons.Organize, "Organize…", "ghost");
         private LibraryManagerWindow managerWindow;
         private bool maintenanceRunning;
         private readonly ComboBox albumFilter = new ComboBox(), albumSort = new ComboBox();
@@ -45,14 +45,16 @@ namespace AlbumArtTool
         {
             foreach (var combo in new[] { albumFilter, albumSort }) { combo.HorizontalAlignment = HorizontalAlignment.Stretch; }
             albumFilter.Named("Album filter"); albumSort.Named("Album sort order");
-            albumFilter.Items.Add("All albums in this tab"); albumFilter.Items.Add("Artist cleanup available");
+            albumFilter.Items.Add("All albums in this view"); albumFilter.Items.Add("Artist cleanup available");
             albumSort.Items.Add("Artist and album"); albumSort.Items.Add("Album title"); albumSort.Items.Add("Artist changes first");
             albumFilter.SelectedIndex = albumSort.SelectedIndex = 0;
             albumFilter.SelectionChanged += (s, e) => { if (!busy && !changingAlbumView) RefreshAlbums(); };
             albumSort.SelectionChanged += (s, e) => { if (!busy && !changingAlbumView) RefreshAlbums(); };
             findDuplicates.Click += async (s, e) => await FindDuplicatesAsync();
             checkTags.Click += (s, e) => CheckTags();
-            checkTags.Tip("List songs missing a Title tag, songs with more than one embedded picture, and low-bitrate songs.");
+            checkTags.Tip("List songs missing a Title tag, songs with more than one embedded picture, and albums with low-bitrate songs, each with a fix.");
+            findDuplicates.Tip("Find confirmed duplicate songs and album copies by comparing their audio, not just their names.");
+            manageLibrary.Tip("Convert, standardize, tidy and reorganize the whole library with presets. Every change is previewed first and can be undone.");
             manageLibrary.Click += (s, e) => ShowLibraryManager();
             var showLabel = Kit.Label("SHOW", cls: "caption"); var sortLabel = Kit.Label("SORT BY", cls: "caption");
             showLabel.Margin = sortLabel.Margin = new Thickness(8, 0, 0, 0);
@@ -133,9 +135,9 @@ namespace AlbumArtTool
 
         private void StyleTabs()
         {
-            foreach (var tab in new[] { missingTab, existingTab, artistsTab })
+            foreach (var tab in new[] { missingTab, existingTab, allTab, artistsTab })
             {
-                bool selected = tab == artistsTab ? showingArtists : !showingArtists && (tab == missingTab ? showingMissing : !showingMissing);
+                bool selected = tab == artistsTab ? showingArtists : !showingArtists && (tab == missingTab ? view == View.Missing : tab == existingTab ? view == View.HasArt : view == View.All);
                 tab.Classes.Set("selected", selected);
             }
             if (coverPanel != null) coverPanel.IsVisible = !showingArtists;
@@ -204,10 +206,10 @@ namespace AlbumArtTool
         private LibraryManagerWindow ShowLibraryManager()
         {
             if (managerWindow != null) { managerWindow.Activate(); return managerWindow; }
-            managerWindow = new LibraryManagerWindow(folder.Text,
+            managerWindow = new LibraryManagerWindow(Root,
                 () => !busy && !queueRunning && !maintenanceRunning && pending == null && (duplicatesWindow == null || !duplicatesWindow.IsScanning),
                 value => { maintenanceRunning = value; UpdateQueueControls(); },
-                async root => { lastEdit = null; folder.Text = root; await ScanAsync(); });
+                async root => { lastEdit = null; Root = root; await ScanAsync(); }, () => ShowSettings());
             managerWindow.Closed += (s, e) => managerWindow = null;
             managerWindow.Show(this);
             return managerWindow;
@@ -222,10 +224,10 @@ namespace AlbumArtTool
         internal UpgradeWindow ShowUpgrade(LibraryCheckResult result)
         {
             if (upgradeWindow != null) { upgradeWindow.Activate(); return upgradeWindow; }
-            var window = upgradeWindow = new UpgradeWindow(folder.Text, library.Albums.ToArray(), result,
+            var window = upgradeWindow = new UpgradeWindow(Root, library.Albums.ToArray(), result,
                 () => !busy && !queueRunning && !maintenanceRunning && pending == null && (duplicatesWindow == null || !duplicatesWindow.IsScanning),
                 value => { maintenanceRunning = value; UpdateQueueControls(); },
-                async root => { lastEdit = null; folder.Text = root; await ScanAsync(); },
+                async root => { lastEdit = null; Root = root; await ScanAsync(); },
                 info => StartExplorer(info), YouTubeMusicForTest, DownloadForTest);
             window.Closed += (s, e) => { if (upgradeWindow == window) upgradeWindow = null; };
             window.Show(this);

@@ -23,19 +23,26 @@ namespace AlbumArtTool
         private readonly Func<bool> canStart;
         private readonly Action<bool> exclusive;
         private readonly Func<string, Task> refreshLibrary;
-        private readonly CheckBox convert = Kit.Check("Convert lossless / over 320 kbps to MP3 320", true), square = Kit.Check("Center-crop embedded artwork to squares", true),
-            duplicates = Kit.Check("Remove confirmed duplicate songs / albums", true), organize = Kit.Check("Organize all folders into Artist / Album", true),
-            archive = Kit.Check("Move old tool backups off the music player", true), compatibility = Kit.Check("Also convert other non-MP3 audio (compatibility)", false),
-            rename = Kit.Check("Rename song files from Title tags", false), combine = Kit.Check("Combine multi-disc albums", false),
-            cleanTitles = Kit.Check("Remove featured artists from titles", false),
-            shrink = Kit.Check("Standardize embedded artwork (one front cover, JPEG ≤ 600 px)", false),
-            titleFromName = Kit.Check("Fill missing Title tags from filenames", false),
-            id3v23 = Kit.Check("Standardize MP3 tags to ID3v2.3 (Latin-1 / UTF-16)", false);
-        private readonly TextBox backup = new TextBox();
-        private readonly TextBlock state = Kit.Label("", Kit.Body), encoderState = Kit.Label("", Kit.Body, cls: "muted");
+        private readonly CheckBox convert = Kit.Check("Convert lossless to MP3 320", false), compatibility = Kit.Check("Also convert other lossy formats", false),
+            square = Kit.Check("Crop artwork to squares", false), shrink = Kit.Check("One front cover per song (JPEG ≤ " + Artwork.EmbedSide + " px)", false),
+            titleFromName = Kit.Check("Fill missing titles from filenames", false), cleanTitles = Kit.Check("Remove “feat.” credits from titles", false),
+            id3v23 = Kit.Check("Standardize MP3 tags to ID3v2.3", false),
+            organize = Kit.Check("Sort into Artist / Album folders", false), rename = Kit.Check("Rename files from their titles", false), combine = Kit.Check("Combine multi-disc albums", false),
+            duplicates = Kit.Check("Remove confirmed duplicates", false), archive = Kit.Check("Move old tool backups off the player", false);
+        private readonly Dictionary<string, CheckBox> optionBoxes;
+        private readonly TextBlock state = Kit.Label("", Kit.Body), encoderState = Kit.Label("", Kit.Small, cls: "muted");
         private readonly ProgressBar progress = new ProgressBar { Minimum = 0, Maximum = 100, Margin = new Thickness(0, 8, 0, 2) };
-        private readonly Button preview = Kit.Button("Preview changes"), apply = Kit.Button("Apply selected changes", "primary"), undo = Kit.Button("Preview Undo"), stop = Kit.Button("Stop"),
-            download = Kit.Button("Download FFmpeg"), chooseEncoder = Kit.Button("Choose FFmpeg…"), chooseBackup = Kit.Button("Choose backup…"), openBackup = Kit.Button("Open backups");
+        private readonly Button preview = Kit.Button("Preview changes", "primary"), apply = Kit.Button("Apply selected changes"), undo = Kit.IconButton(Icons.Undo, "Preview Undo", "ghost"), stop = Kit.Button("Stop"),
+            setupEncoder = Kit.Button("Set up in Settings", "link"), openBackup = Kit.IconButton(Icons.Folder, "Open backups", "ghost");
+        // Presets: built-in ones plus the user's own, saved on this PC.
+        private readonly WrapPanel presetChips = new WrapPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        private readonly Button savePreset = Kit.IconButton(Icons.Add, "Save as preset…", "link"), deletePreset = Kit.IconButton(Icons.Delete, "Delete preset", "link"),
+            confirmSave = Kit.Button("Save preset", "primary"), cancelSave = Kit.Button("Cancel");
+        private readonly TextBox presetName = new TextBox { Watermark = "Name this preset, for example \"Before syncing my phone\"" };
+        private readonly Control saveRow;
+        private List<OrganizePreset> customPresets = new List<OrganizePreset>();
+        private bool applyingPreset;
+        private readonly Action openSettings;
         private readonly ListBox files = new ListBox { Classes = { "grid" } };
         private readonly Control optionsPanel;
         private List<FileRow> rows = new List<FileRow>();
@@ -61,28 +68,67 @@ namespace AlbumArtTool
             internal bool RequestChecked(bool value) => Toggle == null || Toggle(this, value);
         }
 
-        internal LibraryManagerWindow(string musicRoot, Func<bool> ready, Action<bool> setExclusive, Func<string, Task> refresh)
+        internal LibraryManagerWindow(string musicRoot, Func<bool> ready, Action<bool> setExclusive, Func<string, Task> refresh, Action openSettings = null)
         {
-            root = musicRoot; canStart = ready; exclusive = setExclusive; refreshLibrary = refresh;
-            Title = "Manage music library"; Width = 1000; Height = 690; MinWidth = 960; MinHeight = 650;
+            root = musicRoot; canStart = ready; exclusive = setExclusive; refreshLibrary = refresh; this.openSettings = openSettings;
+            Title = "Organize library"; Width = 1000; Height = 720; MinWidth = 960; MinHeight = 660;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
-            var path = Kit.Label("Music folder: " + root, Kit.Body);
+            optionBoxes = new Dictionary<string, CheckBox>
+            {
+                [OrganizePresets.Convert] = convert, [OrganizePresets.Compatibility] = compatibility, [OrganizePresets.Square] = square, [OrganizePresets.Shrink] = shrink,
+                [OrganizePresets.TitleFromName] = titleFromName, [OrganizePresets.CleanTitles] = cleanTitles, [OrganizePresets.Id3v23] = id3v23,
+                [OrganizePresets.Organize] = organize, [OrganizePresets.Rename] = rename, [OrganizePresets.Combine] = combine,
+                [OrganizePresets.Duplicates] = duplicates, [OrganizePresets.Archive] = archive,
+            };
+            convert.Named("Convert lossless to MP3 320"); compatibility.Named("Also convert other lossy formats"); square.Named("Crop artwork to squares");
             rename.Named("Rename song files from Title tags"); combine.Named("Combine multi-disc albums"); cleanTitles.Named("Remove featured artists from titles");
             shrink.Named("Standardize embedded artwork");
             titleFromName.Named("Fill missing Title tags from filenames");
             id3v23.Named("Standardize MP3 tags to ID3v2.3");
+            organize.Named("Organize into Artist / Album folders"); duplicates.Named("Remove confirmed duplicates"); archive.Named("Move old tool backups off the player");
             AddTips();
-            var options = Kit.Grid("*,*", "*,*,*,*,*,*").Add(convert.Cell(0, 0), square.Cell(0, 1), duplicates.Cell(1, 0), organize.Cell(1, 1),
-                archive.Cell(2, 0), compatibility.Cell(2, 1), rename.Cell(3, 0), combine.Cell(3, 1), cleanTitles.Cell(4, 0), shrink.Cell(4, 1), titleFromName.Cell(5, 0), id3v23.Cell(5, 1)).Named("Library management options");
+            var subtitle = Kit.Label("Choose what to change in " + Kit.MiddleEllipsis(root, 70) + ". Nothing changes until you preview and apply, and every original is backed up.", Kit.Body, cls: "muted");
+            subtitle.Tip(root);
+
+            // Presets
+            presetChips.Named("Organize presets");
+            savePreset.Named("Save as preset").Click += (s, e) => ShowSaveRow(true);
+            deletePreset.Named("Delete preset").Click += (s, e) => DeleteMatchingPreset();
+            confirmSave.Click += (s, e) => SaveCurrentAsPreset(presetName.Text);
+            cancelSave.Click += (s, e) => ShowSaveRow(false);
+            presetName.Named("Preset name");
+            presetName.KeyDown += (s, e) =>
+            {
+                if (e.Key == Avalonia.Input.Key.Enter) { SaveCurrentAsPreset(presetName.Text); e.Handled = true; }
+                else if (e.Key == Avalonia.Input.Key.Escape) { ShowSaveRow(false); e.Handled = true; }
+            };
+            var presetLabel = Kit.Caption("Presets"); presetLabel.Margin = new Thickness(2, 0, 12, 0);
+            var presetActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+            presetActions.Children.Add(savePreset); presetActions.Children.Add(deletePreset);
+            var presets = Kit.Grid("Auto,*,Auto", "Auto").Add(presetLabel.Cell(0, 0), presetChips.Cell(0, 1), presetActions.Cell(0, 2));
+            presets.Margin = new Thickness(0, 10, 0, 6);
+            presetName.Margin = new Thickness(0, 0, 6, 0);
+            var save = Kit.Grid("*,120,90", "34").Add(presetName.Cell(0, 0), confirmSave.Cell(0, 1), cancelSave.Cell(0, 2));
+            save.Margin = new Thickness(0, 0, 0, 6);
+            saveRow = save; saveRow.IsVisible = false;
+
+            // Options, grouped by what they change.
+            encoderState.TextWrapping = TextWrapping.Wrap; encoderState.TextTrimming = TextTrimming.None; encoderState.VerticalAlignment = VerticalAlignment.Top;
+            setupEncoder.Click += (s, e) => this.openSettings?.Invoke();
+            var helper = new StackPanel { Spacing = 2 };
+            var helperCaption = Kit.Caption("Needs"); helperCaption.Margin = new Thickness(0, 0, 0, 4);
+            helper.Children.Add(helperCaption); helper.Children.Add(encoderState); helper.Children.Add(setupEncoder);
+            var options = Kit.Grid("*,*,*", "Auto,Auto").Add(
+                Group("Audio", convert, compatibility).Cell(0, 0), Group("Artwork", square, shrink).Cell(0, 1), Group("Cleanup", duplicates, archive).Cell(0, 2),
+                Group("Tags", titleFromName, cleanTitles, id3v23).Cell(1, 0), Group("Files & folders", organize, rename, combine).Cell(1, 1), helper.Cell(1, 2)).Named("Library management options");
+            helper.Margin = new Thickness(8, 8, 8, 4);
             optionsPanel = options;
-            var optionsCard = Kit.Frost(options, new Thickness(10, 5, 10, 5)); optionsCard.Margin = new Thickness(0, 0, 0, 5);
-            foreach (var check in new[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles, shrink, titleFromName, id3v23 }) check.IsCheckedChanged += (s, e) => InvalidatePlan();
-            var tools = Kit.Grid("*,165,160", "*").Add(encoderState.Cell(0, 0), download.Cell(0, 1), chooseEncoder.Cell(0, 2));
-            backup.Text = BackupSettings.Root; backup.Named("PC backup folder"); backup.FontSize = Kit.Small;
-            backup.TextChanged += (s, e) => InvalidatePlan();
-            var backups = Kit.Grid("76,*,150", "*").Add(Kit.Label("Backups", Kit.Body).Cell(0, 0), backup.Cell(0, 1), chooseBackup.Cell(0, 2));
-            var actions = Kit.Grid("165,180,145,140,*,100", "*").Add(preview.Cell(0, 0), apply.Cell(0, 1), undo.Cell(0, 2), openBackup.Cell(0, 3), stop.Cell(0, 5));
-            state.Text = "Preview first, then check the changes to apply. Originals and removed copies are saved in the PC backup folder, outside your music tree.";
+            var optionsCard = Kit.Frost(options, new Thickness(10, 6, 10, 6), 14); optionsCard.Margin = new Thickness(0, 0, 0, 8);
+            foreach (var check in optionBoxes.Values) check.IsCheckedChanged += (s, e) => { if (!applyingPreset) { InvalidatePlan(); UpdatePresetState(); } };
+
+            var actions = Kit.Grid("Auto,Auto,*,90,165,180", "*").Add(undo.Cell(0, 0), openBackup.Cell(0, 1), stop.Cell(0, 3), preview.Cell(0, 4), apply.Cell(0, 5));
+            actions.Margin = new Thickness(0, 8, 0, 0);
+            state.Text = "Pick a preset or the options you want, then Preview changes.";
             state.TextWrapping = TextWrapping.Wrap; state.TextTrimming = TextTrimming.CharacterEllipsis; state.MaxLines = 2;
             state.Named("Library management status");
             files.Named("Planned library changes");
@@ -93,32 +139,102 @@ namespace AlbumArtTool
             var headerBar = new Border { Child = header, BorderThickness = new Thickness(0, 0, 0, 1) };
             headerBar.Brush(Border.BorderBrushProperty, "Border"); headerBar.Brush(Border.BackgroundProperty, "InsetHeader");
             var table = Kit.Inset(Kit.Grid("*", "Auto,*").Add(headerBar.Cell(0, 0), files.Cell(1, 0))); table.Padding = new Thickness(0);
-            var filesCard = Kit.Frost(table, new Thickness(10)); filesCard.Margin = new Thickness(0, 2, 0, 0);
+            table.Margin = new Thickness(0, 6, 0, 0);
             progress.Named("Library management progress"); progress.IsVisible = false;
-            var layout = Kit.Grid("*", "38,192,38,38,44,48,*,28").Add(path.Cell(0, 0), optionsCard.Cell(1, 0), tools.Cell(2, 0), backups.Cell(3, 0),
-                actions.Cell(4, 0), state.Cell(5, 0), filesCard.Cell(6, 0), progress.Cell(7, 0));
-            layout.Margin = new Thickness(12);
+            var layout = Kit.Grid("*", "Auto,Auto,Auto,Auto,Auto,*,Auto,Auto").Add(subtitle.Cell(0, 0), presets.Cell(1, 0), saveRow.Cell(2, 0), optionsCard.Cell(3, 0),
+                state.Cell(4, 0), table.Cell(5, 0), progress.Cell(6, 0), actions.Cell(7, 0));
+            layout.Margin = new Thickness(18, 14, 18, 12);
             Kit.Prepare(this, layout);
             preview.Click += async (s, e) => await PreviewAsync(); apply.Click += async (s, e) => await ApplyAsync();
             undo.Click += (s, e) => PreviewUndo(); stop.Click += (s, e) => source?.Cancel();
-            download.Click += async (s, e) => await DownloadAsync();
-            chooseEncoder.Click += async (s, e) =>
-            {
-                var result = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Choose ffmpeg.exe", AllowMultiple = false,
-                    FileTypeFilter = new[] { new FilePickerFileType("FFmpeg") { Patterns = new[] { Management.Encoder.ExecutableName } }, new FilePickerFileType("Executables") { Patterns = new[] { "*.exe" } } } });
-                string picked = result.Count > 0 ? result[0].TryGetLocalPath() : null;
-                if (picked == null) return;
-                encoder = picked; Management.Encoder.Remember(encoder); UpdateEncoder(); InvalidatePlan();
-            };
-            chooseBackup.Click += async (s, e) =>
-            {
-                var result = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Choose a backup folder on your PC, outside the music folder", AllowMultiple = false });
-                string picked = result.Count > 0 ? result[0].TryGetLocalPath() : null;
-                if (picked != null) backup.Text = picked;
-            };
-            openBackup.Click += (s, e) => { try { Directory.CreateDirectory(backup.Text); using (Process.Start(new ProcessStartInfo(backup.Text) { UseShellExecute = true })) { } } catch (Exception ex) { state.Text = ex.Message; } };
+            openBackup.Click += (s, e) => { try { Directory.CreateDirectory(BackupSettings.Root); using (Process.Start(new ProcessStartInfo(BackupSettings.Root) { UseShellExecute = true })) { } } catch (Exception ex) { state.Text = ex.Message; } };
             Closing += (s, e) => { if (IsWorking) { e.Cancel = true; state.Text = "Task is running. Click Stop; the current file is kept safe before stopping."; } };
+            Activated += (s, e) => { if (!IsWorking) { encoder = Management.Encoder.Find(); UpdateEncoder(); } };
+            try { customPresets = OrganizePresets.LoadCustom(); } catch (Exception) { customPresets = new List<OrganizePreset>(); }
+            RebuildPresets();
             encoder = Management.Encoder.Find(); UpdateEncoder(); SetWorking(false);
+        }
+
+        private static Control Group(string title, params CheckBox[] boxes)
+        {
+            var stack = new StackPanel { Spacing = 0, Margin = new Thickness(8, 8, 8, 4) };
+            var caption = Kit.Caption(title); caption.Margin = new Thickness(0, 0, 0, 4);
+            stack.Children.Add(caption);
+            foreach (var box in boxes) stack.Children.Add(box);
+            return stack;
+        }
+
+        internal IEnumerable<string> SelectedOptions => OrganizePresets.Keys.Where(k => optionBoxes[k].On());
+        internal IReadOnlyList<OrganizePreset> CustomPresets => customPresets;
+        internal IEnumerable<OrganizePreset> AllPresets => OrganizePresets.BuiltIn.Concat(customPresets);
+
+        private void RebuildPresets()
+        {
+            presetChips.Children.Clear();
+            foreach (var preset in AllPresets)
+            {
+                var chip = Kit.Button(preset.Name, "chip").Named("Preset " + preset.Name);
+                chip.Margin = new Thickness(0, 0, 6, 0);
+                chip.Tip((preset.BuiltIn ? preset.Description : "Your preset.") + "\n\nSelects: " +
+                    string.Join(", ", OrganizePresets.Keys.Where(preset.Options.Contains).Select(k => optionBoxes[k].Content as string)) + ". Nothing changes until you preview and apply.");
+                chip.Tag = preset;
+                chip.Click += (s, e) => ApplyPreset(preset);
+                presetChips.Children.Add(chip);
+            }
+            UpdatePresetState();
+        }
+
+        internal void ApplyPreset(OrganizePreset preset)
+        {
+            if (IsWorking || preset == null) return;
+            applyingPreset = true;
+            try { foreach (var pair in optionBoxes) pair.Value.IsChecked = preset.Options.Contains(pair.Key); }
+            finally { applyingPreset = false; }
+            ShowSaveRow(false); InvalidatePlan(); UpdatePresetState();
+            state.Text = preset.Name + " selected. Adjust any option, then Preview changes.";
+        }
+
+        private OrganizePreset MatchingPreset() { var selected = SelectedOptions.ToArray(); return AllPresets.FirstOrDefault(p => p.Matches(selected)); }
+
+        private void UpdatePresetState()
+        {
+            var match = MatchingPreset();
+            foreach (var chip in presetChips.Children.OfType<Button>()) chip.Classes.Set("selected", ReferenceEquals(chip.Tag, match));
+            deletePreset.IsVisible = match != null && !match.BuiltIn;
+            savePreset.IsEnabled = !IsWorking && SelectedOptions.Any() && match == null;
+            preview.IsEnabled = !IsWorking && SelectedOptions.Any();
+        }
+
+        private void ShowSaveRow(bool show)
+        {
+            saveRow.IsVisible = show;
+            if (show) { presetName.Text = ""; presetName.Focus(); }
+        }
+
+        /// <summary>Saves the selected options under a name (replacing a custom preset with that name). False when the name cannot be used.</summary>
+        internal bool SaveCurrentAsPreset(string name)
+        {
+            string clean = OrganizePresets.CleanName(name);
+            if (clean == null) { state.Text = "Type a name for the preset."; return false; }
+            if (OrganizePresets.IsReserved(clean)) { state.Text = "\"" + clean + "\" is a built-in preset. Choose another name."; return false; }
+            if (!SelectedOptions.Any()) { state.Text = "Select at least one option to save as a preset."; return false; }
+            var saved = OrganizePresets.Upsert(customPresets, clean, SelectedOptions);
+            if (saved == null) { state.Text = customPresets.Count >= OrganizePresets.MaxCustom ? "You have the maximum of " + OrganizePresets.MaxCustom + " presets. Delete one first." : "The preset could not be saved on this PC."; return false; }
+            ShowSaveRow(false); RebuildPresets();
+            state.Text = "Saved preset " + clean + ". It is kept on this PC for next time.";
+            return true;
+        }
+
+        /// <summary>Deletes the custom preset that matches the selected options.</summary>
+        internal bool DeleteMatchingPreset()
+        {
+            var match = MatchingPreset();
+            if (match == null || match.BuiltIn) return false;
+            customPresets.Remove(match);
+            bool saved = OrganizePresets.SaveCustom(customPresets);
+            RebuildPresets();
+            state.Text = saved ? "Deleted preset " + match.Name + ". Your selected options are unchanged." : "The preset was removed, but the change could not be saved on this PC.";
+            return saved;
         }
 
         // Mouse-over help for every control. Nothing runs until Preview changes, so each tip says what the preview will propose.
@@ -162,14 +278,14 @@ namespace AlbumArtTool
                 "Each saved file is reread and every field compared, character for character, before the original is replaced.\n\n" +
                 "ID3v2.4 dates are written as their v2.3 fields (TYER, TDAT, TIME, TORY). Old ID3v2.2 tags are upgraded. An MP3 with only an ID3v1 tag gets an ID3v2.3 tag with the same fields; " +
                 "an extra APE tag is merged in and removed (with its second copy of the cover). Duplicate frames left by older versions of this tool are repaired. ID3 tags in AIFF and WAV files are converted too. Files already in this form are left alone." + safe);
-            encoderState.Tip("FFmpeg converts audio to MP3. It is only needed for the conversion options; every other option works without it.");
-            download.Tip("Downloads a Windows build of FFmpeg (about 170 MB, once) from BtbN/FFmpeg-Builds on GitHub into this PC's app cache.\n\n" +
-                "The download's SHA-256 checksum is verified before anything is extracted or run. License notices are included.");
-            chooseEncoder.Tip("Use an ffmpeg.exe you already have instead of downloading one. The location is remembered.");
-            backup.Tip("Where originals, removed duplicates and Undo information are saved. It must be on your PC, outside the music folder, so your player never indexes the backups.\n\n" +
-                "Each run gets its own folder with journal.json (used by Undo) and a readable report.csv. The preview checks there is enough free space first.");
-            chooseBackup.Tip("Pick a different backup folder on your PC (outside the music folder).");
-            openBackup.Tip("Opens the backup folder in File Explorer, where each run's originals, journal.json and report.csv are kept.");
+            encoderState.Tip("FFmpeg converts audio to MP3. It is only needed for the two Audio options; every other option works without it.");
+            setupEncoder.Tip("Open Settings to download FFmpeg (about 170 MB, once, checksum-verified) or choose a copy you already have.");
+            openBackup.Tip("Opens the PC backup folder in File Explorer, where each run's originals, journal.json and report.csv are kept. Change its location in Settings.");
+            savePreset.Tip("Save the options selected now as your own preset, so you can choose them again with one click. Presets are kept on this PC.");
+            deletePreset.Tip("Delete your preset that matches the selected options. The options stay selected; built-in presets cannot be deleted.");
+            presetName.Tip("A short name for your preset, up to " + OrganizePresets.MaxCustom + " presets of " + OrganizePresets.MaxName + " characters. Saving with an existing name replaces that preset.");
+            confirmSave.Tip("Save the selected options under this name. Press Enter to save or Esc to cancel.");
+            cancelSave.Tip("Close the preset name box without saving anything. Your selected options stay as they are.");
             preview.Tip("Scans the music folder and lists every change the selected options would make, with source, destination and the reason for each.\n\n" +
                 "Nothing is moved, converted or rewritten during the preview. Uncheck any rows you don't want, then click Apply selected changes.");
             apply.Tip("Carries out the checked rows of the current preview (or, after Preview Undo, restores the checked files).\n\n" +
@@ -188,7 +304,10 @@ namespace AlbumArtTool
         private Task PreviewOnly(CheckBox option)
         {
             if (IsWorking) return Task.CompletedTask;
-            foreach (var check in new[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles, shrink, titleFromName, id3v23 }) check.IsChecked = check == option;
+            applyingPreset = true;
+            try { foreach (var check in optionBoxes.Values) check.IsChecked = check == option; }
+            finally { applyingPreset = false; }
+            InvalidatePlan(); UpdatePresetState();
             return PreviewAsync();
         }
 
@@ -227,7 +346,11 @@ namespace AlbumArtTool
         }
 
         private string Relative(string path) => BackupSettings.Within(path, root) ? path.Substring(root.TrimEnd(Path.DirectorySeparatorChar).Length).TrimStart(Path.DirectorySeparatorChar) : path;
-        private void UpdateEncoder() => encoderState.Text = encoder == null ? "Conversion needs FFmpeg. Download once or choose your copy." : "FFmpeg: " + encoder;
+        private void UpdateEncoder()
+        {
+            encoderState.Text = encoder == null ? "Converting audio needs FFmpeg, a free helper program. Everything else works without it." : "FFmpeg is ready for converting audio.";
+            setupEncoder.IsVisible = encoder == null && openSettings != null;
+        }
         private void InvalidatePlan() { if (IsWorking) return; plan = null; undoJournal = null; SetRows(new List<FileRow>()); UpdateApply(); }
 
         private void SetRows(List<FileRow> next)
@@ -260,14 +383,18 @@ namespace AlbumArtTool
         private void SetWorking(bool value)
         {
             IsWorking = value;
-            foreach (Control control in new Control[] { convert, square, duplicates, organize, archive, compatibility, rename, combine, cleanTitles, shrink, titleFromName, id3v23, backup, preview, undo, download, chooseEncoder, chooseBackup }) control.IsEnabled = !value;
-            stop.IsEnabled = value; progress.IsVisible = value; UpdateApply();
+            foreach (var check in optionBoxes.Values) check.IsEnabled = !value;
+            foreach (Control control in new Control[] { preview, undo, presetChips, savePreset, deletePreset, confirmSave, presetName }) control.IsEnabled = !value;
+            stop.IsEnabled = value; progress.IsVisible = value; UpdateApply(); UpdatePresetState();
         }
 
         private void UpdateApply()
         {
             apply.IsEnabled = !IsWorking && (plan != null || undoJournal != null) && rows.Any(r => r.IsChecked && (r.Tag is LibraryAction a && a.HasWork || r.Tag is JournalEntry));
             apply.Content = undoJournal != null ? "Undo selected changes" : "Apply selected changes";
+            // One primary action at a time: Preview until there is something to apply, then Apply.
+            bool reviewing = plan != null || undoJournal != null;
+            apply.Classes.Set("primary", reviewing); preview.Classes.Set("primary", !reviewing);
         }
 
         internal IProgress<ProgressInfo> Reporter()
@@ -284,7 +411,8 @@ namespace AlbumArtTool
         internal async Task PreviewAsync()
         {
             if (IsWorking || !Ready()) return;
-            var options = new LibraryOptions { Root = root, BackupRoot = backup.Text, EncoderPath = encoder, Convert = convert.On(), ConvertOtherLossy = compatibility.On(),
+            encoder = Management.Encoder.Find(); UpdateEncoder();
+            var options = new LibraryOptions { Root = root, BackupRoot = BackupSettings.Root, EncoderPath = encoder, Convert = convert.On(), ConvertOtherLossy = compatibility.On(),
                 Square = square.On(), Shrink = shrink.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On(), TitleFromFilename = titleFromName.On(), Id3v23 = id3v23.On() };
             source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
             SetWorking(true); exclusive(true); SetRows(new List<FileRow>()); plan = null; undoJournal = null;
@@ -333,7 +461,6 @@ namespace AlbumArtTool
                 else
                 {
                     var current = plan;
-                    BackupSettings.Root = current.Options.BackupRoot;
                     var result = await Task.Run(() => LibraryRunner.Run(current, token, reporter));
                     wrote = result.Entries.Any(e => e.State == "Committed" || e.State == "TargetCreated");
                     state.Text = (result.Stopped ? "Stopped safely. " : "Finished. ") + result.Entries.Count(e => e.State == "Committed") + " changes completed · " + result.Issues.Count + " issues. Backups and Undo journal: " + result.Directory;
@@ -365,22 +492,6 @@ namespace AlbumArtTool
             }
             catch (Exception e) { undoJournal = null; state.Text = "Could not read the last library journal: " + e.Message; }
             finally { UpdateApply(); }
-        }
-
-        private async Task DownloadAsync()
-        {
-            if (IsWorking) return;
-            source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token; SetWorking(true);
-            try
-            {
-                var reporter = new Progress<int>(n => { if (IsWorking) { progress.IsIndeterminate = false; progress.Value = n; state.Text = "Downloading FFmpeg · " + n + "% (one-time setup; archive is roughly 170 MB)"; } });
-                using (var setup = new EncoderSetup())
-                    encoder = await Task.Run(() => setup.InstallAsync(reporter, token));
-                UpdateEncoder(); state.Text = "FFmpeg is ready. Preview your library changes.";
-            }
-            catch (OperationCanceledException) { state.Text = "Encoder setup cancelled."; }
-            catch (Exception e) { state.Text = "Encoder setup could not finish: " + e.Message; }
-            finally { SetWorking(false); }
         }
 
         internal void SetWorkingForTest(bool value) => SetWorking(value);
