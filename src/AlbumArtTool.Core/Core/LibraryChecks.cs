@@ -18,6 +18,8 @@ namespace AlbumArtTool.Core
         public int TracksChecked { get; set; }
         /// <summary>Measured kbps by path, for low-bitrate candidates that were verified.</summary>
         public Dictionary<string, int> Measured { get; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Measured lengths by path (seconds), alongside Measured.</summary>
+        public Dictionary<string, double> MeasuredSeconds { get; } = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         /// <summary>Songs whose header bitrate looked low but whose measured bitrate is at or above the limit.</summary>
         public List<Track> HeaderWrong { get; } = new List<Track>();
         /// <summary>Songs that could not be measured (kept in LowBitrate with their header bitrate).</summary>
@@ -26,6 +28,8 @@ namespace AlbumArtTool.Core
 
         /// <summary>The measured bitrate when verified, otherwise the header bitrate.</summary>
         public int Bitrate(Track track) => Measured.TryGetValue(track.Path, out int kbps) ? kbps : track.Bitrate;
+        /// <summary>The measured length when known, otherwise the header's.</summary>
+        public TimeSpan Duration(Track track) => MeasuredSeconds.TryGetValue(track.Path, out double seconds) ? TimeSpan.FromSeconds(seconds) : track.Duration;
 
         /// <summary>Low-bitrate songs grouped by album (folder + album tag), lowest bitrate first.</summary>
         public List<LowBitrateAlbum> LowBitrateAlbums() =>
@@ -105,6 +109,7 @@ namespace AlbumArtTool.Core
         {
             public bool Available;
             public Dictionary<string, int> Kbps = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, double> Seconds = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
             public List<string> Issues = new List<string>();
         }
 
@@ -118,19 +123,19 @@ namespace AlbumArtTool.Core
             string ffmpeg = Management.Encoder.Find(), probe = Management.BitrateProbe.FindProbe(ffmpeg);
             if (ffmpeg == null && probe == null) return result;
             result.Available = true;
-            var measured = new System.Collections.Concurrent.ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var measured = new System.Collections.Concurrent.ConcurrentDictionary<string, (int Kbps, double Seconds)>(StringComparer.OrdinalIgnoreCase);
             var issues = new System.Collections.Concurrent.ConcurrentBag<string>();
             int done = 0;
             System.Threading.Tasks.Parallel.ForEach(candidates, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Math.Min(4, Environment.ProcessorCount)), CancellationToken = token }, track =>
             {
-                try { measured[track.Path] = Management.BitrateProbe.Measure(ffmpeg, probe, track.Path, token); }
+                try { measured[track.Path] = Management.BitrateProbe.MeasureFull(ffmpeg, probe, track.Path, token); }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception e) when (e is System.IO.IOException || e is UnauthorizedAccessException || e is System.ComponentModel.Win32Exception) { issues.Add(track.Path + ": " + e.Message); }
                 int n = Interlocked.Increment(ref done);
                 progress?.Report(new ProgressInfo { Completed = n, Total = candidates.Count, Message = "Measuring real bitrates · " + n + "/" + candidates.Count });
             });
             token.ThrowIfCancellationRequested();
-            foreach (var pair in measured) result.Kbps[pair.Key] = pair.Value;
+            foreach (var pair in measured) { result.Kbps[pair.Key] = pair.Value.Kbps; result.Seconds[pair.Key] = pair.Value.Seconds; }
             result.Issues.AddRange(issues.OrderBy(i => i, StringComparer.OrdinalIgnoreCase));
             return result;
         }
@@ -140,6 +145,7 @@ namespace AlbumArtTool.Core
         {
             if (!measured.Available) return;
             foreach (var pair in measured.Kbps) result.Measured[pair.Key] = pair.Value;
+            foreach (var pair in measured.Seconds) result.MeasuredSeconds[pair.Key] = pair.Value;
             result.MeasureIssues.Clear(); result.MeasureIssues.AddRange(measured.Issues);
             var candidates = result.LowBitrate.ToArray();
             result.HeaderWrong.Clear();

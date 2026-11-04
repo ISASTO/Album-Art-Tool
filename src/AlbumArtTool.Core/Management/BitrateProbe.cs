@@ -12,8 +12,8 @@ namespace AlbumArtTool.Management
     // where the first frame's bitrate is taken as the whole file's.
     internal static class BitrateProbe
     {
-        private static readonly ConcurrentDictionary<string, (long Length, long Modified, int Kbps)> cache =
-            new ConcurrentDictionary<string, (long, long, int)>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, (long Length, long Modified, int Kbps, double Seconds)> cache =
+            new ConcurrentDictionary<string, (long, long, int, double)>(StringComparer.OrdinalIgnoreCase);
 
         internal static void ClearCache() => cache.Clear();
 
@@ -36,16 +36,19 @@ namespace AlbumArtTool.Management
         }
 
         /// <summary>Measured kbps (rounded), cached while the file's size and modification time are unchanged.</summary>
-        internal static int Measure(string ffmpeg, string probe, string path, CancellationToken token)
+        internal static int Measure(string ffmpeg, string probe, string path, CancellationToken token) => MeasureFull(ffmpeg, probe, path, token).Kbps;
+
+        /// <summary>Measured kbps and the real length in seconds (sum of the audio packets' durations; headers can be wrong).</summary>
+        internal static (int Kbps, double Seconds) MeasureFull(string ffmpeg, string probe, string path, CancellationToken token)
         {
             var info = new FileInfo(path);
             long length = info.Length, modified = info.LastWriteTimeUtc.Ticks;
-            if (cache.TryGetValue(path, out var known) && known.Length == length && known.Modified == modified) return known.Kbps;
+            if (cache.TryGetValue(path, out var known) && known.Length == length && known.Modified == modified) return (known.Kbps, known.Seconds);
             (long bytes, double seconds) = probe != null ? WithProbe(probe, path, token) : WithFfmpeg(ffmpeg, path, token);
             if (bytes <= 0 || seconds <= 0.05) throw new IOException("No audio packets could be measured.");
             int kbps = (int)Math.Round(bytes * 8 / seconds / 1000);
-            cache[path] = (length, modified, kbps);
-            return kbps;
+            cache[path] = (length, modified, kbps, seconds);
+            return (kbps, seconds);
         }
 
         // ffprobe lists every audio packet's "size=" and "duration_time=" (key=value, so field order does not matter).
