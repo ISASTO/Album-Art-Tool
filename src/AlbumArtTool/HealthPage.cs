@@ -103,7 +103,7 @@ namespace AlbumArtTool
                 Card("Missing titles", titlesCount, titlesDetail, fill, () => ShowFindings(titlesHeader)).Cell(0, 0),
                 Card("No album artist", albumArtistsCount, albumArtistsDetail, fillArtists, () => ShowFindings(albumArtistsHeader)).Cell(0, 1),
                 Card("Extra pictures", picturesCount, picturesDetail, onePicture, () => ShowFindings(picturesHeader)).Cell(0, 2),
-                Card("Low bitrate", bitrateCount, bitrateDetail, replace, () => ShowFindings(bitrateHeader), threshold).Cell(0, 3),
+                Card("Bitrate", bitrateCount, bitrateDetail, replace, () => ShowFindings(bitrateHeader), threshold).Cell(0, 3),
                 Card("Duplicates", duplicatesCount, duplicatesDetail, findDuplicates, () => { if (Duplicates != null) ShowView(true); }).Cell(0, 4));
             cards.Margin = new Thickness(-5, 0, -5, 10);
             duplicatesCount.Text = "Not checked"; duplicatesDetail.Text = "Compares audio, not just names.";
