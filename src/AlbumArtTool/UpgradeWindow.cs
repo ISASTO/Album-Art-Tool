@@ -375,7 +375,7 @@ namespace AlbumArtTool
             state.Set("Finding audio-only versions… 0/" + videos, "Accent");
             try
             {
-                await AlbumUpgrade.ResolveAudioAsync(music, album, state.Low.Artist, token, new Progress<(int Done, int Total)>(p => state.Set("Finding audio-only versions… " + p.Done + "/" + p.Total, "Accent")));
+                await AlbumUpgrade.ResolveAudioAsync(music, album, state.Low.Artist, token, new Immediate<(int Done, int Total)>(p => state.Set("Finding audio-only versions… " + p.Done + "/" + p.Total, "Accent")));
                 if (ReferenceEquals(state.Chosen, album)) state.Pairs = Pair(state, album);
             }
             finally { state.Resolving = false; }
@@ -586,6 +586,14 @@ namespace AlbumArtTool
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException) { status.Text = "Undo could not finish: " + e.Message; }
             finally { exclusive(false); SetWorking(false); if (shown != null) Show(shown); }
+        }
+
+        // Reports straight away on the calling (UI) thread, so a late progress message can't overwrite the final status.
+        private sealed class Immediate<T> : IProgress<T>
+        {
+            private readonly Action<T> report;
+            internal Immediate(Action<T> report) { this.report = report; }
+            public void Report(T value) => report(value);
         }
 
         // ---- Item views ----
