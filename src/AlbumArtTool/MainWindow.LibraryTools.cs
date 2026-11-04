@@ -213,11 +213,30 @@ namespace AlbumArtTool
             return managerWindow;
         }
 
+        private UpgradeWindow upgradeWindow;
+        internal ScanResult Library => library;
+        internal UpgradeWindow UpgradeWindowForTest => upgradeWindow;
+        internal Online.IYouTubeMusic YouTubeMusicForTest;
+        internal Func<string, string, System.Threading.CancellationToken, Action<double>, string> DownloadForTest;
+
+        internal UpgradeWindow ShowUpgrade(LibraryCheckResult result)
+        {
+            if (upgradeWindow != null) { upgradeWindow.Activate(); return upgradeWindow; }
+            var window = upgradeWindow = new UpgradeWindow(folder.Text, library.Albums.ToArray(), result,
+                () => !busy && !queueRunning && !maintenanceRunning && pending == null && (duplicatesWindow == null || !duplicatesWindow.IsScanning),
+                value => { maintenanceRunning = value; UpdateQueueControls(); },
+                async root => { lastEdit = null; folder.Text = root; await ScanAsync(); },
+                info => StartExplorer(info), YouTubeMusicForTest, DownloadForTest);
+            window.Closed += (s, e) => { if (upgradeWindow == window) upgradeWindow = null; };
+            window.Show(this);
+            return window;
+        }
+
         internal LibraryCheckWindow CheckTags()
         {
             if (checkWindow != null) { checkWindow.Check(); checkWindow.Activate(); return checkWindow; }
             if (busy || library.Albums.Count == 0) return null;
-            var window = checkWindow = new LibraryCheckWindow(() => library.Albums.ToArray(), info => StartExplorer(info), () => ShowLibraryManager().PreviewTitleFill(), () => ShowLibraryManager().PreviewArtworkFix());
+            var window = checkWindow = new LibraryCheckWindow(() => library.Albums.ToArray(), info => StartExplorer(info), () => ShowLibraryManager().PreviewTitleFill(), () => ShowLibraryManager().PreviewArtworkFix(), result => { ShowUpgrade(result); return Task.CompletedTask; });
             window.Closed += (s, e) => { if (checkWindow == window) checkWindow = null; };
             window.Show(this);
             return window;

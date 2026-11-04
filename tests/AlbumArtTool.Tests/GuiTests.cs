@@ -39,6 +39,7 @@ internal static partial class Tests
                 await Gui("library manager", ManagerGui);
                 await Gui("album cleanup manager", AlbumCleanupGui);
                 await Gui("update handoff", UpdateHandoffGui);
+                await Gui("YouTube Music replacement", UpgradeGui);
                 return 0;
             }, CancellationToken.None).GetAwaiter().GetResult();
     }

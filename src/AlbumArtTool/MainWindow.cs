@@ -122,7 +122,7 @@ namespace AlbumArtTool
             Closing += (s, e) =>
             {
                 if (installingUpdate && !restartForUpdate) { e.Cancel = true; return; }
-                if (maintenanceRunning || managerWindow != null && managerWindow.IsWorking) { e.Cancel = true; status.Text = "A library task is running. Stop it in Manage library before closing."; return; }
+                if (maintenanceRunning || managerWindow != null && managerWindow.IsWorking || upgradeWindow != null && upgradeWindow.IsWorking) { e.Cancel = true; status.Text = "A library task is running. Stop it in Manage library before closing."; return; }
                 if (writing || queueRunning) { e.Cancel = true; status.Text = "Work is still running. Open Queue to clear waiting jobs; the current update will finish safely."; }
                 else cancellation?.Cancel();
             };

@@ -79,6 +79,12 @@ jobs:
       - name: Live FFmpeg download, checksum, licenses and launch
         continue-on-error: true
         run: dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll --live-encoder
+      - name: Live YouTube Music search and album pages
+        continue-on-error: true
+        run: dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll --live-youtube-music
+      - name: Live yt-dlp and Deno download, checksums and launch
+        continue-on-error: true
+        run: dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll --live-ytdlp
 
       - name: Publish native (AOT) app
         run: dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r win-x64 -o dist/app
