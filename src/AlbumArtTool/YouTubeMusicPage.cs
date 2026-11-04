@@ -49,6 +49,7 @@ namespace AlbumArtTool
         private readonly Func<string, Task> refreshLibrary;
         private readonly Action<ProcessStartInfo> open;
         private readonly IYouTubeMusic music;
+        private readonly bool ownsMusic;
         private readonly Func<string, string, CancellationToken, Action<double>, string> download;
         private readonly int limit;
         private readonly LibraryCheckResult checkResult;
@@ -84,7 +85,7 @@ namespace AlbumArtTool
         internal YouTubeMusicPage(string musicRoot, IReadOnlyList<Album> library, LibraryCheckResult result, Func<bool> ready, Action<bool> setExclusive, Func<string, Task> refresh,
             Action<ProcessStartInfo> openLink, IYouTubeMusic youtube = null, Func<string, string, CancellationToken, Action<double>, string> fetch = null)
         {
-            root = musicRoot; canStart = ready; exclusive = setExclusive; refreshLibrary = refresh; open = openLink; music = youtube ?? new YouTubeMusic(); download = fetch;
+            root = musicRoot; canStart = ready; exclusive = setExclusive; refreshLibrary = refresh; open = openLink; music = youtube ?? new YouTubeMusic(); ownsMusic = youtube == null; download = fetch;
             limit = result.LowBitrateLimit; checkResult = result;
             foreach (var pair in result.MeasuredSeconds) lengths[pair.Key] = TimeSpan.FromSeconds(pair.Value);
             states = result.LowBitrateAlbums().Select(low =>
@@ -200,7 +201,7 @@ namespace AlbumArtTool
         internal bool Shutdown(bool force = false)
         {
             if (IsWorking && !force) { status.Text = "Replacements are running. Click Stop first; the song in progress finishes safely."; return false; }
-            running?.Cancel(); closing.Cancel(); if (youtube == null) music.Dispose();
+            running?.Cancel(); closing.Cancel(); if (ownsMusic) music.Dispose();
             return true;
         }
 
