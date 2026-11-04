@@ -213,6 +213,7 @@ namespace AlbumArtTool
             item.BadgeText.Text = text ?? "";
             item.Badge.Brush(Border.BackgroundProperty, warning ? "BadgeWarning" : "BadgeAccent");
             ToolTip.SetTip(item.Badge, text == null ? null : tip);
+            Avalonia.Automation.AutomationProperties.SetHelpText(item.Button, text == null ? null : tip);
         }
     }
 

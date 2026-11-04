@@ -85,7 +85,7 @@
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
           <SolidColorBrush x:Key="Canvas" Color="#F1F4FA"/>
-          <SolidColorBrush x:Key="Sidebar" Color="#F7F9FD"/>
+          <SolidColorBrush x:Key="Sidebar" Color="#F5F7FC"/>
           <SolidColorBrush x:Key="Surface" Color="#FDFEFF"/>
           <SolidColorBrush x:Key="Input" Color="#F6F8FC"/>
           <SolidColorBrush x:Key="Inset" Color="#F1F4F9"/>
@@ -93,14 +93,14 @@
           <SolidColorBrush x:Key="InsetHeader" Color="#ECEFF5"/>
           <SolidColorBrush x:Key="InsetAlternate" Color="#EDF0F6"/>
           <SolidColorBrush x:Key="Ink" Color="#1E2433"/>
-          <SolidColorBrush x:Key="Muted" Color="#657085"/>
-          <SolidColorBrush x:Key="Accent" Color="#3267EB"/>
+          <SolidColorBrush x:Key="Muted" Color="#5E697E"/>
+          <SolidColorBrush x:Key="Accent" Color="#2B5CD6"/>
           <SolidColorBrush x:Key="Selection" Color="#E7EEFF"/>
           <SolidColorBrush x:Key="Border" Color="#DCE2ED"/>
           <SolidColorBrush x:Key="Positive" Color="#287E68"/>
           <SolidColorBrush x:Key="Warning" Color="#9B6624"/>
-          <SolidColorBrush x:Key="Primary" Color="#3267EB"/>
-          <SolidColorBrush x:Key="PrimaryHover" Color="#2A5ADF"/>
+          <SolidColorBrush x:Key="Primary" Color="#2B5CD6"/>
+          <SolidColorBrush x:Key="PrimaryHover" Color="#2550C4"/>
           <SolidColorBrush x:Key="PrimaryPressed" Color="#1B45B8"/>
           <SolidColorBrush x:Key="Alternate" Color="#F9FBFE"/>
           <SolidColorBrush x:Key="SelectedBorder" Color="#D3DFFB"/>
@@ -130,7 +130,7 @@
             <GradientStop Color="#E7E1F7" Offset="1"/>
           </LinearGradientBrush>
           <LinearGradientBrush x:Key="ProgressFill" StartPoint="0%,0%" EndPoint="100%,0%">
-            <GradientStop Color="#3267EB" Offset="0"/>
+            <GradientStop Color="#2B5CD6" Offset="0"/>
             <GradientStop Color="#769AFF" Offset="1"/>
           </LinearGradientBrush>
 
@@ -141,25 +141,25 @@
           <SolidColorBrush x:Key="TextControlForeground" Color="#1E2433"/>
           <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#1E2433"/>
           <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#1E2433"/>
-          <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#657085"/>
+          <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#5E697E"/>
           <SolidColorBrush x:Key="TextControlBorderBrush" Color="#DCE2ED"/>
           <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#C3CDDF"/>
-          <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#3267EB"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#2B5CD6"/>
           <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#DCE2ED"/>
-          <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#657085"/>
-          <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#3267EB"/>
+          <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#5E697E"/>
+          <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#2B5CD6"/>
           <SolidColorBrush x:Key="ComboBoxBackground" Color="#F6F8FC"/>
           <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#EEF2FD"/>
           <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#E7EEFF"/>
           <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#F6F8FC"/>
           <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#DCE2ED"/>
           <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#C3CDDF"/>
-          <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#3267EB"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#2B5CD6"/>
           <SolidColorBrush x:Key="ComboBoxForeground" Color="#1E2433"/>
-          <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#657085"/>
+          <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#5E697E"/>
           <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#FDFEFF"/>
           <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#DCE2ED"/>
-          <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#657085"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#5E697E"/>
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
     </ResourceDictionary>
@@ -175,11 +175,11 @@
                                ChromeDisabledHigh="#3B485E" ChromeDisabledLow="#7D8BA3" ChromeGray="#ACB8CD" ChromeHigh="#3B485E"
                                ChromeLow="#191F29" ChromeMedium="#202633" ChromeMediumLow="#232A38" ChromeWhite="#FFFFFF"
                                ListLow="#232E44" ListMedium="#293C5D" ErrorText="#FF9B9B"/>
-        <ColorPaletteResources x:Key="Light" Accent="#3267EB" RegionColor="#F1F4FA"
+        <ColorPaletteResources x:Key="Light" Accent="#2B5CD6" RegionColor="#F1F4FA"
                                AltHigh="#FDFEFF" AltLow="#FDFEFF" AltMedium="#FDFEFF" AltMediumHigh="#FDFEFF" AltMediumLow="#FDFEFF"
-                               BaseHigh="#1E2433" BaseLow="#DCE2ED" BaseMedium="#657085" BaseMediumHigh="#3B4458" BaseMediumLow="#8590A5"
+                               BaseHigh="#1E2433" BaseLow="#DCE2ED" BaseMedium="#5E697E" BaseMediumHigh="#3B4458" BaseMediumLow="#8590A5"
                                ChromeAltLow="#3B4458" ChromeBlackHigh="#000000" ChromeBlackLow="#DCE2ED" ChromeBlackMedium="#3B4458" ChromeBlackMediumLow="#8590A5"
-                               ChromeDisabledHigh="#DCE2ED" ChromeDisabledLow="#8590A5" ChromeGray="#657085" ChromeHigh="#DCE2ED"
+                               ChromeDisabledHigh="#DCE2ED" ChromeDisabledLow="#8590A5" ChromeGray="#5E697E" ChromeHigh="#DCE2ED"
                                ChromeLow="#F6F8FC" ChromeMedium="#F1F4FA" ChromeMediumLow="#F6F8FC" ChromeWhite="#FFFFFF"
                                ListLow="#EEF2FD" ListMedium="#E7EEFF" ErrorText="#B42318"/>
       </FluentTheme.Palettes>

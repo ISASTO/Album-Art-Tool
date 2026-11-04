@@ -1,8 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia;
-using Avalonia.Animation;
-using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -111,16 +109,30 @@ namespace AlbumArtTool
             return window;
         }
 
-        // Pages fade in over 150 ms (skipped when Windows asks for fewer animations).
+        // Pages fade in over 150 ms (skipped when Windows asks for fewer animations). A dispatcher timer
+        // drives it, like the appearance wipe, so it also finishes on machines without a GPU clock.
         internal static bool PageFade = true;
         private static readonly TimeSpan FadeDuration = TimeSpan.FromMilliseconds(150);
+        private DispatcherTimer fadeTimer;
+        private Control fading;
 
-        private static void FadeIn(Control page)
+        private void FadeIn(Control page)
         {
-            if (page == null || !PageFade || !Appearance.MotionAllowed) { if (page != null) page.Opacity = 1; return; }
-            page.Transitions = null; page.Opacity = 0;
-            page.Transitions = new Transitions { new DoubleTransition { Property = Visual.OpacityProperty, Duration = FadeDuration, Easing = new CubicEaseOut() } };
-            Dispatcher.UIThread.Post(() => page.Opacity = 1, DispatcherPriority.Render);
+            fadeTimer?.Stop();
+            if (fading != null) fading.Opacity = 1;
+            fading = null;
+            if (page == null) return;
+            if (!PageFade || !Appearance.MotionAllowed) { page.Opacity = 1; return; }
+            fading = page; page.Opacity = 0;
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            fadeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(8), DispatcherPriority.Render, (s, e) =>
+            {
+                double t = Math.Min(1, clock.Elapsed.TotalMilliseconds / FadeDuration.TotalMilliseconds);
+                page.Opacity = 1 - Math.Pow(1 - t, 3);
+                if (t < 1) return;
+                fadeTimer.Stop(); page.Opacity = 1; fading = null;
+            });
+            fadeTimer.Start();
         }
     }
 }
