@@ -25,6 +25,10 @@ namespace AlbumArtTool.Management
         public bool TitleFromFilename { get; set; }
         public bool Duplicates { get; set; }
         public bool ArchiveOldBackups { get; set; }
+        /// <summary>yt-dlp, for replacements from YouTube Music.</summary>
+        public string DownloaderPath { get; set; }
+        /// <summary>Fetches a YouTube Music track's audio into a folder and returns the file (tests substitute their own).</summary>
+        internal Func<string, string, CancellationToken, Action<double>, string> Download { get; set; }
     }
 
     internal sealed class LibraryAction
@@ -55,14 +59,18 @@ namespace AlbumArtTool.Management
         public string MergedArtist { get; set; }
         public uint MergedTrack { get; set; }
         public uint MergedTrackCount { get; set; }
+        /// <summary>A YouTube Music track whose best audio stream replaces this song as MP3 320 (tags and cover are kept).</summary>
+        public string ReplacementUrl { get; set; }
+        public string ReplacementTitle { get; set; }
+        public double ReplacementSeconds { get; set; }
         // Shrinking artwork rewrites only the picture data, through the same verified tag edit.
         internal bool ChangesTags => MergeDiscs || NewTitle != null || Shrink || SinglePicture || Id3v23;
         internal FileStamp Stamp;
         internal bool Move => !string.IsNullOrEmpty(Target) && !Source.Equals(Target, StringComparison.OrdinalIgnoreCase);
         internal bool Rename => !string.IsNullOrEmpty(Target) && !Path.GetFileNameWithoutExtension(Source).Equals(Path.GetFileNameWithoutExtension(Target), StringComparison.Ordinal);
-        internal bool HasWork => Archive || Convert || Square || Move || Rename || ChangesTags;
+        internal bool HasWork => Archive || Convert || Square || Move || Rename || ChangesTags || ReplacementUrl != null;
         internal string Description => Archive ? Keeper != null ? "Remove duplicate (backed up)" : "Archive old backup" :
-            string.Join(" + ", new[] { Convert ? "MP3 320" : null, Square ? "Square art" : null, SinglePicture ? "One front cover" : null, Shrink ? "Resize art" : null, Id3v23 ? "ID3v2.3" : null, MergeDiscs ? "Combine discs · track " + MergedTrack : null, NewTitle != null ? TitleFromName ? "Title from filename" : "Clean title" : null, Rename ? "Rename" : null,
+            string.Join(" + ", new[] { ReplacementUrl != null ? "YouTube Music → MP3 320" : null, Convert ? "MP3 320" : null, Square ? "Square art" : null, SinglePicture ? "One front cover" : null, Shrink ? "Resize art" : null, Id3v23 ? "ID3v2.3" : null, MergeDiscs ? "Combine discs · track " + MergedTrack : null, NewTitle != null ? TitleFromName ? "Title from filename" : "Clean title" : null, Rename ? "Rename" : null,
                 Move && !Path.GetDirectoryName(Source).Equals(Path.GetDirectoryName(Target), StringComparison.OrdinalIgnoreCase) ? "Move" : null }.Where(s => s != null));
     }
 

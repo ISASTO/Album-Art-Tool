@@ -72,6 +72,39 @@ namespace AlbumArtTool.Management
             return (track.Codec ?? Path.GetExtension(track.Path)) + ":" + track.SampleRate + ":" + track.Channels + ":" + hash.Trim();
         }
 
+        /// <summary>
+        /// MP3 320 from a downloaded stream, carrying the original song's tags and pictures (your metadata stays yours),
+        /// saved as ID3v2.3 and verified: 320 kbps, the expected length, and a complete clean decode.
+        /// </summary>
+        internal static void EncodeReplacement(string exe, string input, Track original, string temp, double expectedSeconds, CancellationToken token, Action<double> progress)
+        {
+            if (exe == null) throw new IOException("Set up FFmpeg in Manage library first: it makes the MP3 320 files.");
+            var args = new List<string> { "-v", "error", "-nostdin", "-i", input, "-map", "0:a:0", "-vn", "-map_metadata", "-1", "-c:a", "libmp3lame", "-b:a", "320k",
+                "-id3v2_version", "3", "-write_id3v1", "0", "-ac", "2", "-progress", "pipe:1", "-nostats", "-y", temp };
+            Run(exe, args, token, line =>
+            {
+                if (line.StartsWith("out_time_us=", StringComparison.Ordinal) && long.TryParse(line.Substring(12), out long microseconds) && expectedSeconds > 0)
+                    progress?.Invoke(Math.Min(1, microseconds / 1000000.0 / expectedSeconds));
+            });
+            using (var source = TagLib.File.Create(original.Path, TagLib.ReadStyle.None))
+            using (var result = TagLib.File.Create(temp))
+            {
+                source.Tag.CopyTo(result.Tag, true);
+                result.Tag.Pictures = source.Tag.Pictures;
+                Id3Standard.Apply(result);
+                result.Save();
+            }
+            using (var check = TagLib.File.Create(temp))
+            {
+                double seconds = check.Properties.Duration.TotalSeconds;
+                if (check.Properties.AudioBitrate < 318 || check.Properties.AudioBitrate > 322) throw new IOException("The new MP3 is not 320 kbps. Original kept.");
+                if (expectedSeconds > 0 && Math.Abs(seconds - expectedSeconds) > Math.Max(3, expectedSeconds * 0.01))
+                    throw new IOException("The download is " + Math.Round(seconds) + " s long, not the " + Math.Round(expectedSeconds) + " s YouTube Music lists. Original kept.");
+                if (!string.Equals(check.Tag.Title, original.HasTitleTag ? original.Title : check.Tag.Title, StringComparison.Ordinal)) throw new IOException("The original tags could not be copied. Original kept.");
+            }
+            Run(exe, new[] { "-v", "error", "-xerror", "-nostdin", "-i", temp, "-map", "0:a:0", "-f", "null", "-" }, token);
+        }
+
         internal static void Convert(string exe, Track track, string temp, CancellationToken token, Action<double> progress)
         {
             var args = new List<string> { "-v", "error", "-nostdin", "-i", track.Path, "-map", "0:a:0", "-vn", "-map_metadata", "0", "-c:a", "libmp3lame", "-b:a", "320k", "-id3v2_version", "3", "-write_id3v1", "1" };

@@ -23,6 +23,8 @@ namespace AlbumArtTool
         private readonly Func<Album[]> currentAlbums;
         private readonly Action<ProcessStartInfo> openFolder;
         private readonly Func<Task> fillTitles, fixPictures;
+        private readonly Func<LibraryCheckResult, Task> replaceLow;
+        private readonly Button replace = Kit.Button("Replace from YouTube Music…", "primary");
         private readonly Button fill = Kit.Button("Fill titles from filenames…"), onePicture = Kit.Button("Fix embedded pictures…");
         private readonly ListBox list = new ListBox { Classes = { "grid" } };
         private readonly TextBlock summary = Kit.Label("", Kit.Body);
@@ -41,9 +43,9 @@ namespace AlbumArtTool
             internal bool Header, Folder;
         }
 
-        internal LibraryCheckWindow(Func<Album[]> albums, Action<ProcessStartInfo> openFolder, Func<Task> fillTitles = null, Func<Task> fixPictures = null)
+        internal LibraryCheckWindow(Func<Album[]> albums, Action<ProcessStartInfo> openFolder, Func<Task> fillTitles = null, Func<Task> fixPictures = null, Func<LibraryCheckResult, Task> replaceLow = null)
         {
-            currentAlbums = albums; this.openFolder = openFolder; this.fillTitles = fillTitles; this.fixPictures = fixPictures;
+            currentAlbums = albums; this.openFolder = openFolder; this.fillTitles = fillTitles; this.fixPictures = fixPictures; this.replaceLow = replaceLow;
             Title = "Check library"; Width = 980; Height = 570; MinWidth = 900; MinHeight = 420;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             var help = Kit.Label("Songs without a Title tag show their filename in players. Songs with several embedded pictures can show the wrong cover or carry extra artwork. Albums with low-bitrate lossy songs (measured, not just the file header) may be worth downloading again. Results use the last library scan; nothing is changed.", Kit.Body, cls: "muted");
@@ -70,7 +72,11 @@ namespace AlbumArtTool
             foreach (var b in new[] { refresh, save, fill, onePicture, show }) b.Margin = new Thickness(3, 6, 3, 0);
             var buttons = Kit.Grid("130,140,*,215,215,160", "*").Add(refresh.Cell(0, 0), save.Cell(0, 1), fill.Cell(0, 3), onePicture.Cell(0, 4), show.Cell(0, 5));
             var card = Kit.Frost(Kit.Inset(list), new Thickness(10)); card.Margin = new Thickness(0, 2, 0, 0);
-            var top = Kit.Grid("*,Auto,Auto", "*").Add(summary.Cell(0, 0), Kit.Label("Low bitrate:", Kit.Small, cls: "muted").Cell(0, 1), threshold.Cell(0, 2));
+            replace.Named("Replace from YouTube Music").Tip("Opens a window that finds each low-bitrate album on YouTube Music and replaces the low songs with fresh downloads (best free stream, saved as MP3 320 with your tags and cover). " +
+                "Nothing is replaced until you check songs and click Replace; originals are backed up and can be restored.");
+            replace.Margin = new Thickness(10, 0, 0, 0); replace.IsEnabled = false;
+            replace.Click += async (s, e) => { if (this.replaceLow != null && Result != null) await this.replaceLow(Result); };
+            var top = Kit.Grid("*,Auto,Auto,Auto", "*").Add(summary.Cell(0, 0), Kit.Label("Low bitrate:", Kit.Small, cls: "muted").Cell(0, 1), threshold.Cell(0, 2), replace.Cell(0, 3));
             threshold.Margin = new Thickness(8, 0, 0, 0);
             var layout = Kit.Grid("*", "48,36,*,45").Add(help.Cell(0, 0), top.Cell(1, 0), card.Cell(2, 0), buttons.Cell(3, 0));
             layout.Margin = new Thickness(16);
@@ -156,6 +162,8 @@ namespace AlbumArtTool
                 rows.Add(new Row { Text = Count(Result.MeasureIssues.Count) + " could not be measured and show their header bitrate", Tip = string.Join("\n", Result.MeasureIssues.Take(40)) });
             Rows = rows; list.ItemsSource = rows; show.IsEnabled = false;
             summary.Text = Summary();
+            // Offered once the bitrates are measured (or known to be header-only), so the list it opens is final.
+            replace.IsEnabled = replaceLow != null && albums.Count > 0 && (measureStatus.Length == 0 || measureStatus.StartsWith("header", StringComparison.Ordinal));
             fill.IsEnabled = fillTitles != null && Result.MissingTitles.Count > 0;
             onePicture.IsEnabled = fixPictures != null && Result.MultiplePictures.Count > 0;
             save.IsEnabled = Result.MissingTitles.Count + Result.MultiplePictures.Count + Result.LowBitrate.Count > 0;

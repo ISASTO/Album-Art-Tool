@@ -33,6 +33,8 @@ internal static partial class Tests
             if (options.Contains("--live-search")) return LiveSearch().GetAwaiter().GetResult();
             if (options.Contains("--live-update")) return LiveUpdateTest().GetAwaiter().GetResult();
             if (options.Contains("--live-encoder")) return LiveEncoderSetup().GetAwaiter().GetResult();
+            if (options.Contains("--live-youtube-music")) return LiveYouTubeMusic().GetAwaiter().GetResult();
+            if (options.Contains("--live-ytdlp")) return LiveYtDlpSetup().GetAwaiter().GetResult();
             if (options.Contains("--benchmark")) { Benchmark(); return 0; }
             watchdog = new Timer(_ => { Console.Error.WriteLine("FAIL: watchdog at " + stage); Environment.Exit(1); }, null, TimeSpan.FromMinutes(12), Timeout.InfiniteTimeSpan);
             Run("artwork", ArtworkTests);
@@ -45,6 +47,7 @@ internal static partial class Tests
             Run("artists", ArtistRulesTests);
             Run("duplicates", DuplicateTests);
             Run("tag checks", LibraryCheckTests);
+            Run("YouTube Music replacement", UpgradeTests);
             foreach (var path in Fixtures()) Run("artist round trip " + Path.GetExtension(path), () => ArtistRoundTrip(path));
             Run("scanning", () => { PartialAlbums(); MixedAlbums(); Guards(); FolderArt(); CancelScan(); CountedScanProgress(); InvalidArt(); UntaggedMp3(); });
             if (!options.Contains("--no-gui")) Run("GUI", GuiAll);

@@ -96,6 +96,19 @@ Click **Check library…** after a scan to list:
 
 The check uses the last library scan, so it opens instantly and never changes a file. Select a song and click **Show selected file** to highlight it in File Explorer, or **Save report…** for a CSV. Rescan and click **Check again** after fixing files. **Fill titles from filenames…** and **Fix embedded pictures…** open Manage library with just the matching option selected and preview the fix.
 
+## Replace low-quality songs from YouTube Music
+
+In **Check library**, click **Replace from YouTube Music…** next to the low-bitrate threshold. Every album with low-bitrate songs is listed and searched on **YouTube Music** (music.youtube.com, not regular YouTube) automatically.
+
+- **Matching.** The likeliest albums are opened and compared with yours by title, artist and track count, and the release whose tracks pair best with your songs is chosen. Other results are shown as cards, so you can pick another release or search differently. Each of your songs is paired with its YouTube Music track by title (ignoring featured credits, punctuation and accents), track number and length.
+- **What gets checked.** Low-bitrate songs with an exact match (same title, length within 3 seconds) are checked. Songs that aren't low can be checked too ("All matched"). A track whose length differs, such as a music video with an intro, is highlighted in orange and never checked automatically. Double-click its YouTube Music title to listen first.
+- **Quality.** yt-dlp downloads YouTube Music's best free audio stream: Opus, about 130–160 kbps, which is clearly better than 96–128 kbps MP3. It is saved as an **MP3 320** with your own tags (title, artist, album, track number, year…) and cover, as ID3v2.3. YouTube Music does not offer 320 kbps itself, and re-encoding to 320 keeps compatibility without adding quality.
+- **Safety.** Each replacement uses the same backup and verified swap as Manage library. The original is copied to the PC backup folder first, and the new file must be 320 kbps, have the length YouTube Music lists and decode completely. Only then is the original replaced (a non-MP3 original becomes an .mp3 of the same name). **Undo replacements** puts the originals back, byte for byte; later, Manage library → **Preview Undo** can too.
+- **Setup.** The first time, **Set up** downloads yt-dlp and Deno (the JavaScript runtime yt-dlp needs for YouTube), about 60 MB, from their official GitHub releases, checking each SHA-256. FFmpeg is installed too if it's missing. yt-dlp is kept up to date automatically, because YouTube changes often.
+- **"Confirm you're not a bot".** If YouTube asks for this, choose **Cookies…** and pick a cookies.txt exported from a browser where you're signed in to YouTube. It is only passed to yt-dlp.
+
+Downloading from YouTube is subject to YouTube's terms of service; use it for music you're entitled to.
+
 ## Find duplicate songs and albums
 
 After scanning a music folder, click **Find duplicates**. A separate window scans the successfully read tracks in that folder tree, with a progress bar, percentage, checked/total counter and Stop button. Album browsing remains available. **Open selected folder** takes you to a result's location, and **Save report** exports a CSV with paths and the evidence for each match. Rescan the main library to include newly added music, then click Scan again in the duplicate window.

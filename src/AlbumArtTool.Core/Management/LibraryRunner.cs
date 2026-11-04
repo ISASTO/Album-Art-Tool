@@ -108,7 +108,7 @@ namespace AlbumArtTool.Management
             if (BackupSettings.Within(options.BackupRoot, options.Root)) throw new IOException("Backups must be outside the active music tree.");
             foreach (var group in plan.Actions.Where(a => !string.IsNullOrEmpty(a.MergeGroup)).GroupBy(a => a.MergeGroup))
                 if (group.Any(a => a.Selected) && group.Any(a => !a.Selected)) throw new IOException("Select or clear the complete multi-disc album before applying its merge.");
-            long backupBytes = plan.Actions.Where(a => a.Selected && a.HasWork && (a.Archive || a.Convert || a.Square || a.ChangesTags)).Sum(a => a.Stamp.Length);
+            long backupBytes = plan.Actions.Where(a => a.Selected && a.HasWork && (a.Archive || a.Convert || a.Square || a.ChangesTags || a.ReplacementUrl != null)).Sum(a => a.Stamp.Length);
             try
             {
                 var drive = new DriveInfo(Path.GetPathRoot(options.BackupRoot));
@@ -125,7 +125,7 @@ namespace AlbumArtTool.Management
             {
                 if (token.IsCancellationRequested) { journal.Stopped = true; break; }
                 var entry = new JournalEntry { Index = journal.Entries.Count, Source = row.Source, Target = row.Archive ? null : row.Target, Archive = row.Archive,
-                    MoveOnly = !row.Archive && !row.Convert && !row.Square && !row.ChangesTags, State = "Preparing" };
+                    MoveOnly = !row.Archive && !row.Convert && !row.Square && !row.ChangesTags && row.ReplacementUrl == null, State = "Preparing" };
                 journal.Entries.Add(entry);
                 string temp = null; bool changed = false;
                 try
@@ -161,7 +161,9 @@ namespace AlbumArtTool.Management
                     {
                         Directory.CreateDirectory(Path.GetDirectoryName(row.Target)); LibraryPaths.Safe(row.Target, options.Root);
                         temp = Path.Combine(Path.GetDirectoryName(row.Target), ".aat-manage-" + Guid.NewGuid().ToString("N") + Path.GetExtension(row.Target));
-                        if (row.Convert)
+                        if (row.ReplacementUrl != null) Replace(options, row, temp, token, (step, fraction) => progress?.Report(new ProgressInfo { Completed = done, Total = selected.Length, Fraction = fraction,
+                            Message = step + " · " + (done + 1) + "/" + selected.Length + " · " + Path.GetFileName(row.Source) }));
+                        else if (row.Convert)
                             Encoder.Convert(options.EncoderPath, row.Track, temp, token, fraction => progress?.Report(new ProgressInfo { Completed = done, Total = selected.Length, Fraction = fraction,
                                 Message = "MP3 320 · " + (done + 1) + "/" + selected.Length + " · " + Path.GetFileName(row.Source) }));
                         else Copy(row.Source, temp, token);
@@ -201,6 +203,20 @@ namespace AlbumArtTool.Management
             }
             RemoveEmptySourceFolders(plan.Options.Root, journal.Entries.Where(e => e.State == "Committed").Select(e => e.Source));
             journal.Save(); return journal;
+        }
+
+        // Download outside the music tree (beside the backups), encode MP3 320 with the original's tags, then the usual verified swap.
+        private static void Replace(LibraryOptions options, LibraryAction row, string temp, CancellationToken token, Action<string, double> progress)
+        {
+            string stage = Path.Combine(options.BackupRoot, ".aat-downloads", Guid.NewGuid().ToString("N"));
+            try
+            {
+                var download = options.Download ?? ((url, folder, t, p) => YtDlp.Download(options.DownloaderPath, options.EncoderPath, url, folder, t, p));
+                string audio = download(row.ReplacementUrl, stage, token, fraction => progress("Downloading", fraction * 0.6));
+                token.ThrowIfCancellationRequested();
+                Encoder.EncodeReplacement(options.EncoderPath, audio, row.Track, temp, row.ReplacementSeconds, token, fraction => progress("MP3 320", 0.6 + fraction * 0.4));
+            }
+            finally { try { Directory.Delete(stage, true); } catch { } }
         }
 
         private static void VerifyKeeper(LibraryAction row, Dictionary<string, JournalEntry> completed)
