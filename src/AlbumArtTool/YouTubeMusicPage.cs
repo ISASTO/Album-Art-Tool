@@ -100,7 +100,7 @@ namespace AlbumArtTool
             var intro = Kit.Label("Each album below is matched on YouTube Music automatically. Checked songs are downloaded at YouTube Music's best free quality (Opus, about 130–160 kbps) " +
                 "and saved as MP3 320 with your own tags and cover. Originals are backed up first, and Undo puts them back.", Kit.Body, cls: "muted");
             intro.TextWrapping = TextWrapping.Wrap; intro.TextTrimming = TextTrimming.None;
-            var header = new StackPanel { Spacing = 4 }; header.Children.Add(intro);
+            var header = new StackPanel { Spacing = 4 };
 
             // Tools banner (only when something is missing)
             toolText.TextWrapping = TextWrapping.Wrap; toolText.TextTrimming = TextTrimming.None;
@@ -159,7 +159,7 @@ namespace AlbumArtTool
             searchRow.Margin = new Thickness(0, 14, 0, 4); table.Margin = new Thickness(0, 8, 0, 0);
             var leftCard = Kit.Frost(left, new Thickness(8, 12, 8, 8)); var rightCard = Kit.Frost(right, new Thickness(16, 14, 16, 12));
             leftCard.Margin = new Thickness(0, 0, 10, 0);
-            var body = Kit.Grid("330,*", "*").Add(leftCard.Cell(0, 0), rightCard.Cell(0, 1)); body.Margin = new Thickness(0, 12, 0, 0);
+            var body = Kit.Grid("330,*", "*").Add(leftCard.Cell(0, 0), rightCard.Cell(0, 1));
 
             // Footer
             status.Named("Replacement status"); status.TextWrapping = TextWrapping.Wrap; status.MaxLines = 2;

@@ -217,6 +217,7 @@ namespace AlbumArtTool
             });
             var problemsTitle = Kit.Caption("Problems"); problemsTitle.Margin = new Thickness(0, 0, 0, 2);
             problemsSummary.Margin = new Thickness(0, 0, 0, 8);
+            problemsSummary.Text = "No problems in the last scan or edit.";
             var problemsCard = Kit.Frost(Kit.Grid("*", "Auto,Auto,*").Add(problemsTitle.Cell(0, 0), problemsSummary.Cell(1, 0), Kit.Inset(problems).Cell(2, 0)), new Thickness(14, 12, 14, 12), 14);
             problemsCard.Margin = new Thickness(0, 14, 0, 0);
             var right = Kit.Grid("*", "Auto,*").Add(undoCard.Cell(0, 0), problemsCard.Cell(1, 0));

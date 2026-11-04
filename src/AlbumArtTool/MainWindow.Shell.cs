@@ -46,9 +46,9 @@ namespace AlbumArtTool
 
         private Control BuildSidebar()
         {
-            var mark = new Image { Source = Kit.Mark, Width = 28, Height = 28, Margin = new Thickness(0, 0, 10, 0) };
-            var name = Kit.Label("Music Library Manager", Kit.Body, true);
-            var brand = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 2, 0, 18) };
+            var mark = new Image { Source = Kit.Mark, Width = 26, Height = 26, Margin = new Thickness(0, 0, 9, 0) };
+            var name = Kit.Label("Music Library Manager", 13, true);
+            var brand = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 2, 0, 18) };
             brand.Children.Add(mark); brand.Children.Add(name);
             brand.Named("Music Library Manager");
             var pages = new StackPanel { Spacing = 2 };
@@ -125,7 +125,7 @@ namespace AlbumArtTool
                 case Page.Artists: pageTitle.Text = "Artists"; pageSubtitle.Text = "Collapse guest credits into each album's main artist. Already-correct tracks are left alone."; break;
                 case Page.Health: pageTitle.Text = "Library health"; pageSubtitle.Text = "Based on the last scan. Nothing changes until you choose a fix and apply it."; break;
                 case Page.Organize: pageTitle.Text = "Organize"; pageSubtitle.Text = "Choose what to change in " + Kit.MiddleEllipsis(organizePage?.Root ?? Root, 60) + ". Every change is previewed first and every original is backed up."; break;
-                case Page.YouTube: pageTitle.Text = "Replace from YouTube Music"; pageSubtitle.Text = "Low-bitrate songs are matched with the artist's audio uploads and saved as MP3 320 with your tags and cover."; break;
+                case Page.YouTube: pageTitle.Text = "Replace from YouTube Music"; pageSubtitle.Text = "Checked songs are downloaded at YouTube Music's best free quality and saved as MP3 320 with your tags and cover. Originals are backed up first."; break;
                 case Page.Activity: pageTitle.Text = "Activity"; pageSubtitle.Text = "Work in progress, recent results, problems and Undo."; break;
                 default: pageTitle.Text = "Settings"; pageSubtitle.Text = "Appearance, folders, helper programs and updates."; break;
             }

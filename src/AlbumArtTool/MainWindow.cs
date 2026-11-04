@@ -227,7 +227,7 @@ namespace AlbumArtTool
             bottom.Margin = new Thickness(0, 8, 0, 0);
             var main = Kit.Grid("*", "Auto,*,36").Add(header.Cell(0, 0), pageHost.Cell(1, 0), bottom.Cell(2, 0));
             main.Margin = new Thickness(24, 18, 24, 8);
-            var shell = Kit.Grid("232,*", "*").Add(BuildSidebar().Cell(0, 0), main.Cell(0, 1));
+            var shell = Kit.Grid("240,*", "*").Add(BuildSidebar().Cell(0, 0), main.Cell(0, 1));
             onlyMissing.Tip("Keeps existing embedded front covers. Uncheck to replace the cover on every track in this album.");
             folderCover.Tip("Updates recognized cover/folder/front/album/albumart images, or creates cover.jpg. Disabled when multiple albums share a folder.");
             undo.Named("Undo last change").Tip("Restore the files from your most recent cover or artist edit in this session (Ctrl+Z). Organize runs are undone in Organize.");
@@ -453,7 +453,7 @@ namespace AlbumArtTool
                 var result = await Task.Run(() => scanner.Scan(root, token, reporter, useCache: !force));
                 library = result; hasScanned = true; libraryVersion++; issues.AddRange(result.Issues);
                 if (!result.Cancelled) AppSettings.LastFolder = root;
-                status.Text = (result.Cancelled ? "Scan stopped · " : "") + result.Albums.Count + " albums · " + result.FilesRead + " tracks" +
+                status.Text = (result.Cancelled ? "Scan stopped · " : "") + result.Albums.Count + (result.Albums.Count == 1 ? " album · " : " albums · ") + result.FilesRead + (result.FilesRead == 1 ? " track" : " tracks") +
                     (issues.Count > 0 ? " · " + issues.Count + (issues.Count == 1 ? " issue" : " issues") : " · Drop an image onto an album to get started.");
                 RefreshAlbums();
             }

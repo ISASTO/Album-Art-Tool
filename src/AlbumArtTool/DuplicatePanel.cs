@@ -63,7 +63,7 @@ namespace AlbumArtTool
             open.IsEnabled = false; open.Click += (s, e) => OpenSelected();
             foreach (var b in new[] { scan, save, open }) { b.Margin = new Thickness(3, 8, 3, 0); b.Padding = new Thickness(14, 2); b.Height = 34; }
             var buttons = Kit.Grid("Auto,Auto,*,Auto", "*").Add(scan.Cell(0, 0), save.Cell(0, 1), open.Cell(0, 3));
-            message.FontSize = Kit.Small;
+            message.FontSize = Kit.Small; message.Margin = new Thickness(0, 6, 0, 0);
             var table = Kit.Inset(matches); table.Margin = new Thickness(0, 4, 0, 0);
             var layout = Kit.Grid("*", "Auto,Auto,Auto,*,Auto").Add(help.Cell(0, 0), message.Cell(1, 0), progress.Cell(2, 0), table.Cell(3, 0), buttons.Cell(4, 0));
             Content = layout;

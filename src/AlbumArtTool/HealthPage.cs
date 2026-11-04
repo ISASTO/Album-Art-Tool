@@ -271,6 +271,8 @@ namespace AlbumArtTool
             replace.IsEnabled = replaceLow != null && albums.Count > 0 && (measureStatus.Length == 0 || measureStatus.StartsWith("header", StringComparison.Ordinal));
             fill.IsEnabled = fillTitles != null && Result.MissingTitles.Count > 0;
             onePicture.IsEnabled = fixPictures != null && Result.MultiplePictures.Count > 0;
+            // A card with nothing to fix shows no fix.
+            fill.IsVisible = Result.MissingTitles.Count > 0; onePicture.IsVisible = Result.MultiplePictures.Count > 0; replace.IsVisible = albums.Count > 0;
             save.IsEnabled = Result.MissingTitles.Count + Result.MultiplePictures.Count + Result.LowBitrate.Count > 0;
         }
 
