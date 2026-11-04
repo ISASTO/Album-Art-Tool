@@ -149,7 +149,7 @@ namespace AlbumArtTool
             renameBanner = new Border { Child = Kit.Grid("*,Auto", "Auto").Add(renameText.Cell(0, 0), cancelRename.Cell(0, 1)), CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 8), Margin = new Thickness(0, 0, 0, 8), IsVisible = false };
             renameBanner.Brush(Border.BackgroundProperty, "BadgeWarning");
             // Which folder this works on: the music folder, or New music before it joins the library.
-            libraryTarget.Named("Organize the music folder").Tip("Work on your music folder.");
+            libraryTarget.Named("Organize the music folder").Tip("Work on your music folder: every option and preset changes the songs in your library.");
             newTarget.Named("Organize New music").Tip("Work on the New music folder (your downloads from Add music) before they join the library.");
             libraryTarget.Click += (s, e) => { if (!IsWorking && libraryFolder != null) SwitchFolder?.Invoke(libraryFolder); };
             newTarget.Click += (s, e) => { if (!IsWorking && newMusicFolder != null) SwitchFolder?.Invoke(newMusicFolder); };
