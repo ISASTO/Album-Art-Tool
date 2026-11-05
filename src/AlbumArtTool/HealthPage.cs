@@ -229,7 +229,7 @@ namespace AlbumArtTool
         private async Task VerifyAsync(LibraryCheckResult result)
         {
             var source = measuring = new System.Threading.CancellationTokenSource();
-            var progress = new Progress<ProgressInfo>(p => { if (ReferenceEquals(Result, result) && !source.IsCancellationRequested) { measureStatus = "measuring " + p.Completed + "/" + p.Total + "…"; summary.Text = Summary(); } });
+            var progress = new Throttled<ProgressInfo>(p => { if (ReferenceEquals(Result, result) && !source.IsCancellationRequested) { measureStatus = "measuring " + p.Completed + "/" + p.Total + "…"; summary.Text = Summary(); } });
             var candidates = result.LowBitrate.ToArray();
             LibraryChecks.Measurements measured;
             try { measured = await Task.Run(() => LibraryChecks.Measure(candidates, source.Token, progress)); }

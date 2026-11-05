@@ -485,7 +485,7 @@ namespace AlbumArtTool
 
         internal IProgress<ProgressInfo> Reporter()
         {
-            return new Progress<ProgressInfo>(p =>
+            return new Throttled<ProgressInfo>(p =>
             {
                 if (!IsWorking) return;
                 progress.IsIndeterminate = p.Total <= 0;
@@ -496,7 +496,8 @@ namespace AlbumArtTool
 
         internal async Task PreviewAsync()
         {
-            if (IsWorking || !Ready()) return;
+            if (IsWorking) return;
+            if (!await WaitReadyAsync("The preview")) return;
             encoder = Management.Encoder.Find(); UpdateEncoder();
             var options = new LibraryOptions { Root = root, BackupRoot = BackupSettings.Root, EncoderPath = encoder, Convert = convert.On(), ConvertOtherLossy = compatibility.On(),
                 Square = square.On(), Shrink = shrink.On(), SingleCover = singleCover.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On(), TitleFromFilename = titleFromName.On(), Id3v23 = id3v23.On(),
@@ -505,19 +506,25 @@ namespace AlbumArtTool
             SetWorking(true); exclusive(true); SetRows(new List<FileRow>()); plan = null; undoJournal = null;
             try
             {
-                var reporter = Reporter(); var built = await Task.Run(() => LibraryPlanner.Build(options, token, reporter));
-                plan = built;
-                var next = new List<FileRow>(built.Actions.Count + built.Issues.Count);
-                foreach (var action in built.Actions)
+                var reporter = Reporter();
+                // The plan and its rows are built off the UI thread, so a big library never freezes clicks.
+                var (built, next, bytes) = await Task.Run(() =>
                 {
-                    var row = new FileRow { Tag = action, Action = action.HasWork ? action.Description : "Keep", Source = Relative(action.Source),
-                        Destination = action.Keeper != null ? "Keep: " + Relative(action.Keeper) : action.Target != null ? Relative(action.Target) : "PC backup folder",
-                        Details = action.Reason ?? "", Muted = !action.HasWork, Tooltip = action.Source + "\n" + (action.Target ?? action.Keeper ?? "PC backup folder") + "\n" + (action.Reason ?? "") };
-                    row.SetChecked(action.HasWork); next.Add(row);
-                }
-                foreach (string issue in built.Issues) next.Add(new FileRow { Action = "Skipped", Source = issue, Muted = true, Tooltip = issue });
+                    var made = LibraryPlanner.Build(options, token, reporter);
+                    var list = new List<FileRow>(made.Actions.Count + made.Issues.Count);
+                    foreach (var action in made.Actions)
+                    {
+                        var row = new FileRow { Tag = action, Action = action.HasWork ? action.Description : "Keep", Source = Relative(action.Source),
+                            Destination = action.Keeper != null ? "Keep: " + Relative(action.Keeper) : action.Target != null ? Relative(action.Target) : "PC backup folder",
+                            Details = action.Reason ?? "", Muted = !action.HasWork, Tooltip = action.Source + "\n" + (action.Target ?? action.Keeper ?? "PC backup folder") + "\n" + (action.Reason ?? "") };
+                        row.SetChecked(action.HasWork); list.Add(row);
+                    }
+                    foreach (string issue in made.Issues) list.Add(new FileRow { Action = "Skipped", Source = issue, Muted = true, Tooltip = issue });
+                    long size = made.Actions.Where(a => a.HasWork && (a.Archive || a.Convert || a.Square || a.ChangesTags)).Sum(a => a.Stamp.Length);
+                    return (made, list, size);
+                }, token);
+                plan = built;
                 SetRows(next);
-                long bytes = built.Actions.Where(a => a.HasWork && (a.Archive || a.Convert || a.Square || a.ChangesTags)).Sum(a => a.Stamp.Length);
                 state.Text = built.Actions.Count(a => a.HasWork) + " changes across " + built.Actions.Count + " files · originals need about " + (bytes / 1048576.0).ToString("N0") + " MB in the backup folder · " + built.Issues.Count + " skipped/problems. Review, uncheck unwanted changes, then Apply.";
             }
             catch (OperationCanceledException) { state.Text = "Preview stopped. No files were changed."; }
@@ -525,12 +532,39 @@ namespace AlbumArtTool
             finally { exclusive(false); SetWorking(false); }
         }
 
-        private bool Ready()
-        { if (canStart()) return true; state.Text = "Wait for scans, artwork/artist jobs and duplicate scans to finish. Apply or discard any staged cover in the main window first."; return false; }
+        /// <summary>What other work this page is waiting on, or null when it can start. A reason starting with "!" cannot be waited out.</summary>
+        internal Func<string> Blocked;
+        internal bool IsWaiting { get; private set; }
+
+        // A click while the library is still busy (for example the rescan right after Apply) is remembered, not dropped:
+        // the page says what it is waiting for and starts by itself as soon as that finishes. Stop cancels the wait.
+        private async Task<bool> WaitReadyAsync(string what)
+        {
+            string reason = Blocked?.Invoke();
+            if (reason == null) { if (canStart()) return true; reason = "other library work"; }
+            if (reason.StartsWith("!", StringComparison.Ordinal)) { state.Text = reason.Substring(1); return false; }
+            source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
+            SetWorking(true); IsWaiting = true; progress.IsIndeterminate = true;
+            try
+            {
+                while (reason != null)
+                {
+                    if (reason.StartsWith("!", StringComparison.Ordinal)) { state.Text = reason.Substring(1); return false; }
+                    state.Text = "Waiting for " + reason + " to finish… " + what + " starts by itself. Click Stop to cancel.";
+                    await Task.Delay(150, token);
+                    reason = Blocked?.Invoke() ?? (canStart() ? null : "other library work");
+                }
+                return true;
+            }
+            catch (OperationCanceledException) { state.Text = "Cancelled. Nothing was changed."; return false; }
+            finally { IsWaiting = false; SetWorking(false); }
+        }
 
         internal async Task ApplyAsync()
         {
-            if (IsWorking || !Ready()) return;
+            if (IsWorking) return;
+            if (plan == null && undoJournal == null) return;
+            if (!await WaitReadyAsync(undoJournal != null ? "Undo" : "Applying")) return;
             if (plan == null && undoJournal == null) return;
             if (plan != null) foreach (var row in rows) if (row.Tag is LibraryAction action) action.Selected = row.IsChecked;
             var selectedUndo = new HashSet<JournalEntry>(rows.Where(r => r.IsChecked && r.Tag is JournalEntry).Select(r => (JournalEntry)r.Tag));

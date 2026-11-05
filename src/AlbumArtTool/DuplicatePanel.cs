@@ -79,7 +79,7 @@ namespace AlbumArtTool
             IsScanning = true; Result = null; save.IsEnabled = open.IsEnabled = false; scan.SetText("Stop scan");
             Nodes = Array.Empty<Node>(); matches.ItemsSource = null;
             progress.IsVisible = true; progress.Value = 0; message.Text = "Finding duplicate candidates…";
-            var reporter = new Progress<ProgressInfo>(p =>
+            var reporter = new Throttled<ProgressInfo>(p =>
             {
                 if (!IsScanning || token.IsCancellationRequested) return;
                 progress.Value = p.Total > 0 ? Math.Max(0, Math.Min(100, (int)(100.0 * p.Completed / p.Total))) : 0;

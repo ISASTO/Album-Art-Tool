@@ -525,7 +525,7 @@ namespace AlbumArtTool
 
         private IProgress<int> Percent(string message) => new Progress<int>(p => { progress.IsIndeterminate = false; progress.Value = p; status.Text = message + " · " + p + "%"; });
 
-        private IProgress<ProgressInfo> Reporter() => new Progress<ProgressInfo>(p =>
+        private IProgress<ProgressInfo> Reporter() => new Throttled<ProgressInfo>(p =>
         {
             if (!IsWorking) return;
             progress.IsIndeterminate = p.Total <= 0;

@@ -46,6 +46,7 @@ internal static partial class Tests
                 await Gui("YouTube Music replacement", UpgradeGui);
                 await Gui("add music", AddMusicGui);
                 await Gui("artist tags", ArtistTagsGui);
+                await Gui("click while busy", ClickWhileBusyGui);
                 return 0;
             }, CancellationToken.None).GetAwaiter().GetResult();
     }
@@ -606,6 +607,38 @@ internal static partial class Tests
             await form.ApplyAsync();
             using (var file = TagLib.File.Create(Path.Combine(album, "one.mp3")))
                 Assert(file.Tag.Title == "One" && file.Tag.TrackCount == 2 && file.Tag.DiscCount == 1, "the manager applies its previewed title and disc tags");
+        }
+        finally { host.Close(); }
+    }
+
+    // A Preview click while other library work runs is remembered: the page waits, then starts by itself.
+    private static async Task ClickWhileBusyGui()
+    {
+        string root = NewFolder("click-while-busy"), album = Path.Combine(root, "Artist", "Album"); Directory.CreateDirectory(album);
+        SetArtists(CopyTrack(album, "01.mp3", "Album", "Artist"), new[] { "Artist" }, new string[0], "Song");
+        bool busy = true; string reason = "the library scan";
+        var form = new OrganizePage(root, () => !busy, _ => { }, _ => Task.CompletedTask) { Blocked = () => busy ? reason : null };
+        var host = Host(form);
+        try
+        {
+            foreach (var box in Controls(form.OptionsPanel).OfType<CheckBox>()) box.IsChecked = false;
+            BackupSettings.Root = NewFolder("click-while-busy-backups");
+            Named<CheckBox>(form, "Fill missing album artists from the artist").IsChecked = true;
+            Click(ButtonStarting(form, "Preview changes"));
+            await Until(() => form.IsWaiting, "the click is remembered while the library is busy", 5000);
+            Assert(Controls(form).OfType<TextBlock>().Any(t => (t.Text ?? "").StartsWith("Waiting for the library scan to finish")), "the page says what it is waiting for");
+            busy = false;
+            await Until(() => !form.IsWorking && form.CurrentPlan != null, "the preview starts by itself once the scan is done", 20000);
+            Assert(form.CurrentPlan.Actions.Count(a => a.AlbumArtistFilled) == 1, "the waited preview is the one that was asked for");
+            busy = true; reason = "!Apply or discard the cover waiting on the Albums page first.";
+            await form.ApplyAsync();
+            Assert(!form.IsWaiting && !form.IsWorking && form.CurrentPlan != null, "a block that cannot be waited out is reported straight away");
+            busy = true; reason = "the album update";
+            var apply = form.ApplyAsync();
+            await Until(() => form.IsWaiting, "Apply waits too", 5000);
+            Click(ButtonStarting(form, "Stop"));
+            await apply;
+            Assert(!form.IsWorking && form.CurrentPlan != null, "Stop cancels the wait and keeps the preview");
         }
         finally { host.Close(); }
     }
