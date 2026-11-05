@@ -179,6 +179,9 @@ namespace AlbumArtTool
                     value => { maintenanceRunning = value; UpdateQueueControls(); },
                     library ? async root => { lastEdit = null; Root = root; await ScanAsync(); } : _ => { addMusicPage?.Refresh(); return Task.CompletedTask; },
                     () => Navigate(Page.Settings));
+                organizePage.Blocked = () => pending != null ? "!Apply or discard the cover waiting on the Albums page first." :
+                    busy ? (writing ? "the album update" : "the library scan") : queueRunning ? "the album covers being saved" : maintenanceRunning ? "another library task" :
+                    healthPage?.IsScanning == true ? "the duplicate scan" : !library && addMusicPage?.Queue.IsRunning == true ? "the downloads" : null;
                 organizePage.SwitchFolder = f => ShowOrganize(f);
                 organizePage.RenameArtists = f => _ = ShowRenameArtistAsync(f);
                 AddPage(organizePage);

@@ -441,7 +441,7 @@ namespace AlbumArtTool
         internal IProgress<ProgressInfo> Reporter()
         {
             int operation = progressVersion;
-            return new Progress<ProgressInfo>(p =>
+            return new Throttled<ProgressInfo>(p =>
             {
                 if (!busy || operation != progressVersion) return;
                 status.Text = p.Message;

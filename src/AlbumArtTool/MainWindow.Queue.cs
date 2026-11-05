@@ -77,7 +77,7 @@ namespace AlbumArtTool
                 progress.Value = 0; progress.IsIndeterminate = true; progressPercent.Text = "";
                 status.Text = job.Phase + " · " + job.Name;
                 UpdateQueueControls();
-                var reporter = new Progress<ProgressInfo>(p =>
+                var reporter = new Throttled<ProgressInfo>(p =>
                 {
                     if (currentJob != job) return;
                     status.Text = job.Album.Title + " · " + p.Message + (waitingJobs.Count > 0 ? " · " + waitingJobs.Count + " waiting" : "");
