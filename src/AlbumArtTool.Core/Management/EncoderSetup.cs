@@ -34,8 +34,11 @@ namespace AlbumArtTool.Management
                 string json;
                 using (var output = new MemoryStream()) { await Fetch(Api, output, 2 * 1024 * 1024, null, token).ConfigureAwait(false); json = Encoding.UTF8.GetString(output.ToArray()); }
                 string url, digest; long size;
+                string source = Repository;
                 using (var document = Json.Parse(json))
                 {
+                    // GitHub may have moved the builds to a new address: the release names its repository, and downloads come from there.
+                    source = RepositoryOf(Json.String(document.RootElement, "html_url")) ?? Repository;
                     JsonElement? asset = Json.Array(document.RootElement, "assets")
                         .Where(a => Json.String(a, "name").StartsWith("ffmpeg-", StringComparison.Ordinal) && Json.String(a, "name").EndsWith("-win64-lgpl.zip", StringComparison.Ordinal))
                         .OrderBy(a => Json.String(a, "name") == "ffmpeg-master-latest-win64-lgpl.zip" ? 0 : 1).Select(a => (JsonElement?)a).FirstOrDefault();
@@ -43,8 +46,10 @@ namespace AlbumArtTool.Management
                     url = Json.String(asset, "browser_download_url"); digest = Json.String(asset, "digest");
                     long.TryParse(Json.String(asset, "size"), out size);
                 }
-                if (!url.StartsWith(Repository + "/releases/download/", StringComparison.Ordinal) || size <= 0 || size > 256L * 1024 * 1024 ||
-                    !digest.StartsWith("sha256:", StringComparison.Ordinal) || !UpdateService.ValidHash(digest.Substring(7))) throw new IOException("The FFmpeg download does not have valid release metadata/checksum.");
+                if (!url.StartsWith(source + "/releases/download/", StringComparison.OrdinalIgnoreCase) || size <= 0 || size > 256L * 1024 * 1024 ||
+                    !digest.StartsWith("sha256:", StringComparison.Ordinal) || !UpdateService.ValidHash(digest.Substring(7)))
+                    throw new IOException("The FFmpeg download does not have valid release metadata/checksum (" + Address(url) + ", " + (digest.Length == 0 ? "no checksum" : "checksum " + digest.Split(':')[0]) + ").");
+                downloads = new Uri(source).AbsolutePath + "/releases/download/";
                 string zip = Path.Combine(stage, "encoder.zip");
                 using (var output = File.Create(zip)) { await Fetch(url, output, size, progress, token).ConfigureAwait(false); if (output.Length != size) throw new IOException("The FFmpeg download was incomplete."); }
                 if (!UpdateService.Hash(zip).Equals(digest.Substring(7), StringComparison.OrdinalIgnoreCase)) throw new IOException("FFmpeg's SHA-256 checksum did not match.");
@@ -60,7 +65,7 @@ namespace AlbumArtTool.Management
                     File.Copy(file, temp);
                     if (File.Exists(destination)) File.Replace(temp, destination, null); else File.Move(temp, destination);
                 }
-                File.WriteAllText(Path.Combine(Encoder.Cache, "SOURCE.txt"), Repository + "\r\n" + url + "\r\n" + digest + "\r\nFFmpeg is a separate command-line program. Its license notices are supplied here.\r\n");
+                File.WriteAllText(Path.Combine(Encoder.Cache, "SOURCE.txt"), source + "\r\n" + url + "\r\n" + digest + "\r\nFFmpeg is a separate command-line program. Its license notices are supplied here.\r\n");
                 return Path.Combine(Encoder.Cache, "ffmpeg.exe");
             }
             finally { try { Directory.Delete(stage, true); } catch { } }
@@ -87,13 +92,25 @@ namespace AlbumArtTool.Management
         // Where a refused redirect pointed, without its query (which can hold a download token).
         private static string Address(string url) => Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.Scheme + "://" + u.Host + u.AbsolutePath : "an invalid address";
 
-        internal static bool Allowed(string url)
+        // Release downloads are accepted from the builds' repository (its current address, once the release names it).
+        private string downloads = "/BtbN/FFmpeg-Builds/releases/download/";
+
+        internal static bool Allowed(string url, string downloads = "/BtbN/FFmpeg-Builds/releases/download/")
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme != "https" || u.Port != 443 || u.UserInfo.Length != 0) return false;
             // GitHub answers a renamed or moved repository's address with a redirect to its numeric id.
             return u.AbsoluteUri == Api || u.Host == "api.github.com" && u.Query.Length == 0 && System.Text.RegularExpressions.Regex.IsMatch(u.AbsolutePath, "^/repositories/[0-9]{1,12}/releases/latest$") ||
-                u.Host == "github.com" && u.AbsolutePath.StartsWith("/BtbN/FFmpeg-Builds/releases/download/", StringComparison.OrdinalIgnoreCase) ||
+                u.Host == "github.com" && u.AbsolutePath.StartsWith(downloads, StringComparison.OrdinalIgnoreCase) ||
                 u.Host == "release-assets.githubusercontent.com" || u.Host == "objects.githubusercontent.com";
+        }
+
+        /// <summary>"https://github.com/owner/name" from a release page address on github.com, or null.</summary>
+        internal static string RepositoryOf(string releasePage)
+        {
+            if (!Uri.TryCreate(releasePage, UriKind.Absolute, out var u) || u.Scheme != "https" || u.Host != "github.com") return null;
+            var parts = u.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 3 || parts[2] != "releases" || parts.Take(2).Any(p => !System.Text.RegularExpressions.Regex.IsMatch(p, "^[A-Za-z0-9_.-]{1,100}$"))) return null;
+            return "https://github.com/" + parts[0] + "/" + parts[1];
         }
 
         private async Task Fetch(string url, Stream output, long limit, IProgress<int> progress, CancellationToken token)
@@ -103,7 +120,7 @@ namespace AlbumArtTool.Management
                 timeout.CancelAfter(TimeSpan.FromMinutes(15));
                 for (int redirects = 0; redirects < 6; redirects++)
                 {
-                    if (!Allowed(url)) throw new IOException("The encoder download redirected outside GitHub's release servers (" + Address(url) + ").");
+                    if (!Allowed(url, downloads)) throw new IOException("The encoder download redirected outside GitHub's release servers (" + Address(url) + ").");
                     using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false))
                     {
                         int status = (int)response.StatusCode;
