@@ -84,10 +84,15 @@ namespace AlbumArtTool.Management
             }
         }
 
+        // Where a refused redirect pointed, without its query (which can hold a download token).
+        private static string Address(string url) => Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.Scheme + "://" + u.Host + u.AbsolutePath : "an invalid address";
+
         internal static bool Allowed(string url)
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme != "https" || u.Port != 443 || u.UserInfo.Length != 0) return false;
-            return u.AbsoluteUri == Api || u.Host == "github.com" && u.AbsolutePath.StartsWith("/BtbN/FFmpeg-Builds/releases/download/", StringComparison.Ordinal) ||
+            // GitHub answers a renamed or moved repository's address with a redirect to its numeric id.
+            return u.AbsoluteUri == Api || u.Host == "api.github.com" && u.Query.Length == 0 && System.Text.RegularExpressions.Regex.IsMatch(u.AbsolutePath, "^/repositories/[0-9]{1,12}/releases/latest$") ||
+                u.Host == "github.com" && u.AbsolutePath.StartsWith("/BtbN/FFmpeg-Builds/releases/download/", StringComparison.OrdinalIgnoreCase) ||
                 u.Host == "release-assets.githubusercontent.com" || u.Host == "objects.githubusercontent.com";
         }
 
@@ -98,7 +103,7 @@ namespace AlbumArtTool.Management
                 timeout.CancelAfter(TimeSpan.FromMinutes(15));
                 for (int redirects = 0; redirects < 6; redirects++)
                 {
-                    if (!Allowed(url)) throw new IOException("The encoder download redirected outside GitHub's release servers.");
+                    if (!Allowed(url)) throw new IOException("The encoder download redirected outside GitHub's release servers (" + Address(url) + ").");
                     using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false))
                     {
                         int status = (int)response.StatusCode;
