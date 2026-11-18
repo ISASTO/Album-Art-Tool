@@ -76,7 +76,7 @@ namespace AlbumArtTool
                 job.Phase = job.Artist == null ? "Loading cover" : "Updating artists";
                 progress.Value = 0; progress.IsIndeterminate = true; progressPercent.Text = "";
                 status.Text = job.Phase + " · " + job.Name;
-                UpdateQueueControls();
+                Guard(UpdateQueueControls);
                 var reporter = new Throttled<ProgressInfo>(p =>
                 {
                     if (currentJob != job) return;
@@ -96,7 +96,7 @@ namespace AlbumArtTool
                     else
                     {
                         byte[] image = await Task.Run(job.LoadImage);
-                        job.Phase = "Saving covers"; UpdateQueueDisplay();
+                        job.Phase = "Saving covers"; Guard(UpdateQueueDisplay);
                         result = await Task.Run(() => editor.Apply(job.Album, image, job.OnlyMissing, job.FolderCover, reporter));
                     }
                     issues.AddRange(result.Issues);
@@ -125,7 +125,7 @@ namespace AlbumArtTool
             progress.IsVisible = progressPercent.IsVisible = false;
             status.Text = "Queue finished · " + jobsFinished + " albums processed" +
                 (jobsWithIssues > 0 ? " · " + jobsWithIssues + " need attention (see Issues)." : " · Backups saved. Undo is available.");
-            UpdateQueueControls();
+            Guard(UpdateQueueControls);
         }
 
         /// <summary>The last error from refreshing the window after queued work (tests check it stays empty).</summary>
@@ -243,6 +243,7 @@ namespace AlbumArtTool
         // "Done · Artist · Album · 12 tracks" becomes a colored status and the rest of the line.
         private static Control ActivityRow(string line)
         {
+            line ??= ""; // a recycled row is briefly built with no line
             int split = line.IndexOf(" · ", StringComparison.Ordinal);
             string state = split > 0 ? line.Substring(0, split) : "", rest = split > 0 ? line.Substring(split + 3) : line;
             string tone = state == "Done" ? "Positive" : state == "Failed" || state == "Needs attention" ? "Warning" : state == "Cancelled" ? "Muted" : "Accent";
