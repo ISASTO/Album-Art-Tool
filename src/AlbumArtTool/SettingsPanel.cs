@@ -22,7 +22,7 @@ namespace AlbumArtTool
     {
         private readonly Func<string> musicFolder;
         private readonly Func<Task> changeFolder, checkUpdates;
-        private readonly Button systemTheme = Kit.Button("Match Windows", "chip"), lightTheme = Kit.Button("Silver", "chip"), darkTheme = Kit.Button("Black", "chip");
+        private readonly Button systemTheme = Kit.Button(Platform.Windows ? "Match Windows" : "Match system", "chip"), lightTheme = Kit.Button("Silver", "chip"), darkTheme = Kit.Button("Black", "chip");
         private readonly TextBlock folderValue = Value(), backupValue = Value(), encoderValue = Value(), downloaderValue = Value(), cookiesValue = Value(), versionValue = Value();
         private readonly Button changeMusic = Kit.Button("Change…"), changeBackup = Kit.Button("Change…"), openBackup = Kit.Button("Open"),
             downloadEncoder = Kit.Button("Download"), chooseEncoder = Kit.Button("Choose…"), downloadDownloader = Kit.Button("Download"),
@@ -39,9 +39,9 @@ namespace AlbumArtTool
         internal SettingsPanel(Func<string> musicFolder, Func<Task> changeFolder, Func<Task> checkUpdates)
         {
             this.musicFolder = musicFolder; this.changeFolder = changeFolder; this.checkUpdates = checkUpdates;
-            systemTheme.Named("Appearance: Match Windows").Tip("Silver when Windows is light, Black when it is dark, switching automatically when Windows does.");
-            lightTheme.Named("Appearance: Light").Tip("Always use the Silver finish (light), whatever Windows uses.");
-            darkTheme.Named("Appearance: Dark").Tip("Always use the Black finish (dark), whatever Windows uses.");
+            systemTheme.Named("Appearance: Match Windows").Tip("Silver when " + Platform.SystemName + " is light, Black when it is dark, switching automatically when it does.");
+            lightTheme.Named("Appearance: Light").Tip("Always use the Silver finish (light), whatever " + Platform.SystemName + " uses.");
+            darkTheme.Named("Appearance: Dark").Tip("Always use the Black finish (dark), whatever " + Platform.SystemName + " uses.");
             systemTheme.Click += (s, e) => SetTheme(ThemeMode.System);
             lightTheme.Click += (s, e) => SetTheme(ThemeMode.Light);
             darkTheme.Click += (s, e) => SetTheme(ThemeMode.Dark);
@@ -52,11 +52,14 @@ namespace AlbumArtTool
             changeMusic.Click += async (s, e) => { await this.changeFolder(); Refresh(); };
             changeBackup.Named("Change backup folder").Tip("Choose where originals, removed copies and Undo information are kept. It must be on this PC, outside the music folder, so your player never indexes the backups.");
             changeBackup.Click += async (s, e) => await ChooseBackupAsync();
-            openBackup.Named("Open backup folder").Tip("Open the backup folder in File Explorer. Each run has its own folder with the originals, journal.json (used by Undo) and a readable report.csv.");
+            openBackup.Named("Open backup folder").Tip("Open the backup folder in " + Platform.FileManager + ". Each run has its own folder with the originals, journal.json (used by Undo) and a readable report.csv.");
             openBackup.Click += (s, e) => Open(BackupSettings.Root);
-            downloadEncoder.Named("Download FFmpeg").Tip("Download a Windows build of FFmpeg (about 170 MB, once) from BtbN/FFmpeg-Builds on GitHub. Its SHA-256 checksum is verified before anything is extracted or run.");
+            downloadEncoder.Named("Download FFmpeg").Tip(EncoderSetup.Supported
+                ? "Download a static build of FFmpeg for this system (about 100–170 MB, once) from BtbN/FFmpeg-Builds on GitHub. Its SHA-256 checksum is verified before anything is extracted or run."
+                : "Automatic FFmpeg setup is not available on this system. Install FFmpeg yourself, then choose its ffmpeg program.");
+            downloadEncoder.IsEnabled = EncoderSetup.Supported;
             downloadEncoder.Click += async (s, e) => await DownloadEncoderAsync();
-            chooseEncoder.Named("Choose FFmpeg").Tip("Use an ffmpeg.exe you already have instead of downloading one. The location is remembered.");
+            chooseEncoder.Named("Choose FFmpeg").Tip("Use an " + Encoder.ExecutableName + " you already have instead of downloading one (one from your distribution's packages works too). The location is remembered.");
             chooseEncoder.Click += async (s, e) => await ChooseEncoderAsync();
             downloadDownloader.Named("Download yt-dlp").Tip("Download yt-dlp and Deno from their official GitHub releases (verified with GitHub's SHA-256 digests). They are only used to replace low-bitrate songs from YouTube Music.");
             downloadDownloader.Click += async (s, e) => await DownloadDownloaderAsync();
@@ -198,8 +201,9 @@ namespace AlbumArtTool
         private async Task ChooseEncoderAsync()
         {
             if (Storage == null) return;
-            var result = await Storage.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Choose ffmpeg.exe", AllowMultiple = false,
-                FileTypeFilter = new[] { new FilePickerFileType("FFmpeg") { Patterns = new[] { Encoder.ExecutableName } }, new FilePickerFileType("Executables") { Patterns = new[] { "*.exe" } } } });
+            var result = await Storage.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Choose " + Encoder.ExecutableName, AllowMultiple = false,
+                FileTypeFilter = Platform.Windows ? new[] { new FilePickerFileType("FFmpeg") { Patterns = new[] { Encoder.ExecutableName } }, new FilePickerFileType("Executables") { Patterns = new[] { "*.exe" } } }
+                    : new[] { new FilePickerFileType("FFmpeg") { Patterns = new[] { Encoder.ExecutableName } }, new FilePickerFileType("All files") { Patterns = new[] { "*" } } } });
             string picked = result.Count > 0 ? result[0].TryGetLocalPath() : null;
             if (picked == null) return;
             try { Encoder.Remember(picked); message.Text = "FFmpeg will be used from " + picked + "."; }

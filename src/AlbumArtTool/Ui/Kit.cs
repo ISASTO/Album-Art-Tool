@@ -71,6 +71,16 @@ namespace AlbumArtTool.Ui
             return new PathIcon { Data = geometry, Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center };
         }
 
+        /// <summary>Shows a folder, or a file highlighted in its folder: File Explorer on Windows; elsewhere the desktop's file
+        /// manager opens the folder (through the file-opening portal inside a Flatpak).</summary>
+        internal static System.Diagnostics.ProcessStartInfo Reveal(string path, bool selectFile)
+        {
+            if (OperatingSystem.IsWindows() && selectFile)
+                return new System.Diagnostics.ProcessStartInfo("explorer.exe", "/select," + Updates.UpdateInstaller.QuoteArgument(path)) { UseShellExecute = true };
+            string folder = selectFile ? System.IO.Path.GetDirectoryName(path) : path;
+            return new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true };
+        }
+
         /// <summary>Shortens a path in the middle, keeping the drive/first folder and the last folders: C:\Users\…\Music\Albums.</summary>
         internal static string MiddleEllipsis(string path, int max = 60)
         {

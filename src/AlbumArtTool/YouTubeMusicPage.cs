@@ -214,13 +214,13 @@ namespace AlbumArtTool
 
         private string Ffmpeg => Management.Encoder.Find();
         private string Downloader => YtDlp.Find();
-        private bool ToolsReady => download != null || Downloader != null && (YtDlp.FindDeno(Downloader) != null || !OperatingSystem.IsWindows()) && Ffmpeg != null;
+        private bool ToolsReady => download != null || Downloader != null && (YtDlp.FindDeno(Downloader) != null || !YtDlpSetup.Supported) && Ffmpeg != null;
 
         private void UpdateTools()
         {
             var missing = new List<string>();
             if (download == null && Downloader == null) missing.Add("yt-dlp (downloads the audio)");
-            if (download == null && Downloader != null && YtDlp.FindDeno(Downloader) == null && OperatingSystem.IsWindows()) missing.Add("Deno (runs YouTube's player code for yt-dlp)");
+            if (download == null && Downloader != null && YtDlp.FindDeno(Downloader) == null && YtDlpSetup.Supported) missing.Add("Deno (runs YouTube's player code for yt-dlp)");
             if (Ffmpeg == null) missing.Add("FFmpeg (makes the MP3 320 files)");
             toolsCard.IsVisible = missing.Count > 0;
             toolText.Text = "To download, this needs " + string.Join(", ", missing) + ". Set up installs them once into this PC's app folder from their official GitHub releases (about " +
@@ -255,7 +255,7 @@ namespace AlbumArtTool
         // Keeps the copy of yt-dlp this app installed current: YouTube changes often, and old versions stop working.
         private async Task UpdateYtDlpAsync(CancellationToken token)
         {
-            if (download != null || !YtDlpSetup.Installed || !OperatingSystem.IsWindows()) return;
+            if (download != null || !YtDlpSetup.Installed || !YtDlpSetup.Supported) return;
             string stamp = Path.Combine(YtDlp.Cache, "CHECKED.txt");
             try { if (File.Exists(stamp) && DateTime.UtcNow - File.GetLastWriteTimeUtc(stamp) < TimeSpan.FromHours(20)) return; } catch { }
             try

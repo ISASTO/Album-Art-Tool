@@ -47,6 +47,7 @@ internal static partial class Tests
                 await Gui("library manager", ManagerGui);
                 await Gui("album cleanup manager", AlbumCleanupGui);
                 await Gui("update handoff", UpdateHandoffGui);
+                await Gui("Linux updates", LinuxUpdateGui);
                 await Gui("YouTube Music replacement", UpgradeGui);
                 await Gui("add music", AddMusicGui);
                 await Gui("artist tags", ArtistTagsGui);
@@ -377,7 +378,8 @@ internal static partial class Tests
             Assert(albumFolder.IsEnabled && !showTrack.IsEnabled, "artist tab offers album folder access and waits for a selected track before revealing a file");
             Click(albumFolder); Assert(opened.FileName == list.SelectedAlbum.Folder && opened.UseShellExecute, "artist-tab album button opens the currently selected album folder");
             Named<ListBox>(window, "Current track artists").SelectedIndex = 1; Click(showTrack);
-            Assert(opened.FileName == "explorer.exe" && opened.Arguments == "/select," + UpdateInstaller.QuoteArgument(window.ArtistRows[1].Track.Path), "selected-track action reveals that exact file in Explorer with a quoted path");
+            Assert(OperatingSystem.IsWindows() ? opened.FileName == "explorer.exe" && opened.Arguments == "/select," + UpdateInstaller.QuoteArgument(window.ArtistRows[1].Track.Path)
+                : opened.FileName == Path.GetDirectoryName(window.ArtistRows[1].Track.Path) && opened.UseShellExecute, "selected-track action reveals that exact file in Explorer with a quoted path (its folder elsewhere)");
             Shot(window, "track-artists.png");
             string firstKey = list.SelectedAlbum.Key;
             // A paused artwork job shares the same queue with artist edits.
@@ -433,7 +435,8 @@ internal static partial class Tests
             Assert(!show.IsEnabled, "a song must be selected before it can be shown");
             int index = dialog.Rows.ToList().FindIndex(r => r.Path != null && r.Path.EndsWith("05 - two covers.mp3"));
             dialog.Select(index); Click(show);
-            Assert(opened.FileName == "explorer.exe" && opened.Arguments == "/select," + UpdateInstaller.QuoteArgument(dialog.Rows[index].Path), "the selected song is highlighted in File Explorer");
+            Assert(OperatingSystem.IsWindows() ? opened.FileName == "explorer.exe" && opened.Arguments == "/select," + UpdateInstaller.QuoteArgument(dialog.Rows[index].Path)
+                : opened.FileName == Path.GetDirectoryName(dialog.Rows[index].Path), "the selected song is highlighted in File Explorer (its folder opens elsewhere)");
             var fill = Named<Button>(dialog, "Fill titles from filenames");
             Assert(fill.IsEnabled, "songs missing titles can be filled from their filenames");
             Click(fill);
@@ -498,7 +501,7 @@ internal static partial class Tests
     {
         string root = NewFolder("update app & 100% élite") + Path.DirectorySeparatorChar;
         byte[] installer = File.ReadAllBytes(InstallerStandIn);
-        var window = new MainWindow(root, false, new FakeCoverSearch(Cover)) { InstalledVersion = new Version(2, 5, 2) };
+        var window = new MainWindow(root, false, new FakeCoverSearch(Cover)) { InstalledVersion = new Version(2, 5, 2), UpdatePackage = UpdateService.Package.Installer };
         string launchedFolder = null, launchedDirectory = null;
         window.LaunchInstaller = (directory, folder) => { launchedDirectory = directory; launchedFolder = folder; return null; };
         window.CreateUpdateService = () => new UpdateService(new FakeHandler(request => request.RequestUri.Host == "api.github.com"
@@ -518,6 +521,42 @@ internal static partial class Tests
         Assert(launchedFolder == root && UpdateService.Hash(Path.Combine(launchedDirectory, UpdateInstaller.SetupFile)) == UpdateService.Hash(InstallerStandIn),
             "the verified installer is started with the current music folder");
         Assert(closed, "the app closes so the installer can replace it");
+    }
+
+    // Linux: an AppImage replaces itself and reopens; a Flatpak or a plain folder points to the release page.
+    private static async Task LinuxUpdateGui()
+    {
+        string root = NewFolder("linux update") + Path.DirectorySeparatorChar;
+        byte[] next = Enumerable.Range(0, 4096).Select(i => (byte)(i * 7)).ToArray();
+        new byte[] { 0x7F, (byte)'E', (byte)'L', (byte)'F', 2, 1, 1, 0, (byte)'A', (byte)'I', 2 }.CopyTo(next, 0);
+        string appImage = Path.Combine(NewFolder("appimage home"), "Muzikette-x86_64.AppImage"); File.WriteAllBytes(appImage, new byte[] { 1, 2, 3 });
+        string relaunched = null, relaunchedFolder = null;
+        var window = new MainWindow(root, false, new FakeCoverSearch(Cover)) { InstalledVersion = new Version(4, 0, 0), UpdatePackage = UpdateService.Package.AppImage, AppImagePath = appImage };
+        window.RelaunchAppImage = (file, folder) => { relaunched = file; relaunchedFolder = folder; };
+        window.CreateUpdateService = () => new UpdateService(new FakeHandler(request => request.RequestUri.Host == "api.github.com"
+            ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(ReleaseJson("v" + UpdateService.DisplayVersion, next, name: UpdateService.AppImageName)) }
+            : new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(next) }));
+        bool closed = false; window.Closed += (s, e) => closed = true;
+        window.Show();
+        await window.GetUpdatesAsync();
+        Assert(closed && relaunched == appImage && relaunchedFolder == root && File.ReadAllBytes(appImage).SequenceEqual(next) &&
+            Directory.GetFiles(Path.GetDirectoryName(appImage)).Length == 1, "an AppImage downloads its update beside itself, checks it, replaces itself and reopens in the same folder");
+        if (!OperatingSystem.IsWindows()) Assert((File.GetUnixFileMode(appImage) & UnixFileMode.UserExecute) != 0, "the new AppImage is executable");
+
+        var manual = new MainWindow(root, false, new FakeCoverSearch(Cover)) { InstalledVersion = new Version(4, 0, 0), UpdatePackage = UpdateService.Package.Manual };
+        string opened = null; manual.OpenPage = url => opened = url;
+        manual.CreateUpdateService = () => new UpdateService(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(ReleaseJson("v" + UpdateService.DisplayVersion, next)) }));
+        manual.Show();
+        try
+        {
+            await manual.GetUpdatesAsync();
+            var dialog = manual.UpdateWindow;
+            Assert(Named<TextBlock>(dialog, "App update status").Text.StartsWith("Version " + UpdateService.DisplayVersion + " is available."), "a copy that cannot update itself says a new version is out");
+            Click(Named<Button>(dialog, "Open release page"));
+            Assert(opened == UpdateService.RepositoryUrl + "/releases/latest" && manual.IsVisible, "and opens the release page, leaving the app running");
+            dialog.Close();
+        }
+        finally { manual.Close(); }
     }
 
     private sealed class UpdateGateHandler : HttpMessageHandler

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Muzikette
+GenericName=Music Library Manager
+Comment=Keep a music library in order: covers, artists, tags, formats and duplicates
+Exec=muzikette %f
+Icon=io.github.isasto.Muzikette
+Terminal=false
+Categories=AudioVideo;Audio;
+Keywords=music;library;tags;tagger;album art;cover;covers;mp3;flac;id3;metadata;duplicates;
+StartupNotify=true
+StartupWMClass=Muzikette

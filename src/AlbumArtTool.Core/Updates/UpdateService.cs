@@ -17,6 +17,11 @@ namespace AlbumArtTool.Updates
         internal Version Version;
         internal string DownloadUrl, Sha256;
         internal long Size;
+        /// <summary>No download the app can install itself (a Flatpak or a plain folder on Linux): it points to <see cref="PageUrl"/>.</summary>
+        internal bool Manual;
+        internal string PageUrl;
+        /// <summary>The download is an AppImage (checked by its checksum and AppImage header, not a Windows version resource).</summary>
+        internal bool AppImage;
     }
 
     internal sealed class UpdateService : IDisposable
@@ -29,6 +34,12 @@ namespace AlbumArtTool.Updates
         internal const string LatestUrl = "https://api.github.com/repos/" + Owner + "/Muzikette/releases/latest";
         internal const string InstallerName = "Muzikette-Setup.exe", LegacyInstallerName = "AlbumArtTool-Setup.exe";
         internal const string ProductName = "Muzikette", LegacyProductName = "Music Library Manager";
+        internal const string AppImageName = "Muzikette-x86_64.AppImage";
+
+        /// <summary>How this copy updates: the Windows installer, replacing its own AppImage, or by hand from the release page.</summary>
+        internal enum Package { Installer, AppImage, Manual }
+        internal static Package CurrentPackage => OperatingSystem.IsWindows() ? Package.Installer : Platform.AppImage != null ? Package.AppImage : Package.Manual;
+
         internal static string LatestUrlFor(string repository) => "https://api.github.com/repos/" + Owner + "/" + repository + "/releases/latest";
         internal const int MaxDownload = 200 * 1024 * 1024;
         private readonly HttpClient client;
@@ -42,7 +53,7 @@ namespace AlbumArtTool.Updates
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Muzikette/" + DisplayVersion);
         }
 
-        internal async Task<AppRelease> CheckAsync(CancellationToken token, Version installedVersion = null)
+        internal async Task<AppRelease> CheckAsync(CancellationToken token, Version installedVersion = null, Package package = Package.Installer)
         {
             // The new repository name first; until the repository is renamed it does not exist yet, so the old one answers.
             for (int i = 0; ; i++)
@@ -51,7 +62,7 @@ namespace AlbumArtTool.Updates
                 {
                     try { await GetAsync(LatestUrlFor(Repositories[i]), output, 1024 * 1024, null, token, TimeSpan.FromSeconds(25)).ConfigureAwait(false); }
                     catch (NotFoundException) when (i + 1 < Repositories.Length) { continue; }
-                    return ParseRelease(Encoding.UTF8.GetString(output.ToArray()), installedVersion ?? CurrentVersion);
+                    return ParseRelease(Encoding.UTF8.GetString(output.ToArray()), installedVersion ?? CurrentVersion, package);
                 }
             }
         }
@@ -61,7 +72,7 @@ namespace AlbumArtTool.Updates
             internal NotFoundException() : base("The release download is not available. Please try again later.") { }
         }
 
-        internal static AppRelease ParseRelease(string json, Version current)
+        internal static AppRelease ParseRelease(string json, Version current, Package package = Package.Installer)
         {
             using (var document = Json.Parse(json))
             {
@@ -74,13 +85,20 @@ namespace AlbumArtTool.Updates
                 if (!Version.TryParse(number, out var version)) throw new InvalidDataException("The release has an unsupported version number.");
                 version = NormalizeVersion(version);
                 if (version <= NormalizeVersion(current)) return null;
+                if (package == Package.Manual)
+                {
+                    string page = Json.String(data, "html_url");
+                    if (!Repositories.Any(r => page.StartsWith("https://github.com/" + Owner + "/" + r + "/releases/", StringComparison.OrdinalIgnoreCase)))
+                        page = RepositoryUrl + "/releases/latest";
+                    return new AppRelease { Version = version, Manual = true, PageUrl = page };
+                }
                 if (!data.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
-                    throw new InvalidDataException("The release does not contain a Windows download yet. Try again shortly.");
-                // Muzikette-Setup.exe, or the installer's name before 4.0.
-                string name = InstallerName;
-                var matches = assets.EnumerateArray().Where(a => Json.String(a, "name") == InstallerName).ToList();
-                if (matches.Count == 0) { name = LegacyInstallerName; matches = assets.EnumerateArray().Where(a => Json.String(a, "name") == LegacyInstallerName).ToList(); }
-                if (matches.Count != 1) throw new InvalidDataException("The release does not contain a single Windows installer. Try again shortly.");
+                    throw new InvalidDataException("The release does not contain a download yet. Try again shortly.");
+                // Muzikette-Setup.exe (or the installer's name before 4.0), or the AppImage.
+                string name = package == Package.AppImage ? AppImageName : InstallerName;
+                var matches = assets.EnumerateArray().Where(a => Json.String(a, "name") == name).ToList();
+                if (matches.Count == 0 && package == Package.Installer) { name = LegacyInstallerName; matches = assets.EnumerateArray().Where(a => Json.String(a, "name") == LegacyInstallerName).ToList(); }
+                if (matches.Count != 1) throw new InvalidDataException(package == Package.AppImage ? "The release does not contain a single AppImage yet. Try again shortly." : "The release does not contain a single Windows installer. Try again shortly.");
                 JsonElement? asset = matches[0];
                 string url = Json.String(asset, "browser_download_url"), digest = Json.String(asset, "digest");
                 if (!Repositories.Any(r => string.Equals(url, "https://github.com/" + Owner + "/" + r + "/releases/download/" + Uri.EscapeDataString(tag) + "/" + name, StringComparison.OrdinalIgnoreCase)) || !AllowedUrl(url))
@@ -89,7 +107,7 @@ namespace AlbumArtTool.Updates
                     throw new InvalidDataException("GitHub has not supplied a SHA-256 checksum for this download. Try again later.");
                 if (!long.TryParse(Json.String(asset, "size"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long size) || size <= 0 || size > MaxDownload)
                     throw new InvalidDataException("The update download has an invalid size.");
-                return new AppRelease { Version = version, DownloadUrl = url, Sha256 = digest.Substring(7).ToLowerInvariant(), Size = size };
+                return new AppRelease { Version = version, DownloadUrl = url, Sha256 = digest.Substring(7).ToLowerInvariant(), Size = size, AppImage = package == Package.AppImage };
             }
         }
 
@@ -104,7 +122,8 @@ namespace AlbumArtTool.Updates
                     if (output.Length != release.Size) throw new InvalidDataException("The update download was incomplete. Your current app has not changed.");
                 }
                 token.ThrowIfCancellationRequested();
-                VerifyInstaller(destination, release.Sha256, release.Version);
+                if (release.AppImage) VerifyAppImage(destination, release.Sha256);
+                else VerifyInstaller(destination, release.Sha256, release.Version);
             }
             catch { TryDelete(destination); throw; }
         }
@@ -191,6 +210,17 @@ namespace AlbumArtTool.Updates
             string product = info.ProductName?.Trim();
             if (product != ProductName && product != LegacyProductName || found != NormalizeVersion(version))
                 throw new InvalidDataException("The downloaded installer does not match the expected app and version.");
+        }
+
+        // An AppImage is an ELF program with "AI" and type 2 at byte 8.
+        internal static void VerifyAppImage(string path, string hash)
+        {
+            if (!ValidHash(hash) || !string.Equals(Hash(path), hash, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("The update checksum did not match. Your current app has not changed.");
+            byte[] header = new byte[11];
+            using (var file = File.OpenRead(path)) file.ReadExactly(header);
+            if (header[0] != 0x7F || header[1] != (byte)'E' || header[2] != (byte)'L' || header[3] != (byte)'F' || header[8] != (byte)'A' || header[9] != (byte)'I' || header[10] != 2)
+                throw new InvalidDataException("The downloaded file is not an AppImage. Your current app has not changed.");
         }
 
         internal static string Hash(string path) => Convert.ToHexString(FileTransfer.HashBytes(path)).ToLowerInvariant();

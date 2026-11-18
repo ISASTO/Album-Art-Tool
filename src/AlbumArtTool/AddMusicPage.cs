@@ -118,7 +118,7 @@ namespace AlbumArtTool
             clearFinished.Click += (s, e) => { Queue.ClearFinished(); SyncQueue(); };
             waitingText.Named("Songs in New music"); waitingText.FontSize = 15;
             folderText.TextWrapping = TextWrapping.NoWrap;
-            openNew.Tip("Open the New music folder in File Explorer."); openNew.Click += (s, e) => OpenNew();
+            openNew.Tip("Open the New music folder in " + Platform.FileManager + "."); openNew.Click += (s, e) => OpenNew();
             changeNew.Tip("Choose where new downloads are saved before they join your library. It must be outside the music folder.");
             changeNew.Click += async (s, e) => await ChangeFolderAsync();
             tidy.Named("Tidy up in Organize").Tip("Open Organize on the New music folder, so you can run your preset (artwork, tags, file names…) before the songs join the library. Every change is previewed first.");

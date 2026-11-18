@@ -150,7 +150,7 @@ namespace AlbumArtTool
             words.Children.Add(titleRow); words.Children.Add(description);
             var head = Kit.Grid("Auto,*", "Auto").Add(tile.Cell(0, 0), words.Cell(0, 1));
             show.IsEnabled = false; show.Click += (s, e) => ShowSelected();
-            show.Tip("Highlights the selected song in File Explorer, or opens the selected album's folder.");
+            show.Tip("Highlights the selected song in " + Platform.FileManager + ", or opens the selected album's folder.");
             show.Height = 34; show.Margin = new Thickness(0);
             // The fix, its option, and Show selected; on a narrow window they wrap instead of running off the panel.
             var actions = new WrapPanel { Margin = new Thickness(60, 14, 0, 14) };
@@ -405,8 +405,7 @@ namespace AlbumArtTool
         private void ShowSelected()
         {
             if (!(list.SelectedItem is Row { Path: string path } row)) return;
-            string arguments = row.Folder ? Updates.UpdateInstaller.QuoteArgument(path) : "/select," + Updates.UpdateInstaller.QuoteArgument(path);
-            try { openFolder(new ProcessStartInfo("explorer.exe", arguments) { UseShellExecute = true }); }
+            try { openFolder(Kit.Reveal(path, !row.Folder)); }
             catch (Exception e) { _ = Dialogs.ShowMessage(Owner, "Could not open folder", e.Message); }
         }
 

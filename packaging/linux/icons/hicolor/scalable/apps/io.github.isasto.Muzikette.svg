@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Muzikette: a brushed-silver front panel with a dark display window, two amber-lit reels, an orange LED and key. -->
+  <defs>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ECEBE7"/><stop offset="1" stop-color="#BDBCB6"/></linearGradient>
+    <pattern id="brush" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="1" fill="#FFFFFF" fill-opacity=".22"/><rect y="2" width="4" height="1" fill="#000000" fill-opacity=".035"/></pattern>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#000000"/><stop offset="1" stop-color="#14120F"/></linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="ledglow" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="key" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#F3F2EE"/><stop offset="1" stop-color="#D3D2CC"/></linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#FF7433"/><stop offset="1" stop-color="#E84E0C"/></linearGradient>
+  </defs>
+  <rect x="24" y="40" width="464" height="432" rx="72" fill="#2A2926" fill-opacity=".28"/>
+  <rect x="24" y="28" width="464" height="440" rx="72" fill="url(#face)"/>
+  <rect x="24" y="28" width="464" height="440" rx="72" fill="url(#brush)"/>
+  <rect x="25.5" y="29.5" width="461" height="437" rx="70.5" fill="none" stroke="#8F8E89" stroke-width="3"/>
+  <rect x="28" y="32" width="456" height="2" rx="1" fill="#FFFFFF" fill-opacity=".8"/>
+  <!-- LED -->
+  <circle cx="414" cy="94" r="15" fill="#FF5B14" filter="url(#ledglow)"/>
+  <circle cx="410" cy="90" r="5" fill="#FFD2BC" fill-opacity=".9"/>
+  <!-- Legend line -->
+  <rect x="86" y="88" width="150" height="12" rx="6" fill="#5D5C58" fill-opacity=".55"/>
+  <!-- Display window -->
+  <rect x="78" y="140" width="356" height="186" rx="26" fill="url(#glass)"/>
+  <rect x="78" y="140" width="356" height="186" rx="26" fill="none" stroke="#000" stroke-opacity=".6" stroke-width="3"/>
+  <rect x="78" y="326" width="356" height="2" fill="#FAFAF7" fill-opacity=".9"/>
+  <!-- Tape path -->
+  <path d="M176 296 L336 296" stroke="#FFB347" stroke-opacity=".35" stroke-width="6" stroke-linecap="round"/>
+  <!-- Reels -->
+  <g filter="url(#glow)" fill="none" stroke="#FFB347">
+    <circle cx="176" cy="233" r="54" stroke-width="10"/>
+    <circle cx="336" cy="233" r="54" stroke-width="10"/>
+    <circle cx="176" cy="233" r="17" stroke-width="9"/>
+    <circle cx="336" cy="233" r="17" stroke-width="9"/>
+  </g>
+  <g stroke="#FFB347" stroke-width="8" stroke-linecap="round" filter="url(#glow)">
+    <path d="M176 199 L176 211 M147 250 L157 244 M205 250 L195 244"/>
+    <path d="M336 199 L336 211 M307 250 L317 244 M365 250 L355 244"/>
+  </g>
+  <!-- Keys -->
+  <rect x="86" y="368" width="156" height="56" rx="12" fill="#A3A29C"/>
+  <rect x="86" y="364" width="156" height="56" rx="12" fill="url(#key)"/>
+  <rect x="270" y="368" width="156" height="56" rx="12" fill="#B23A05"/>
+  <rect x="270" y="364" width="156" height="56" rx="12" fill="url(#orange)"/>
+</svg>

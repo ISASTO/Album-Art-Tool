@@ -112,8 +112,8 @@ namespace AlbumArtTool
             openArtistAlbum.Named("Open artist-tab album folder"); showArtistTrack.Named("Reveal artist-tab selected track");
             openArtistAlbum.Click += (s, e) => OpenSelectedFolder();
             showArtistTrack.Click += (s, e) => { if (artistPreview.SelectedItem is ArtistRow row) OpenLocation(row.Track.Path, true); };
-            openArtistAlbum.Tip("Open this album's folder in File Explorer.");
-            showArtistTrack.Tip("Select a track above, then open its folder with that song highlighted in File Explorer.");
+            openArtistAlbum.Tip("Open this album's folder in " + Platform.FileManager + ".");
+            showArtistTrack.Tip("Select a track above, then open its folder with that song highlighted in " + Platform.FileManager + ".");
             applyArtist.Click += async (s, e) => await ApplyArtistAsync();
             foreach (var b in new[] { openArtistAlbum, showArtistTrack }) { b.Height = 34; b.Margin = new Thickness(0, 0, 4, 0); b.HorizontalAlignment = HorizontalAlignment.Left; }
             applyArtist.Height = 42; applyArtist.MinWidth = 180; applyArtist.Padding = new Thickness(16, 2); applyArtist.Margin = new Thickness(0); applyArtist.FontSize = 11.5;

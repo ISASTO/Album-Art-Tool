@@ -6,7 +6,7 @@ Package: https://www.nuget.org/packages/TagLibSharp/2.3.0
 Full license: licenses/TagLibSharp-LGPL-2.1.txt
 
 The native (ahead-of-time compiled) build links TagLibSharp into
-Muzikette.exe. The complete application source and build instructions are
+Muzikette.exe (Muzikette on Linux). The complete application source and build instructions are
 available at https://github.com/ISASTO/Muzikette so that you can modify
 TagLibSharp and rebuild (relink) the application with your modified version,
 and reverse-engineer the application as needed to debug such modifications,
@@ -20,7 +20,7 @@ Copyright (c) Microsoft Corporation and contributors. The bundled native
 libSkiaSharp and libHarfBuzzSharp libraries include Skia (BSD-3-Clause,
 Copyright Google LLC) and HarfBuzz (Old MIT license).
 
-ANGLE (BSD-3-Clause) - av_libglesv2.dll, Copyright The ANGLE Project Authors.
+ANGLE (BSD-3-Clause) - av_libglesv2.dll (Windows), Copyright The ANGLE Project Authors.
 
 Fonts, bundled in the application (SIL Open Font License 1.1):
   Archivo - Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo)
@@ -38,9 +38,10 @@ application; no separate .NET installation is required.
 
 Optional FFmpeg command-line program
 ------------------------------------
-FFmpeg is not embedded in this EXE or bundled in the default app ZIP.
-The app can use a user-supplied ffmpeg.exe or download a Windows static LGPL
-build directly from https://github.com/BtbN/FFmpeg-Builds/releases.
+FFmpeg is not embedded in the app or bundled in any of its packages (the
+installer, the ZIP, the AppImage, the Flatpak or the tar.gz). The app can use a
+user-supplied ffmpeg or download a static LGPL build for Windows or Linux
+directly from https://github.com/BtbN/FFmpeg-Builds/releases.
 That download retains upstream LICENSE/COPYING notices and a SOURCE.txt
 record of the release URL and verified GitHub SHA-256 digest in the cache.
 FFmpeg project and source: https://ffmpeg.org/ and https://git.ffmpeg.org/ffmpeg.git

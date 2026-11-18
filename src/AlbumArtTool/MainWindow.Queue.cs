@@ -205,7 +205,7 @@ namespace AlbumArtTool
             undoFromActivity.Click += async (s, e) => await UndoAsync();
             openOrganizeUndo.Tip("Organize keeps a journal of its last run, even after restarting the app. This opens it in Organize so you can choose what to restore.");
             openOrganizeUndo.Click += (s, e) => { var page = ShowOrganize(Root); if (!page.IsWorking) page.PreviewUndo(); };
-            openBackups.Tip("Open the PC backup folder in File Explorer. Each run's originals, journal.json and report.csv are kept there.");
+            openBackups.Tip("Open the PC backup folder in " + Platform.FileManager + ". Each run's originals, journal.json and report.csv are kept there.");
             openBackups.Click += (s, e) =>
             {
                 try { Directory.CreateDirectory(BackupSettings.Root); StartExplorer(new System.Diagnostics.ProcessStartInfo(BackupSettings.Root) { UseShellExecute = true }); }

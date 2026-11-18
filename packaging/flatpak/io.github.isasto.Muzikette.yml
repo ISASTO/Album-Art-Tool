@@ -1,0 +1,37 @@
+# Packs the Linux build that CI has already compiled and tested (dist/linux, unpacked from Muzikette-linux-x64.tar.gz)
+# into Muzikette.flatpak, the bundle attached to GitHub releases. It is not a Flathub manifest: it does not build from
+# source and is not meant to be submitted there.
+id: io.github.isasto.Muzikette
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: muzikette
+finish-args:
+  # Avalonia draws through X11 (XWayland on a Wayland session).
+  - --share=ipc
+  - --socket=x11
+  - --device=dri
+  # Cover search, YouTube Music, updates and the FFmpeg / yt-dlp downloads.
+  - --share=network
+  # The Music folder and removable drives; any other folder can be chosen with the folder picker.
+  - --filesystem=xdg-music
+  - --filesystem=/media
+  - --filesystem=/run/media
+  - --filesystem=/mnt
+modules:
+  - name: muzikette
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/lib/muzikette
+      - cp -a app/. /app/lib/muzikette/
+      - install -Dm755 linux/muzikette.sh /app/bin/muzikette
+      - install -Dm644 linux/io.github.isasto.Muzikette.desktop -t /app/share/applications
+      - install -Dm644 linux/io.github.isasto.Muzikette.metainfo.xml -t /app/share/metainfo
+      - cp -a linux/icons /app/share/
+    sources:
+      - type: dir
+        path: ../../dist/linux
+        dest: app
+      - type: dir
+        path: ../linux
+        dest: linux
