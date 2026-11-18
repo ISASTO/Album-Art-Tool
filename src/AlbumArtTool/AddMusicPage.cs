@@ -51,7 +51,7 @@ namespace AlbumArtTool
         private readonly ListBox queueList = new ListBox { Classes = { "grid" } };
         private readonly EmptyState queueEmpty = new EmptyState("Download queue", withAction: false);
         private readonly TextBlock waitingText = Kit.Label("", Kit.Body, true), folderText = Kit.Label("", Kit.Small, cls: "muted"), mergeText = Kit.Label("", Kit.Small, cls: "muted");
-        private readonly Button renameNew = Kit.IconButton(Icons.Artist, "Rename artists…"), coversNew = Kit.IconButton(Icons.Album, "Change covers…");
+        private readonly Button renameNew = Kit.IconButton(Icons.Artist, "Artists…"), coversNew = Kit.IconButton(Icons.Album, "Covers…");
         /// <summary>Opens the cover window for New music (set by the main window).</summary>
         internal Func<Task> ChangeCovers;
         /// <summary>Opens the rename dialog for a folder (set by the main window).</summary>
@@ -96,7 +96,7 @@ namespace AlbumArtTool
             toolsText.TextWrapping = TextWrapping.Wrap; toolsText.TextTrimming = TextTrimming.None;
             var setup = Kit.Button("Open Settings", "link"); setup.Click += (s, e) => openSettings?.Invoke();
             setup.Tip("FFmpeg and yt-dlp are free helper programs, downloaded once from their official GitHub releases with checksums verified.");
-            toolsBanner = new Border { Child = Kit.Grid("*,Auto", "Auto").Add(toolsText.Cell(0, 0), setup.Cell(0, 1)), CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 8), Margin = new Thickness(0, 0, 0, 8) };
+            toolsBanner = new Border { Child = Kit.Grid("*,Auto", "Auto").Add(toolsText.Cell(0, 0), setup.Cell(0, 1)), CornerRadius = new CornerRadius(6), Padding = new Thickness(12, 8), Margin = new Thickness(0, 0, 0, 8) };
             toolsBanner.Brush(Border.BackgroundProperty, "BadgeWarning");
 
             home.Show(Icons.Search, "Find music on YouTube Music", "Search for an artist to see their albums, singles and EPs, or search for an album or a song. Anything you add starts downloading right away.");
@@ -334,7 +334,7 @@ namespace AlbumArtTool
 
         private Control BuildRelease(YtmAlbum release)
         {
-            var cover = new Border { Width = 176, Height = 176, CornerRadius = new CornerRadius(12), ClipToBounds = true, Margin = new Thickness(0, 0, 20, 0) };
+            var cover = new Border { Width = 176, Height = 176, CornerRadius = new CornerRadius(3), ClipToBounds = true, Margin = new Thickness(0, 0, 20, 0) };
             cover.Brush(Border.BackgroundProperty, "CoverPlaceholder");
             var image = new Image { Stretch = Stretch.UniformToFill }; cover.Child = image;
             _ = SetThumbAsync(image, release.ThumbnailUrl);
@@ -580,9 +580,9 @@ namespace AlbumArtTool
             internal ReleaseCard(AddMusicPage page, YtmAlbum release)
             {
                 this.page = page; Release = release;
-                Width = 172; Padding = new Thickness(6, 6, 6, 8); Margin = new Thickness(0, 0, 6, 10); CornerRadius = new CornerRadius(12); Classes.Add("release");
+                Width = 172; Padding = new Thickness(6, 6, 6, 8); Margin = new Thickness(0, 0, 6, 10); CornerRadius = new CornerRadius(6); Classes.Add("release");
                 Cursor = new Cursor(StandardCursorType.Hand);
-                var cover = new Border { Width = 160, Height = 160, CornerRadius = new CornerRadius(9), ClipToBounds = true };
+                var cover = new Border { Width = 160, Height = 160, CornerRadius = new CornerRadius(3), ClipToBounds = true };
                 cover.Brush(Border.BackgroundProperty, "CoverPlaceholder");
                 var image = new Image { Stretch = Stretch.UniformToFill }; cover.Child = image;
                 _ = page.SetThumbAsync(image, release.ThumbnailUrl);
@@ -613,7 +613,7 @@ namespace AlbumArtTool
         {
             internal ArtistTile(AddMusicPage page, YtmArtist artist)
             {
-                Width = 138; Padding = new Thickness(6, 8); CornerRadius = new CornerRadius(12); Classes.Add("release");
+                Width = 138; Padding = new Thickness(6, 8); CornerRadius = new CornerRadius(6); Classes.Add("release");
                 Cursor = new Cursor(StandardCursorType.Hand);
                 var picture = new Border { Width = 118, Height = 118, CornerRadius = new CornerRadius(59), ClipToBounds = true, HorizontalAlignment = HorizontalAlignment.Center };
                 picture.Brush(Border.BackgroundProperty, "CoverPlaceholder");
@@ -643,14 +643,13 @@ namespace AlbumArtTool
             internal TrackRow(AddMusicPage page, YtmAlbum album, YtmTrack track, bool selectable)
             {
                 this.page = page; Album = album; Track = track;
-                Padding = new Thickness(8, 2, 6, 2); MinHeight = 42; CornerRadius = new CornerRadius(8); Classes.Add("track");
+                Padding = new Thickness(8, 2, 6, 2); MinHeight = 42; CornerRadius = new CornerRadius(6); Classes.Add("track");
                 var number = Kit.Label(selectable ? track.Index.ToString() : "", Kit.Body, cls: "muted"); number.HorizontalAlignment = HorizontalAlignment.Right; number.Margin = new Thickness(0, 0, 12, 0);
                 var title = Kit.Label(track.Title, Kit.Body); var artists = Kit.Label(string.Join(" · ", new[] { track.Artists, selectable ? "" : track.AlbumTitle }.Where(p => !string.IsNullOrWhiteSpace(p))), 11.5, cls: "muted");
                 var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; names.Children.Add(title); if (artists.Text.Length > 0) names.Children.Add(artists);
-                var badge = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(8, 1), Margin = new Thickness(8, 0), VerticalAlignment = VerticalAlignment.Center };
-                var badgeText = new TextBlock { FontSize = 11 }; badge.Child = badgeText;
-                if (track.VideoOnly) { badgeText.Text = "Music video only"; badge.Brush(Border.BackgroundProperty, "BadgeWarning"); badgeText.Classes.Add("warning"); ToolTip.SetTip(badge, "YouTube Music has no audio-only version of this song. Its music video can have an intro, an outro or silence; tick it to download it anyway."); }
-                else badge.IsVisible = false;
+                var badge = new Pill(track.VideoOnly ? "Video only" : "", "Warning") { Margin = new Thickness(8, 0) };
+                badge.Label.FontSize = 9.5;
+                if (track.VideoOnly) ToolTip.SetTip(badge, "YouTube Music has no audio-only version of this song, only its music video, which can have an intro, an outro or silence. Tick it to download it anyway.");
                 var length = Kit.Label(track.Duration > TimeSpan.Zero ? (int)track.Duration.TotalMinutes + ":" + track.Duration.Seconds.ToString("00") : "", Kit.Body, cls: "muted"); length.Margin = new Thickness(8, 0);
                 add.Named("Add " + track.Title); add.Height = 32;
                 add.Click += (s, e) => { if (album == null) page.AddSong(track); else page.AddTracks(album, new List<YtmTrack> { track }); add.IsEnabled = false; Kit.SetIcon(add, Icons.Check); add.Tip("Added to the download queue."); };

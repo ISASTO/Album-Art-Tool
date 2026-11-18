@@ -194,7 +194,7 @@ namespace AlbumArtTool.Ui
         internal CoverCard(CoverCandidate candidate)
         {
             this.candidate = candidate;
-            Classes.Add("frost"); CornerRadius = new CornerRadius(12);
+            Classes.Add("frost"); CornerRadius = new CornerRadius(6);
             Width = 166; Margin = new Thickness(5); Padding = new Thickness(6, 5, 6, 5);
             string name = candidate.Title + " by " + candidate.Artist + " from " + candidate.Source;
             this.Named(name);

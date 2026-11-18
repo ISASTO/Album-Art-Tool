@@ -35,8 +35,9 @@ namespace AlbumArtTool
         {
             // The front panel's model name, then one sentence on what the app does and one clear first step.
             var name = new TextBlock { Text = "MUZIKETTE", FontFamily = Skin.Legend, FontSize = 30, LetterSpacing = 2, Margin = new Thickness(0, 0, 0, 22) };
-            var leds = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7, Margin = new Thickness(2, 0, 0, 14) };
-            foreach (string tone in new[] { "on", "amber", "green" }) leds.Children.Add(Kit.Led(tone));
+            // A lit power light and its printed legend, as on the front of a deck.
+            var leds = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(1, 0, 0, 14) };
+            leds.Children.Add(Kit.Led("on").Also(l => l.VerticalAlignment = VerticalAlignment.Center)); leds.Children.Add(Kit.Legend("Power", 8.5).Also(l => l.VerticalAlignment = VerticalAlignment.Center));
             var title = Kit.Heading("Welcome to Muzikette", 22);
             var intro = Kit.Label("Choose the folder that holds your music. Muzikette scans it and shows what needs attention: missing covers, untitled songs, low-bitrate albums and duplicates. " +
                 "Nothing changes until you pick a fix, and every change is previewed and backed up first.", Kit.Body, cls: "muted");

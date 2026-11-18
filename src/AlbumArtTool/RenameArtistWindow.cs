@@ -74,7 +74,7 @@ namespace AlbumArtTool
                 "originals are backed up, and Organize › Preview Undo restores them.", Kit.Small);
             warning.TextWrapping = TextWrapping.Wrap; warning.TextTrimming = TextTrimming.None; warning.Named("Rename warning");
             var warningIcon = Kit.Glyph(Icons.Warning, 18); warningIcon.Margin = new Thickness(0, 0, 10, 0); warningIcon.VerticalAlignment = VerticalAlignment.Top;
-            var warningBox = new Border { Child = Kit.Grid("Auto,*", "Auto").Add(warningIcon.Cell(0, 0), warning.Cell(0, 1)), CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 10), Margin = new Thickness(0, 12, 0, 0) };
+            var warningBox = new Border { Child = Kit.Grid("Auto,*", "Auto").Add(warningIcon.Cell(0, 0), warning.Cell(0, 1)), CornerRadius = new CornerRadius(6), Padding = new Thickness(12, 10), Margin = new Thickness(0, 12, 0, 0) };
             warningBox.Brush(Border.BackgroundProperty, "BadgeWarning");
             preview.Named("Preview artist rename").Tip("Open Organize with this rename only and list every song it changes. Nothing is written until you click Apply there.");
             cancel.Click += (s, e) => Close();

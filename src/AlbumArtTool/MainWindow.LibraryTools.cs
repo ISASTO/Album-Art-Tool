@@ -88,7 +88,7 @@ namespace AlbumArtTool
             artistHeading.FontSize = 19; artistHeading.TextWrapping = TextWrapping.Wrap; artistHeading.MaxLines = 2;
             var help = Kit.Label("Guest credits are collapsed into the main artist, so players file every song under one name. Tracks that already match are left alone.", Kit.Small, cls: "muted");
             help.TextWrapping = TextWrapping.Wrap; help.TextTrimming = TextTrimming.None; help.Margin = new Thickness(0, 4, 0, 0);
-            var coverBox = new Border { Width = 84, Height = 84, CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = artistCover, VerticalAlignment = VerticalAlignment.Top };
+            var coverBox = new Border { Width = 84, Height = 84, CornerRadius = new CornerRadius(3), ClipToBounds = true, Child = artistCover, VerticalAlignment = VerticalAlignment.Top };
             coverBox.Brush(Border.BackgroundProperty, "CoverPlaceholder");
             var titles = new StackPanel { Spacing = 2, Margin = new Thickness(16, 0, 0, 0) };
             titles.Children.Add(artistHeading); titles.Children.Add(artistAlbumArtist); titles.Children.Add(help);

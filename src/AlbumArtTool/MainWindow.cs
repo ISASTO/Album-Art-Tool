@@ -102,7 +102,7 @@ namespace AlbumArtTool
             Width = 1320; Height = 840; MinWidth = 1140; MinHeight = 720;
             Root = root;
             browse.Named("Music folder"); search.Named("Search albums, artists or folders");
-            coverFrame = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Margin = new Thickness(4, 0, 8, 2), Cursor = new Cursor(StandardCursorType.Hand), Child = cover };
+            coverFrame = new Border { CornerRadius = new CornerRadius(3), ClipToBounds = true, Margin = new Thickness(4, 0, 8, 2), Cursor = new Cursor(StandardCursorType.Hand), Child = cover };
             coverFrame.Brush(Border.BackgroundProperty, "Input");
             coverFrame.Named("Album cover preview and image drop target");
             Kit.Prepare(this, BuildLayout());

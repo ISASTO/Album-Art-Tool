@@ -48,7 +48,7 @@ namespace AlbumArtTool
             albums.Named("Albums in New music");
             albums.SelectionChanged += (s, e) => ShowSelection();
             albums.CoverDropped += (album, path) => Stage(path);
-            var frame = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Child = cover, Width = 150, Height = 150, Cursor = new Cursor(StandardCursorType.Hand) };
+            var frame = new Border { CornerRadius = new CornerRadius(3), ClipToBounds = true, Child = cover, Width = 150, Height = 150, Cursor = new Cursor(StandardCursorType.Hand) };
             frame.Brush(Border.BackgroundProperty, "Input");
             frame.Named("New music cover preview and image drop target");
             DragDrop.SetAllowDrop(frame, true);

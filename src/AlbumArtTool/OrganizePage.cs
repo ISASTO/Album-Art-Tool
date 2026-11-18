@@ -148,7 +148,7 @@ namespace AlbumArtTool
             renameText.TextWrapping = TextWrapping.Wrap; renameText.TextTrimming = TextTrimming.None; renameText.Named("Artist rename");
             cancelRename.Tip("Stop renaming this artist. Nothing has been changed yet.");
             cancelRename.Click += (s, e) => { SetRename(null, null, true); InvalidatePlan(); UpdatePresetState(); };
-            renameBanner = new Border { Child = Kit.Grid("*,Auto", "Auto").Add(renameText.Cell(0, 0), cancelRename.Cell(0, 1)), CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 8), Margin = new Thickness(0, 0, 0, 8), IsVisible = false };
+            renameBanner = new Border { Child = Kit.Grid("*,Auto", "Auto").Add(renameText.Cell(0, 0), cancelRename.Cell(0, 1)), CornerRadius = new CornerRadius(6), Padding = new Thickness(12, 8), Margin = new Thickness(0, 0, 0, 8), IsVisible = false };
             renameBanner.Brush(Border.BackgroundProperty, "BadgeWarning");
             // Which folder this works on: the music folder, or New music before it joins the library.
             libraryTarget.Named("Organize the music folder").Tip("Work on your music folder: every option and preset changes the songs in your library.");
