@@ -49,6 +49,8 @@ namespace AlbumArtTool
         internal DuplicatePanel Duplicates { get; private set; }
         internal bool IsScanning => Duplicates != null && Duplicates.IsScanning;
         internal LibraryCheckResult Result { get; private set; }
+        /// <summary>How many checks found something to fix.</summary>
+        internal int Attention => checks.Count(c => !c.Clean && c.Found > 0);
         /// <summary>Every finding, grouped under one header row per check (the order of the checks on the left).</summary>
         internal IReadOnlyList<Row> Rows { get; private set; } = Array.Empty<Row>();
         /// <summary>The bitrate measurement started by the last check (completed when there is nothing to measure).</summary>

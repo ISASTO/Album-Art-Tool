@@ -109,30 +109,15 @@ namespace AlbumArtTool
             return window;
         }
 
-        // Pages fade in over 150 ms (skipped when Windows asks for fewer animations). A dispatcher timer
-        // drives it, like the appearance wipe, so it also finishes on machines without a GPU clock.
+        // A new page rises a few pixels into place and fades in (180 ms, the settle curve). With Windows "Show
+        // animations" off, or PageFade off in tests, it simply appears.
         internal static bool PageFade = true;
-        private static readonly TimeSpan FadeDuration = TimeSpan.FromMilliseconds(150);
-        private DispatcherTimer fadeTimer;
-        private Control fading;
 
         private void FadeIn(Control page)
         {
-            fadeTimer?.Stop();
-            if (fading != null) fading.Opacity = 1;
-            fading = null;
             if (page == null) return;
-            if (!PageFade || !Appearance.MotionAllowed) { page.Opacity = 1; return; }
-            fading = page; page.Opacity = 0;
-            var clock = System.Diagnostics.Stopwatch.StartNew();
-            fadeTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(8), DispatcherPriority.Render, (s, e) =>
-            {
-                double t = Math.Min(1, clock.Elapsed.TotalMilliseconds / FadeDuration.TotalMilliseconds);
-                page.Opacity = 1 - Math.Pow(1 - t, 3);
-                if (t < 1) return;
-                fadeTimer.Stop(); page.Opacity = 1; fading = null;
-            });
-            fadeTimer.Start();
+            if (!PageFade || !Motion.Allowed) { Motion.Stop(page); page.Opacity = 1; page.RenderTransform = null; return; }
+            Motion.Arrive(page, 6);
         }
     }
 }

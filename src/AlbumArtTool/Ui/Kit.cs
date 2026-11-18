@@ -9,6 +9,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Avalonia.Media.Immutable;
 
 namespace AlbumArtTool.Ui
 {
@@ -29,14 +30,15 @@ namespace AlbumArtTool.Ui
         internal static string Text(this Button button) => button.Content switch
         {
             string text => text,
-            Panel panel => panel.Children.OfType<TextBlock>().LastOrDefault()?.Text ?? "",
+            CapsText caps => caps.Source,
+            Panel panel => panel.Children.OfType<TextBlock>().LastOrDefault() is TextBlock label ? (label is CapsText c ? c.Source : label.Text ?? "") : "",
             _ => ""
         };
 
         /// <summary>Changes a button's label without removing its icon.</summary>
         internal static void SetText(this Button button, string text)
         {
-            if (button.Content is Panel panel && panel.Children.OfType<TextBlock>().LastOrDefault() is TextBlock label) label.Text = text;
+            if (button.Content is Panel panel && panel.Children.OfType<TextBlock>().LastOrDefault() is TextBlock label) { if (label is CapsText caps) caps.Source = text; else label.Text = text; }
             else button.Content = text;
         }
 
@@ -45,7 +47,7 @@ namespace AlbumArtTool.Ui
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7, VerticalAlignment = VerticalAlignment.Center };
             row.Children.Add(Glyph(icon));
-            if (!string.IsNullOrEmpty(text)) row.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
+            if (!string.IsNullOrEmpty(text)) row.Children.Add(CapsText.Create(text));
             var button = new Button { Content = row };
             foreach (string name in classes) button.Classes.Add(name);
             if (string.IsNullOrEmpty(text)) button.Classes.Add("square");
@@ -120,20 +122,60 @@ namespace AlbumArtTool.Ui
         internal static T Brush<T>(this T control, AvaloniaProperty property, string key) where T : Control
         { control.Bind(property, control.GetResourceObservable(key)); return control; }
 
-        internal static Border Frost(Control child, Thickness padding, double radius = 18) =>
-            new Border { Child = child, Padding = padding, CornerRadius = new CornerRadius(radius), Classes = { "frost" } };
+        /// <summary>A panel: flat, outlined, one depth above the faceplate (corners come from the theme).</summary>
+        internal static Border Frost(Control child, Thickness padding, double radius = 6) =>
+            new Border { Child = child, Padding = padding, Classes = { "frost" } };
+
+        /// <summary>An indicator light. Classes: on (orange), red, green, amber; none = unlit.</summary>
+        internal static Border Led(string tone = null)
+        {
+            var led = new Border { Classes = { "led" } };
+            if (!string.IsNullOrEmpty(tone)) led.Classes.Add(tone);
+            return led;
+        }
+
+        internal static void SetLed(Border led, string tone)
+        {
+            foreach (string t in new[] { "on", "red", "green", "amber" }) led.Classes.Set(t, t == tone);
+        }
+
+        /// <summary>A small printed legend in wide capitals (section labels, units).</summary>
+        internal static TextBlock Legend(string text, double size = 9.5)
+        {
+            var legend = Caption(text); legend.FontSize = size;
+            return legend;
+        }
+
+        /// <summary>Dot-matrix amber text with a soft glow, for display windows only.</summary>
+        internal static TextBlock Readout(string text, double size = 28)
+        {
+            var readout = new TextBlock { Text = text, FontFamily = Theme.Readout, FontWeight = FontWeight.Bold, FontSize = size, VerticalAlignment = VerticalAlignment.Center,
+                Foreground = new SolidColorBrush(Theme.Amber), Effect = Theme.Glow(Theme.Amber, size > 16 ? 12 : 7, size > 16 ? 0.65 : 0.5) };
+            return readout;
+        }
 
         internal static IEnumerable<Control> Descendants(Control root) => Avalonia.LogicalTree.LogicalExtensions.GetLogicalDescendants(root).OfType<Control>();
 
         /// <summary>A small uppercase section label.</summary>
         internal static TextBlock Caption(string text) => new TextBlock { Text = text.ToUpperInvariant(), Classes = { "caption" }, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
 
+        /// <summary>A number printed on a panel with its unit as a small legend: 320 KBPS.</summary>
+        internal static Control Figure(string value, string unit, out TextBlock number)
+        {
+            number = new TextBlock { Text = value, FontFamily = Theme.Key, FontWeight = FontWeight.SemiBold, FontSize = 18, VerticalAlignment = VerticalAlignment.Bottom };
+            var legend = Legend(unit, 8.5); legend.Margin = new Thickness(5, 0, 0, 3); legend.VerticalAlignment = VerticalAlignment.Bottom;
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            row.Children.Add(number); row.Children.Add(legend);
+            return row;
+        }
+
         internal static Border Inset(Control child) => new Border { Child = child, Classes = { "inset" } };
 
         private static WindowIcon icon;
         private static Bitmap mark;
-        internal static WindowIcon Icon => icon ??= new WindowIcon(AssetLoader.Open(new Uri("avares://AlbumArtTool/Assets/AppIcon.ico")));
-        internal static Bitmap Mark => mark ??= new Bitmap(AssetLoader.Open(new Uri("avares://AlbumArtTool/Assets/AppIcon.ico")));
+        private static Uri IconUri => new Uri("avares://" + typeof(Kit).Assembly.GetName().Name + "/Assets/AppIcon.ico");
+        internal static WindowIcon Icon => icon ??= new WindowIcon(AssetLoader.Open(IconUri));
+        internal static Bitmap Mark => mark ??= new Bitmap(AssetLoader.Open(IconUri));
 
         internal static Bitmap Decode(byte[] bytes)
         {
@@ -141,13 +183,13 @@ namespace AlbumArtTool.Ui
             using (var stream = new MemoryStream(bytes, false)) return new Bitmap(stream);
         }
 
-        /// <summary>Applies the shared window chrome: icon, canvas glow, native title bar colors.</summary>
+        /// <summary>Applies the shared window chrome: icon, the faceplate's brushed texture, native title bar colors.</summary>
         internal static void Prepare(Window window, Control content)
         {
             window.Icon = Icon;
+            Theme.Install(Application.Current);
             var host = new Panel();
-            host.Children.Add(new Border { IsHitTestVisible = false }.Brush(Border.BackgroundProperty, "GlowA"));
-            host.Children.Add(new Border { IsHitTestVisible = false }.Brush(Border.BackgroundProperty, "GlowB"));
+            host.Children.Add(new Border { IsHitTestVisible = false }.Brush(Border.BackgroundProperty, "FaceTexture"));
             host.Children.Add(content);
             window.Content = host;
             window.Opened += (s, e) => Appearance.ApplyNativeFrame(window);

@@ -20,6 +20,7 @@ namespace AlbumArtTool
         {
             AvaloniaXamlLoader.Load(this);
             Appearance.Initialize(this);
+            Theme.Install(this);
         }
 
         public override void OnFrameworkInitializationCompleted()
