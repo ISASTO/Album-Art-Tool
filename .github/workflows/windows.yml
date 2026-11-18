@@ -333,6 +333,6 @@ jobs:
           # Notes come from the release commit message (without the [release] marker).
           NOTES="$(printf '%s' "$COMMIT_MESSAGE" | sed -e 's/\[release\] *//' -e '/^Co-Authored-By:/d' -e '/^Claude-Session:/d')"
           [ -n "$NOTES" ] || NOTES="Muzikette $RELEASE_TAG"
-          NOTES="$(printf '%s\n\nInstall Muzikette-Setup.exe, or use Get updates in the app.' "$NOTES")"
+          NOTES="$(printf '%s\n\nInstall Muzikette-Setup.exe, or update from inside the app (Settings › Check for updates; Get updates in Music Library Manager).' "$NOTES")"
           gh release create "$RELEASE_TAG" release/Muzikette-Setup.exe release/AlbumArtTool-Setup.exe release/AlbumArtTool.exe release/Muzikette-Portable.zip release/SHA256SUMS.txt \
             --target "$RELEASE_COMMIT" --title "Muzikette $RELEASE_TAG" --notes "$NOTES"

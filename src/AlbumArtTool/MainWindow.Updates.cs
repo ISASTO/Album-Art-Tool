@@ -28,7 +28,7 @@ namespace AlbumArtTool
             if (updateWindow != null) { updateWindow.Activate(); return; }
             if (checkingUpdate) return;
             checkingUpdate = true;
-            var dialog = updateWindow = new Window { Title = "Get updates", Width = 530, Height = 222, MinWidth = 530, MinHeight = 222, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false };
+            var dialog = updateWindow = new Window { Title = "Check for updates", Width = 530, Height = 222, MinWidth = 530, MinHeight = 222, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false };
             var version = Kit.Heading("Muzikette " + UpdateService.DisplayVersion, 18);
             var message = Kit.Label("Checking GitHub for a newer release…", Kit.Body).Named("App update status");
             message.TextWrapping = TextWrapping.Wrap; message.TextTrimming = TextTrimming.None; message.VerticalAlignment = VerticalAlignment.Top; message.Margin = new Thickness(0, 6, 0, 0);
