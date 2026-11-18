@@ -326,7 +326,7 @@ jobs:
   flatpak:
     name: Flatpak bundle and launch test
     needs: linux-package
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -339,10 +339,10 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update -qq
+          sudo timeout 300 apt-get update -qq
           # Without recommends: those pull in desktop portals and services that do not belong on a build machine.
           sudo -E apt-get install -y --no-install-recommends flatpak flatpak-builder xvfb xauth ffmpeg
-          # Ubuntu 24.04 limits unprivileged user namespaces, which bubblewrap (Flatpak's sandbox) needs.
+          # Ubuntu limits unprivileged user namespaces, which bubblewrap (Flatpak's sandbox) needs.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
           flatpak --version; flatpak-builder --version
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
