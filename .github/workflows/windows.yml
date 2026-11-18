@@ -313,6 +313,13 @@ jobs:
         run: |
           DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 ALBUMART_DATA="$RUNNER_TEMP/data-invariant" timeout 120 xvfb-run -a -s "-screen 0 1600x1000x24" \
             dist/linux/Muzikette --smoke "$RUNNER_TEMP/library" "$RUNNER_TEMP/invariant.png"
+      - name: Keep the test library for the Flatpak check
+        run: tar -C "$RUNNER_TEMP" -cf smoke-library.tar library
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoke-library
+          path: smoke-library.tar
+          retention-days: 1
       - uses: actions/upload-artifact@v4
         with:
           name: Muzikette-Linux
@@ -334,14 +341,18 @@ jobs:
         with:
           name: Muzikette-Linux
           path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: smoke-library
+          path: ${{ runner.temp }}
       - name: Install Flatpak tools
-        timeout-minutes: 10
+        timeout-minutes: 20
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo timeout 300 apt-get update -qq
           # Without recommends: those pull in desktop portals and services that do not belong on a build machine.
-          sudo -E apt-get install -y --no-install-recommends flatpak flatpak-builder xvfb xauth ffmpeg
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder xvfb xauth
           # Ubuntu limits unprivileged user namespaces, which bubblewrap (Flatpak's sandbox) needs.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
           flatpak --version; flatpak-builder --version
@@ -364,7 +375,7 @@ jobs:
         timeout-minutes: 10
         run: |
           flatpak install --user -y --noninteractive dist/Muzikette.flatpak
-          packaging/linux/smoke-library.sh "$RUNNER_TEMP/library"
+          tar -C "$RUNNER_TEMP" -xf "$RUNNER_TEMP/smoke-library.tar"
           echo "Tools in the runtime: $(flatpak run --command=sh io.github.isasto.Muzikette -c 'for t in tar xz xdg-open; do command -v $t || echo "$t missing"; done' | tr '\n' ' ')"
           code=0
           timeout 180 xvfb-run -a -s "-screen 0 1600x1000x24" flatpak run --filesystem="$RUNNER_TEMP" io.github.isasto.Muzikette \
