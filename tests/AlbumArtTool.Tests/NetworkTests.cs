@@ -182,6 +182,32 @@ internal static partial class Tests
             Assert(!UpdateService.AllowedUrl(address), "unsafe update URL rejected: " + address);
         Assert(UpdateService.AllowedUrl("https://release-assets.githubusercontent.com/github-production-release-asset/1/2?token=abc"), "GitHub's release asset CDN is allowed");
 
+        // The rename: releases from the old repository and installer name (3.x) and the new ones (4.0+) are both accepted.
+        string legacyUrl = "https://github.com/ISASTO/Album-Art-Tool/releases/download/v" + version + "/" + UpdateService.LegacyInstallerName;
+        var legacy = UpdateService.ParseRelease(ReleaseJson("v" + version, appBytes, url: legacyUrl, name: UpdateService.LegacyInstallerName), old);
+        Assert(legacy != null && legacy.DownloadUrl == legacyUrl, "a release from before the rename (Album-Art-Tool, AlbumArtTool-Setup.exe) is still offered");
+        Assert(UpdateService.ParseRelease(ReleaseJson("v" + version, appBytes, url: "https://github.com/isasto/muzikette/releases/download/v" + version + "/" + UpdateService.InstallerName), old) != null,
+            "the repository name is matched without regard to case");
+        Assert(Throws(() => UpdateService.ParseRelease(ReleaseJson("v" + version, appBytes, url: "https://github.com/ISASTO/Muzikette-fork/releases/download/v" + version + "/" + UpdateService.InstallerName), old)),
+            "a similarly named repository is rejected");
+        Assert(UpdateService.AllowedUrl(UpdateService.LatestUrlFor("Album-Art-Tool")) && UpdateService.AllowedUrl("https://api.github.com/repositories/912345678/releases/latest") &&
+            !UpdateService.AllowedUrl("https://api.github.com/repositories/912345678/releases") && !UpdateService.AllowedUrl("https://api.github.com/repos/someone/Muzikette/releases/latest"),
+            "the release check may follow GitHub's redirect for a renamed repository, and nothing else");
+        var asked = new List<string>();
+        using (var service = new UpdateService(new FakeHandler(request =>
+        {
+            asked.Add(request.RequestUri.AbsoluteUri);
+            return request.RequestUri.AbsoluteUri.Contains("/Muzikette/") ? new HttpResponseMessage(HttpStatusCode.NotFound)
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(ReleaseJson("v" + version, appBytes, url: legacyUrl, name: UpdateService.LegacyInstallerName)) };
+        })))
+        {
+            var found = await service.CheckAsync(CancellationToken.None, old);
+            Assert(found != null && asked.Count == 2 && asked[0] == UpdateService.LatestUrl && asked[1] == UpdateService.LatestUrlFor("Album-Art-Tool"),
+                "until the repository is renamed, the update check falls back to the old repository");
+        }
+        string both = ReleaseJson("v" + version, appBytes).Replace("\"name\":\"AlbumArtTool.exe\"", "\"name\":\"" + UpdateService.LegacyInstallerName + "\"");
+        Assert(UpdateService.ParseRelease(both, old)?.DownloadUrl.EndsWith("/" + UpdateService.InstallerName) == true, "with both installers published, Muzikette-Setup.exe is used");
+
         string download = Path.Combine(NewFolder("update-download"), "Setup.exe");
         int lastProgress = -1;
         using (var service = new UpdateService(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(appBytes) })))

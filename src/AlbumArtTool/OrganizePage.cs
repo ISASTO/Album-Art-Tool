@@ -125,7 +125,7 @@ namespace AlbumArtTool
                 Group("Tags", titleFromName, albumArtist, cleanTitles, id3v23).Cell(1, 0), Group("Files & folders", organize, rename, combine).Cell(1, 1), helper.Cell(1, 2)).Named("Library management options");
             helper.Margin = new Thickness(8, 8, 8, 4);
             optionsPanel = options;
-            var optionsCard = Kit.Frost(options, new Thickness(12, 8, 12, 10), 14);
+            var optionsCard = Kit.Frost(options, new Thickness(12, 8, 12, 10));
             foreach (var check in optionBoxes.Values) check.IsCheckedChanged += (s, e) => { if (!applyingPreset) { InvalidatePlan(); UpdatePresetState(); } };
 
             state.Text = "Pick a preset or the options you want, then Preview changes.";
@@ -201,10 +201,11 @@ namespace AlbumArtTool
 
         private static Button Step(int number, string text)
         {
-            var digit = new TextBlock { Text = number.ToString(), FontSize = 11.5, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-            var badge = new Border { Child = digit, Classes = { "stepNumber" }, Margin = new Thickness(0, 0, 9, 0), VerticalAlignment = VerticalAlignment.Center };
+            // The step number glows in a tiny display window; the legend is printed beside it.
+            var digit = new TextBlock { Text = number.ToString(), FontFamily = Skin.Readout, FontSize = 15, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            var badge = new Border { Child = digit, Classes = { "stepNumber" }, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
             var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            row.Children.Add(badge); row.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
+            row.Children.Add(badge); row.Children.Add(CapsText.Create(text));
             return new Button { Content = row, Classes = { "step" } };
         }
 

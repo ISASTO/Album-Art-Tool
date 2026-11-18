@@ -25,7 +25,7 @@ namespace AlbumArtTool.Online
             client = new HttpClient(handler ?? new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false,
                 AutomaticDecompression = DecompressionMethods.All, PooledConnectionLifetime = TimeSpan.FromMinutes(5) });
             client.Timeout = Timeout.InfiniteTimeSpan;
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("AlbumArtTool/" + Updates.UpdateService.DisplayVersion + " (+https://github.com/ISASTO/Album-Art-Tool)");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Muzikette/" + Updates.UpdateService.DisplayVersion + " (+https://github.com/ISASTO/Muzikette)");
         }
 
         public Task<byte[]> GetAsync(string url, int limit, CancellationToken token) => FetchAsync(url, limit, false, token);

@@ -270,7 +270,7 @@ namespace AlbumArtTool.Management
         private async Task RunOneAsync(DownloadGroup group, DownloadItem item, CancellationToken token)
         {
             await Task.Yield();
-            string stage = Path.Combine(Path.GetTempPath(), "AlbumArtTool-add-" + Guid.NewGuid().ToString("N"));
+            string stage = Path.Combine(Path.GetTempPath(), "Muzikette-add-" + Guid.NewGuid().ToString("N"));
             string target = null;
             try
             {

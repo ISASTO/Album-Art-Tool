@@ -66,7 +66,7 @@ namespace AlbumArtTool
         private readonly ItemsControl candidateList = new ItemsControl();
         private readonly ListBox trackList = new ListBox { Classes = { "grid" } };
         private readonly TextBox query = new TextBox { Watermark = "Search YouTube Music" };
-        private readonly TextBlock heading = Kit.Label("", 17.33, true), subheading = Kit.Label("", Kit.Body, cls: "muted"), status = Kit.Label("", Kit.Body),
+        private readonly TextBlock heading = Kit.Heading("", 18), subheading = Kit.Label("", Kit.Body, cls: "muted"), status = Kit.Label("", Kit.Body),
             toolText = Kit.Label("", Kit.Body), tableNote = Kit.Label("", Kit.Small, cls: "muted");
         private readonly Image localCover = new Image { Stretch = Stretch.UniformToFill };
         private readonly Border toolsCard;
@@ -105,7 +105,7 @@ namespace AlbumArtTool
             // Tools banner (only when something is missing)
             toolText.TextWrapping = TextWrapping.Wrap; toolText.TextTrimming = TextTrimming.None;
             setup.MinWidth = 120; setup.Click += async (s, e) => await SetupAsync(false);
-            toolsCard = Kit.Frost(Kit.Grid("*,Auto", "Auto").Add(toolText.Cell(0, 0), setup.Cell(0, 1)), new Thickness(14, 10, 10, 10), 14);
+            toolsCard = Kit.Frost(Kit.Grid("*,Auto", "Auto").Add(toolText.Cell(0, 0), setup.Cell(0, 1)), new Thickness(14, 10, 10, 10));
             toolsCard.Margin = new Thickness(0, 10, 0, 0);
 
             // Left: albums

@@ -49,6 +49,7 @@ internal static partial class Tests
             Run("tag checks", LibraryCheckTests);
             Run("YouTube Music replacement", UpgradeTests);
             Run("presets and preferences", PreferenceTests);
+            Run("data folder rename", DataMigrationTests);
             Run("add music parsing", AddMusicParsingTests);
             Run("album artists and artist rename", ArtistTagTests);
             Run("large covers", LargeCoverTests);

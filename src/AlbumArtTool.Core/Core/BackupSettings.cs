@@ -5,9 +5,11 @@ namespace AlbumArtTool.Core
 {
     internal static class BackupSettings
     {
-        // ALBUMART_DATA relocates all per-PC settings, caches and backups (used by the tests).
+        // Per-PC settings, caches and backups live in %LocalAppData%\Muzikette (moved there from the pre-4.0 folder on
+        // first use). ALBUMART_DATA relocates them (used by the tests).
+        private static string resolved;
         internal static string AppData => Environment.GetEnvironmentVariable("ALBUMART_DATA") is string custom && custom.Length > 0
-            ? custom : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AlbumArtTool");
+            ? custom : resolved ??= DataMigration.Resolve(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
         private static string setting => Path.Combine(AppData, "backup-folder.txt");
         internal static string Root
         {

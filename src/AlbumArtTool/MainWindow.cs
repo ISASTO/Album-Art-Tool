@@ -97,7 +97,7 @@ namespace AlbumArtTool
         {
             coverSearch = onlineService ?? new CoverSearchService();
             online = new CoverSearchPanel(coverSearch) { UseCover = ApplyOnlineCoverAsync };
-            Title = "Music Library Manager";
+            Title = "Muzikette";
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Width = 1320; Height = 840; MinWidth = 1140; MinHeight = 720;
             Root = root;
@@ -221,7 +221,7 @@ namespace AlbumArtTool
             var coverStack = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
             coverStack.Children.Add(coverFrame); coverStack.Children.Add(coverCaption); coverStack.Children.Add(discard);
             var kicker = Kit.Legend("Album", 8.5); kicker.Margin = new Thickness(1, 2, 0, 8);
-            selectedTitle.FontFamily = Theme.Display; selectedTitle.FontWeight = FontWeight.ExtraBold; selectedTitle.FontSize = 25;
+            selectedTitle.FontFamily = Skin.Display; selectedTitle.FontWeight = FontWeight.ExtraBold; selectedTitle.FontSize = 25;
             selectedTitle.TextWrapping = TextWrapping.Wrap; selectedTitle.MaxLines = 2; selectedTitle.LineHeight = 28;
             selectedArtist.FontSize = 15; selectedArtist.Margin = new Thickness(0, 4, 0, 0);
             detail.FontSize = Kit.Small; detail.TextWrapping = TextWrapping.Wrap; selectedPath.FontSize = 11;
@@ -257,8 +257,8 @@ namespace AlbumArtTool
             status.Named("Operation status and track counter");
             status.PropertyChanged += (s, e) => { if (e.Property == TextBlock.TextProperty) UpdateStatusBar(); };
             progress.Named("Scan and update progress"); progress.IsVisible = false; progress.Classes.Add("display"); progress.Width = 230;
-            progressPercent.Named("Progress percentage"); progressPercent.FontFamily = Theme.Readout; progressPercent.FontWeight = FontWeight.Bold; progressPercent.FontSize = 15;
-            progressPercent.Foreground = new SolidColorBrush(Theme.Amber); progressPercent.Effect = Theme.Glow(Theme.Amber, 6, 0.5); progressPercent.MinWidth = 40; progressPercent.TextAlignment = TextAlignment.Right;
+            progressPercent.Named("Progress percentage"); progressPercent.FontFamily = Skin.Readout; progressPercent.FontWeight = FontWeight.Bold; progressPercent.FontSize = 15;
+            progressPercent.Foreground = new SolidColorBrush(Skin.Amber); progressPercent.Effect = Skin.Glow(Skin.Amber, 6, 0.5); progressPercent.MinWidth = 40; progressPercent.TextAlignment = TextAlignment.Right;
             display.SetMeter(progress, progressPercent);
             display.Named("Display");
             // The page's name and status line stay as text for screen readers and tests; the display shows them.

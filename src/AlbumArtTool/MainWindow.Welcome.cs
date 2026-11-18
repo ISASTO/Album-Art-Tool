@@ -33,25 +33,28 @@ namespace AlbumArtTool
         // Welcome: where the music is, and one clear first step. Nothing is scanned until it is clicked.
         private Control BuildWelcome()
         {
-            var mark = new Image { Source = Kit.Mark, Width = 64, Height = 64, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 12) };
-            var title = Kit.Label("Welcome to Music Library Manager", 24, true);
-            var intro = Kit.Label("Choose the folder that holds your music. The app scans it and shows what needs attention: missing covers, untitled songs, low-bitrate albums and duplicates. " +
+            // The front panel's model name, then one sentence on what the app does and one clear first step.
+            var name = new TextBlock { Text = "MUZIKETTE", FontFamily = Skin.Legend, FontSize = 30, LetterSpacing = 2, Margin = new Thickness(0, 0, 0, 22) };
+            var leds = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7, Margin = new Thickness(2, 0, 0, 14) };
+            foreach (string tone in new[] { "on", "amber", "green" }) leds.Children.Add(Kit.Led(tone));
+            var title = Kit.Heading("Welcome to Muzikette", 22);
+            var intro = Kit.Label("Choose the folder that holds your music. Muzikette scans it and shows what needs attention: missing covers, untitled songs, low-bitrate albums and duplicates. " +
                 "Nothing changes until you pick a fix, and every change is previewed and backed up first.", Kit.Body, cls: "muted");
-            intro.TextWrapping = TextWrapping.Wrap; intro.TextTrimming = TextTrimming.None; intro.Margin = new Thickness(0, 6, 0, 18);
+            intro.TextWrapping = TextWrapping.Wrap; intro.TextTrimming = TextTrimming.None; intro.Margin = new Thickness(0, 8, 0, 20); intro.LineHeight = 20;
             var folderIcon = Kit.Glyph(Icons.Folder, 18); folderIcon.Margin = new Thickness(0, 0, 10, 0);
             welcomeFolder.Named("Music folder to scan first");
             var place = Kit.Grid("Auto,*", "Auto").Add(folderIcon.Cell(0, 0), welcomeFolder.Cell(0, 1));
             var placeCard = Kit.Inset(place); placeCard.Padding = new Thickness(14, 10); placeCard.Margin = new Thickness(0, 0, 0, 16);
             var start = Kit.Button("Scan this folder", "primary").Tip("Scan the folder shown above. Afterwards, Health shows what in your library needs attention.");
             var other = Kit.Button("Choose another folder…").Tip("Pick the top folder that contains your albums, then scan it.");
-            foreach (var b in new[] { start, other }) { b.Height = 38; b.Padding = new Thickness(18, 2); b.HorizontalAlignment = HorizontalAlignment.Left; b.FontSize = Kit.Body; }
+            foreach (var b in new[] { start, other }) { b.Height = 40; b.Padding = new Thickness(20, 2); b.HorizontalAlignment = HorizontalAlignment.Left; }
             start.Click += async (s, e) => await StartFirstScanAsync(false);
             other.Click += async (s, e) => await StartFirstScanAsync(true);
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             buttons.Children.Add(start); buttons.Children.Add(other);
             var stack = new StackPanel();
-            foreach (var c in new Control[] { mark, title, intro, placeCard, buttons }) stack.Children.Add(c);
-            var card = Kit.Frost(stack, new Thickness(36, 32, 36, 32));
+            foreach (var c in new Control[] { leds, name, title, intro, placeCard, buttons }) stack.Children.Add(c);
+            var card = Kit.Frost(stack, new Thickness(40, 34, 40, 36));
             card.MaxWidth = 640; card.HorizontalAlignment = HorizontalAlignment.Center; card.VerticalAlignment = VerticalAlignment.Center;
             return new Panel { Children = { card } };
         }
@@ -94,14 +97,14 @@ namespace AlbumArtTool
             var rows = Kit.Grid("170,*", string.Join(",", System.Linq.Enumerable.Repeat("32", Shortcuts.Length)));
             for (int i = 0; i < Shortcuts.Length; i++)
             {
-                var keys = Kit.Label(Shortcuts[i].Keys, Kit.Small, true);
+                var keys = Kit.Label(Shortcuts[i].Keys.ToUpperInvariant(), 11, true); keys.FontFamily = Skin.Key; keys.FontWeight = FontWeight.SemiBold; keys.LetterSpacing = 0.8;
                 rows.Add(keys.Cell(i, 0), Kit.Label(Shortcuts[i].Action, Kit.Body, cls: "muted").Cell(i, 1));
             }
             rows.Named("Keyboard shortcuts");
             var close = Kit.Button("Close", "primary"); close.Width = 96; close.Height = 32; close.HorizontalAlignment = HorizontalAlignment.Right; close.Margin = new Thickness(0, 14, 0, 0);
             close.Click += (s, e) => window.Close();
             var layout = new StackPanel { Margin = new Thickness(22, 18, 22, 16) };
-            layout.Children.Add(Kit.Label("Keyboard shortcuts", 17.33, true).Also(t => t.Margin = new Thickness(0, 0, 0, 10)));
+            layout.Children.Add(Kit.Heading("Keyboard shortcuts", 18).Also(t => t.Margin = new Thickness(0, 0, 0, 12)));
             layout.Children.Add(rows); layout.Children.Add(close);
             Kit.Prepare(window, layout);
             window.Closed += (s, e) => { if (shortcutsWindow == window) shortcutsWindow = null; };

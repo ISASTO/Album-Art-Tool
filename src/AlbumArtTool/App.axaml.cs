@@ -20,7 +20,7 @@ namespace AlbumArtTool
         {
             AvaloniaXamlLoader.Load(this);
             Appearance.Initialize(this);
-            Theme.Install(this);
+            Skin.Install(this);
         }
 
         public override void OnFrameworkInitializationCompleted()
@@ -32,7 +32,7 @@ namespace AlbumArtTool
                     // Mirror a WinForms ThreadException dialog: report and keep the app usable.
                     e.Handled = true;
                     var owner = desktop.MainWindow;
-                    if (owner != null && owner.IsVisible) _ = Dialogs.ShowMessage(owner, "Album Art Tool", e.Exception.Message);
+                    if (owner != null && owner.IsVisible) _ = Dialogs.ShowMessage(owner, "Muzikette", e.Exception.Message);
                 };
                 Task.Run(UpdateInstaller.CleanOldWorkspaces);
                 desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;

@@ -43,7 +43,7 @@ namespace AlbumArtTool.Ui
 
         private static TextBlock Label(string text)
         {
-            var label = new TextBlock { Text = text, FontFamily = Theme.Legend, FontSize = 8, LetterSpacing = 1.6, Foreground = new SolidColorBrush(Theme.Amber), Opacity = 0.72,
+            var label = new TextBlock { Text = text, FontFamily = Skin.Legend, FontSize = 8, LetterSpacing = 1.6, Foreground = new SolidColorBrush(Skin.Amber), Opacity = 0.72,
                 VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(1, 0, 0, 3) };
             return label;
         }

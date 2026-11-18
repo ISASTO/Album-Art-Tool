@@ -21,14 +21,14 @@ namespace AlbumArtTool.Management
         internal EncoderSetup(HttpMessageHandler handler = null)
         {
             client = new HttpClient(handler ?? new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false });
-            client.Timeout = Timeout.InfiniteTimeSpan; client.DefaultRequestHeaders.UserAgent.ParseAdd("AlbumArtTool/" + UpdateService.DisplayVersion);
+            client.Timeout = Timeout.InfiniteTimeSpan; client.DefaultRequestHeaders.UserAgent.ParseAdd("Muzikette/" + UpdateService.DisplayVersion);
         }
 
         internal async Task<string> InstallAsync(IProgress<int> progress, CancellationToken token)
         {
             if (!Environment.Is64BitOperatingSystem || !OperatingSystem.IsWindows())
                 throw new IOException("Automatic FFmpeg setup needs 64-bit Windows. Choose a compatible local FFmpeg folder instead.");
-            string stage = Path.Combine(Path.GetTempPath(), "AlbumArtTool-encoder-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
+            string stage = Path.Combine(Path.GetTempPath(), "Muzikette-encoder-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
             try
             {
                 string json;

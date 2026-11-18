@@ -28,7 +28,7 @@ namespace AlbumArtTool
         private readonly AlbumList albums = new AlbumList();
         private readonly CoverSearchPanel online;
         private readonly Image cover = new Image { Stretch = Stretch.Uniform };
-        private readonly TextBlock title = Kit.Label("Select an album", 17.33, true), artist = Kit.Label("", Kit.Body, cls: "muted"),
+        private readonly TextBlock title = Kit.Heading("Select an album", 18), artist = Kit.Label("", Kit.Body, cls: "muted"),
             caption = Kit.Label("", Kit.Tiny, cls: "muted"), status = Kit.Label("", Kit.Small, cls: "muted");
         private readonly Button choose = Kit.Button("Choose image…"), apply = Kit.Button("Apply cover", "primary"), undo = Kit.IconButton(Icons.Undo, "Undo", "ghost");
         private byte[] pending;
@@ -70,7 +70,7 @@ namespace AlbumArtTool
             var manual = Kit.Grid("Auto,*", "Auto").Add(preview.Cell(0, 0), actions.Cell(0, 1)); manual.Margin = new Thickness(0, 10, 0, 0);
             var details = Kit.Frost(Kit.Grid("*", "Auto,Auto,*,Auto").Add(title.Cell(0, 0), artist.Cell(1, 0), online.Cell(2, 0), manual.Cell(3, 0)), new Thickness(12));
             var list = Kit.Frost(albums, new Thickness(8)); list.Margin = new Thickness(0, 0, 14, 0);
-            var heading = Kit.Label("Covers in New music", 20, true);
+            var heading = Kit.Heading("Covers in New music", 20);
             var sub = Kit.Label("Pick an album, then use a suggested cover, choose an image or drop one. Downloads stay in New music until you add them to your library.", Kit.Small, cls: "muted");
             sub.Margin = new Thickness(0, 2, 0, 12);
             var layout = Kit.Grid("*", "Auto,Auto,*").Add(heading.Cell(0, 0), sub.Cell(1, 0), Kit.Grid("*,520", "*").Add(list.Cell(0, 0), details.Cell(0, 1)).Cell(2, 0));

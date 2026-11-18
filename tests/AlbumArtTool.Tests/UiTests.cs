@@ -7,6 +7,49 @@ using AlbumArtTool.Ui;
 
 internal static partial class Tests
 {
+    // The rename to Muzikette: the pre-4.0 data folder moves, and every path saved inside it follows.
+    private static void DataMigrationTests()
+    {
+        string local = NewFolder("local-app-data"), legacy = Path.Combine(local, DataMigration.LegacyFolder), current = Path.Combine(local, DataMigration.Folder);
+        string run = Path.Combine(legacy, "LibraryBackups", "run-1"), newMusic = Path.Combine(legacy, "New music"), music = NewFolder("migration-music");
+        Directory.CreateDirectory(run); Directory.CreateDirectory(newMusic);
+        File.WriteAllText(Path.Combine(legacy, "appearance.txt"), "dark");
+        File.WriteAllText(Path.Combine(legacy, "new-music-folder.txt"), newMusic);
+        File.WriteAllText(Path.Combine(legacy, "last-folder.txt"), music);
+        File.WriteAllText(Path.Combine(legacy, "last-library-run.txt"), Path.Combine(run, "journal.json"));
+        File.WriteAllText(Path.Combine(legacy, "last-add-to-library.txt"), Path.Combine(music, "a.mp3") + "\t" + Path.Combine(newMusic, "a.mp3") + "\t12\n" + Path.Combine(music, "b.mp3") + "\t" + Path.Combine(newMusic, "b.mp3") + "\t34");
+        var journal = new LibraryJournal { Root = newMusic, Directory = run };
+        journal.Entries.Add(new JournalEntry { Index = 0, Source = Path.Combine(newMusic, "x.mp3"), Target = Path.Combine(music, "x.mp3"), Backup = Path.Combine(run, "files", "x.mp3"), State = "done" });
+        journal.Save();
+        File.WriteAllText(Path.Combine(run, "events.jsonl"), System.Text.Json.JsonSerializer.Serialize(journal.Entries[0], JournalJson.Default.JournalEntry) + "\n");
+        // A custom backup folder elsewhere, whose run changed songs in New music.
+        string elsewhere = Path.Combine(NewFolder("custom-backups"), "run-2");
+        File.WriteAllText(Path.Combine(legacy, "backup-folder.txt"), Path.GetDirectoryName(elsewhere));
+        var other = new LibraryJournal { Root = newMusic, Directory = elsewhere };
+        other.Entries.Add(new JournalEntry { Source = Path.Combine(newMusic, "y.mp3"), Target = Path.Combine(newMusic, "z.mp3"), Backup = Path.Combine(elsewhere, "y.mp3"), State = "done" });
+        other.Save();
+
+        Assert(DataMigration.Resolve(local) == current && Directory.Exists(current) && !Directory.Exists(legacy), "the pre-4.0 data folder moves to Muzikette");
+        string Read(string name) => File.ReadAllText(Path.Combine(current, name)).Trim();
+        string movedRun = Path.Combine(current, "LibraryBackups", "run-1"), movedMusic = Path.Combine(current, "New music");
+        Assert(Read("appearance.txt") == "dark" && Read("last-folder.txt") == music, "settings move unchanged; paths outside the data folder stay as they were");
+        Assert(Read("new-music-folder.txt") == movedMusic && Read("last-library-run.txt") == Path.Combine(movedRun, "journal.json"), "saved paths inside the data folder follow it");
+        Assert(Read("last-add-to-library.txt").Replace("\r", "") == Path.Combine(music, "a.mp3") + "\t" + Path.Combine(movedMusic, "a.mp3") + "\t12\n" + Path.Combine(music, "b.mp3") + "\t" + Path.Combine(movedMusic, "b.mp3") + "\t34",
+            "the last Add to library run can still be undone");
+        var moved = System.Text.Json.JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(movedRun, "journal.json")), JournalJson.Default.LibraryJournal);
+        Assert(moved.Directory == movedRun && moved.Root == movedMusic && moved.Entries[0].Backup == Path.Combine(movedRun, "files", "x.mp3") &&
+            moved.Entries[0].Source == Path.Combine(movedMusic, "x.mp3") && moved.Entries[0].Target == Path.Combine(music, "x.mp3") && moved.Entries[0].State == "done", "Organize's Undo journal points to the moved backups");
+        var evented = System.Text.Json.JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(movedRun, "events.jsonl")).Trim(), JournalJson.Default.JournalEntry);
+        Assert(evented.Backup == Path.Combine(movedRun, "files", "x.mp3"), "an interrupted run's event log follows too");
+        var outside = System.Text.Json.JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(elsewhere, "journal.json")), JournalJson.Default.LibraryJournal);
+        Assert(outside.Directory == elsewhere && outside.Entries[0].Source == Path.Combine(movedMusic, "y.mp3") && outside.Entries[0].Backup == Path.Combine(elsewhere, "y.mp3"),
+            "a run kept in a custom backup folder keeps its backups and finds New music in its new place");
+        Directory.CreateDirectory(legacy); File.WriteAllText(Path.Combine(legacy, "appearance.txt"), "light");
+        Assert(DataMigration.Resolve(local) == current && Read("appearance.txt") == "dark" && Directory.Exists(legacy), "once moved, a reappearing old folder is left alone");
+        string fresh = NewFolder("fresh-local");
+        Assert(DataMigration.Resolve(fresh) == Path.Combine(fresh, DataMigration.Folder) && !Directory.Exists(Path.Combine(fresh, DataMigration.LegacyFolder)), "a new install uses the Muzikette folder");
+    }
+
     // Organize presets, theme preference and path display (no window needed).
     private static void PreferenceTests()
     {

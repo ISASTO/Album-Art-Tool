@@ -13,9 +13,9 @@ namespace AlbumArtTool.Ui
 {
     // The parts of the Silver and Black finishes that XAML cannot express: the bundled fonts, shadow tokens,
     // tiled textures (brushed metal, display dots, meter segments) and the capitals printed on keys.
-    internal static class Theme
+    internal static class Skin
     {
-        private static readonly string Assets = "avares://" + typeof(Theme).Assembly.GetName().Name + "/Assets/Fonts#";
+        private static readonly string Assets = "avares://" + typeof(Skin).Assembly.GetName().Name + "/Assets/Fonts#";
         /// <summary>Everything you read: lists, descriptions, fields.</summary>
         internal static readonly FontFamily Text = new FontFamily(Assets + "Archivo");
         /// <summary>Keys, switches, navigation and status tags (drawn in capitals).</summary>

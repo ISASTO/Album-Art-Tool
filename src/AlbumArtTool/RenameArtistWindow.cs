@@ -92,7 +92,7 @@ namespace AlbumArtTool
             var intro = Kit.Label("Tick every name to change (for example all the names one artist released under) and type the one name they should become.", Kit.Small, cls: "muted");
             intro.TextWrapping = TextWrapping.Wrap; intro.TextTrimming = TextTrimming.None;
             var layout = new StackPanel { Margin = new Thickness(22, 18, 22, 16), Spacing = 4 };
-            layout.Children.Add(Kit.Label(folderName == null ? "Rename artists everywhere" : "Rename artists in " + folderName, 17.33, true).Named("Rename title"));
+            layout.Children.Add(Kit.Heading(folderName == null ? "Rename artists everywhere" : "Rename artists in " + folderName, 18).Named("Rename title"));
             layout.Children.Add(intro);
             layout.Children.Add(Kit.Label("Artists", Kit.Small, cls: "muted").Also(l => l.Margin = new Thickness(0, 10, 0, 0))); layout.Children.Add(find);
             layout.Children.Add(Kit.Inset(list).Also(b => b.Padding = new Thickness(2))); layout.Children.Add(pickedRow);

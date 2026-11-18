@@ -171,7 +171,7 @@ namespace AlbumArtTool.Ui
             text.Children.Add(title); text.Children.Add(detail);
             tag.Margin = new Thickness(0, 0, 16, 0); tag.MaxWidth = 190; tag.Label.FontSize = 9.5;
             var edge = new Border { Classes = { "edge" }, Width = 3, CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 12, 0, 12), HorizontalAlignment = HorizontalAlignment.Left,
-                Effect = Theme.Glow(Theme.Orange, 8, 0.85), IsHitTestVisible = false };
+                Effect = Skin.Glow(Skin.Orange, 8, 0.85), IsHitTestVisible = false };
             edge.Brush(Border.BackgroundProperty, "Primary");
             var grid = Kit.Grid("Auto,*,Auto", null).Add(frame.Cell(0, 0), text.Cell(0, 1), tag.Cell(0, 2));
             var layers = new Panel(); layers.Children.Add(grid); layers.Children.Add(edge);

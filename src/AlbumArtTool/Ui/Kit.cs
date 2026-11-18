@@ -95,6 +95,14 @@ namespace AlbumArtTool.Ui
             return label;
         }
 
+        /// <summary>A name in the wide display face: album and artist names, page and dialog headings.</summary>
+        internal static TextBlock Heading(string text, double size = 18)
+        {
+            var heading = Label(text, size, true);
+            heading.FontFamily = Skin.Display; heading.FontWeight = FontWeight.ExtraBold;
+            return heading;
+        }
+
         internal static CheckBox Check(string text, bool value) => new CheckBox { Content = text, IsChecked = value, VerticalAlignment = VerticalAlignment.Center };
         internal static bool On(this CheckBox box) => box.IsChecked == true;
 
@@ -149,8 +157,8 @@ namespace AlbumArtTool.Ui
         /// <summary>Dot-matrix amber text with a soft glow, for display windows only.</summary>
         internal static TextBlock Readout(string text, double size = 28)
         {
-            var readout = new TextBlock { Text = text, FontFamily = Theme.Readout, FontWeight = FontWeight.Bold, FontSize = size, VerticalAlignment = VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(Theme.Amber), Effect = Theme.Glow(Theme.Amber, size > 16 ? 12 : 7, size > 16 ? 0.65 : 0.5) };
+            var readout = new TextBlock { Text = text, FontFamily = Skin.Readout, FontWeight = FontWeight.Bold, FontSize = size, VerticalAlignment = VerticalAlignment.Center,
+                Foreground = new SolidColorBrush(Skin.Amber), Effect = Skin.Glow(Skin.Amber, size > 16 ? 12 : 7, size > 16 ? 0.65 : 0.5) };
             return readout;
         }
 
@@ -162,7 +170,7 @@ namespace AlbumArtTool.Ui
         /// <summary>A number printed on a panel with its unit as a small legend: 320 KBPS.</summary>
         internal static Control Figure(string value, string unit, out TextBlock number)
         {
-            number = new TextBlock { Text = value, FontFamily = Theme.Key, FontWeight = FontWeight.SemiBold, FontSize = 18, VerticalAlignment = VerticalAlignment.Bottom };
+            number = new TextBlock { Text = value, FontFamily = Skin.Key, FontWeight = FontWeight.SemiBold, FontSize = 18, VerticalAlignment = VerticalAlignment.Bottom };
             var legend = Legend(unit, 8.5); legend.Margin = new Thickness(5, 0, 0, 3); legend.VerticalAlignment = VerticalAlignment.Bottom;
             var row = new StackPanel { Orientation = Orientation.Horizontal };
             row.Children.Add(number); row.Children.Add(legend);
@@ -187,7 +195,7 @@ namespace AlbumArtTool.Ui
         internal static void Prepare(Window window, Control content)
         {
             window.Icon = Icon;
-            Theme.Install(Application.Current);
+            Skin.Install(Application.Current);
             var host = new Panel();
             host.Children.Add(new Border { IsHitTestVisible = false }.Brush(Border.BackgroundProperty, "FaceTexture"));
             host.Children.Add(content);

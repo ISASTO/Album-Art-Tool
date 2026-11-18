@@ -150,7 +150,7 @@ namespace AlbumArtTool.Management
         internal YtDlpSetup(HttpMessageHandler handler = null)
         {
             client = new HttpClient(handler ?? new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false });
-            client.Timeout = Timeout.InfiniteTimeSpan; client.DefaultRequestHeaders.UserAgent.ParseAdd("AlbumArtTool/" + UpdateService.DisplayVersion);
+            client.Timeout = Timeout.InfiniteTimeSpan; client.DefaultRequestHeaders.UserAgent.ParseAdd("Muzikette/" + UpdateService.DisplayVersion);
         }
 
         internal static bool Installed => File.Exists(Path.Combine(YtDlp.Cache, YtDlp.ExecutableName)) && File.Exists(Path.Combine(YtDlp.Cache, YtDlp.DenoName));
@@ -167,7 +167,7 @@ namespace AlbumArtTool.Management
         {
             if (!Environment.Is64BitOperatingSystem || !OperatingSystem.IsWindows())
                 throw new IOException("Automatic setup needs 64-bit Windows. Put yt-dlp and deno on PATH instead.");
-            string stage = Path.Combine(Path.GetTempPath(), "AlbumArtTool-downloader-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
+            string stage = Path.Combine(Path.GetTempPath(), "Muzikette-downloader-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
             try
             {
                 string tag;

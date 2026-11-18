@@ -36,7 +36,7 @@ namespace AlbumArtTool
         private readonly ComboBox threshold = new ComboBox { Width = 132 };
         private readonly Button refresh = Kit.IconButton(Icons.Refresh, "Check again", "ghost"), save = Kit.IconButton(Icons.Download, "Save report…", "ghost"),
             show = Kit.IconButton(Icons.Open, "Show selected", "ghost");
-        private readonly TextBlock title = Kit.Label("", 19, true), description = Kit.Label("", Kit.Small, cls: "muted");
+        private readonly TextBlock title = Kit.Heading("", 20), description = Kit.Label("", Kit.Small, cls: "muted");
         private readonly Pill count = new Pill();
         private readonly PathIcon icon = Kit.Glyph(Icons.Health, 22);
         private readonly Panel fixHost = new Panel(), content = new Panel();
@@ -132,13 +132,14 @@ namespace AlbumArtTool
             save.Tip("Save every finding as a CSV report you can open in Excel.");
             save.Click += async (s, e) => await SaveAsync();
             save.HorizontalAlignment = HorizontalAlignment.Left; save.Height = 32; save.Margin = new Thickness(0);
-            var left = Kit.Frost(Kit.Grid("*", "Auto,Auto,*,Auto,Auto").Add(top.Cell(0, 0), items.Cell(1, 0), summary.Cell(3, 0), save.Cell(4, 0)), new Thickness(10, 12, 10, 10), 16);
+            var left = Kit.Frost(Kit.Grid("*", "Auto,Auto,*,Auto,Auto").Add(top.Cell(0, 0), items.Cell(1, 0), summary.Cell(3, 0), save.Cell(4, 0)), new Thickness(10, 12, 10, 10));
             left.Margin = new Thickness(0, 0, 14, 0);
 
             // Right: the selected check.
-            icon.Brush(PathIcon.ForegroundProperty, "Accent");
-            var tile = new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(12), Child = icon, VerticalAlignment = VerticalAlignment.Top };
-            tile.Brush(Border.BackgroundProperty, "BadgeAccent");
+            // The check's symbol glows amber in a small display window.
+            icon.Foreground = new SolidColorBrush(Skin.Amber); icon.Effect = Skin.Glow(Skin.Amber, 8, 0.6);
+            var tile = new Border { Width = 46, Height = 46, CornerRadius = new CornerRadius(6), Child = icon, VerticalAlignment = VerticalAlignment.Top };
+            tile.Brush(Border.BackgroundProperty, "Glass"); tile.Brush(Border.BoxShadowProperty, "GlassDepth");
             title.Named("Health check title");
             count.Margin = new Thickness(10, 2, 0, 0);
             var titleRow = new StackPanel { Orientation = Orientation.Horizontal };
@@ -159,7 +160,7 @@ namespace AlbumArtTool
             findings = Kit.Inset(list); findings.Padding = new Thickness(0);
             allGood.Margin = new Thickness(24);
             content.Children.Add(findings); content.Children.Add(allGood);
-            var right = Kit.Frost(Kit.Grid("*", "Auto,Auto,*").Add(head.Cell(0, 0), actions.Cell(1, 0), content.Cell(2, 0)), new Thickness(20, 18, 20, 18), 16);
+            var right = Kit.Frost(Kit.Grid("*", "Auto,Auto,*").Add(head.Cell(0, 0), actions.Cell(1, 0), content.Cell(2, 0)), new Thickness(20, 18, 20, 18));
             Content = Kit.Grid("290,*", "*").Add(left.Cell(0, 0), right.Cell(0, 1));
             duplicates.Status.Text = "Not checked"; duplicates.Status.Classes.Add("muted");
             Check();
@@ -168,12 +169,16 @@ namespace AlbumArtTool
         private HealthCheck Add(string name, string glyph, Button fix, string about)
         {
             var check = new HealthCheck { Name = name, Glyph = glyph, Fix = fix, About = about };
-            var mark = Kit.Glyph(glyph, 18); mark.Margin = new Thickness(2, 0, 12, 0); mark.Brush(PathIcon.ForegroundProperty, "Muted");
-            var label = Kit.Label(name, Kit.Body, true);
+            // Each check is a key with an indicator: red when it found something, green when all is well, orange while it runs.
+            var led = Kit.Led(); led.Margin = new Thickness(4, 6, 12, 0); led.VerticalAlignment = VerticalAlignment.Top;
+            var label = CapsText.Create(name); label.FontFamily = Skin.Key; label.FontWeight = FontWeight.SemiBold; label.FontSize = 11.5; label.LetterSpacing = 0.9;
             check.Status = Kit.Label("", Kit.Small);
-            var words = new StackPanel { Spacing = 1, VerticalAlignment = VerticalAlignment.Center };
+            void Light() => Kit.SetLed(led, check.Status.Classes.Contains("warning") ? "red" : check.Status.Classes.Contains("positive") ? "green" : (check.Status.Text ?? "").EndsWith("…") ? "on" : null);
+            check.Status.Classes.CollectionChanged += (s, e) => Light();
+            check.Status.PropertyChanged += (s, e) => { if (e.Property == TextBlock.TextProperty) Light(); };
+            var words = new StackPanel { Spacing = 3, VerticalAlignment = VerticalAlignment.Center };
             words.Children.Add(label); words.Children.Add(check.Status);
-            check.Item = new Button { Content = Kit.Grid("Auto,*", "Auto").Add(mark.Cell(0, 0), words.Cell(0, 1)), Classes = { "item" } }.Named("Health check " + name).Tip(about);
+            check.Item = new Button { Content = Kit.Grid("Auto,*", "Auto").Add(led.Cell(0, 0), words.Cell(0, 1)), Classes = { "item" } }.Named("Health check " + name).Tip(about);
             check.Item.Click += (s, e) => Select(check);
             checks.Add(check);
             return check;

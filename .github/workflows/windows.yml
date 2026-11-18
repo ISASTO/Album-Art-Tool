@@ -101,11 +101,11 @@ jobs:
           & $iscc /Qp "/DAppVersion=${{ steps.version.outputs.value }}" "/DSourceDir=$PWD\dist\app" "/DOutputDir=$PWD\dist" installer\AlbumArtTool.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-ChildItem dist\app | Format-Table Name, Length
-          Write-Host ("Installer: {0:N1} MB" -f ((Get-Item dist\AlbumArtTool-Setup.exe).Length / 1MB))
+          Write-Host ("Installer: {0:N1} MB" -f ((Get-Item dist\Muzikette-Setup.exe).Length / 1MB))
       - name: Build v2.x update bridge
         shell: pwsh
         run: |
-          dotnet build src/LegacyBridge/LegacyBridge.csproj -c Release "-p:SetupPath=$PWD\dist\AlbumArtTool-Setup.exe" -o dist/bridge
+          dotnet build src/LegacyBridge/LegacyBridge.csproj -c Release "-p:SetupPath=$PWD\dist\Muzikette-Setup.exe" -o dist/bridge
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $bridge = Get-Item dist\bridge\AlbumArtTool.exe
           $name = [Reflection.AssemblyName]::GetAssemblyName($bridge.FullName)
@@ -117,9 +117,9 @@ jobs:
         shell: pwsh
         run: |
           $dir = "$env:RUNNER_TEMP\install-test"
-          $p = Start-Process dist\AlbumArtTool-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER',"/DIR=$dir" -PassThru -Wait
+          $p = Start-Process dist\Muzikette-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER',"/DIR=$dir" -PassThru -Wait
           if ($p.ExitCode -ne 0) { throw "Setup failed with $($p.ExitCode)" }
-          $exe = Join-Path $dir 'AlbumArtTool.exe'
+          $exe = Join-Path $dir 'Muzikette.exe'
           if (-not (Test-Path $exe) -or -not (Test-Path (Join-Path $dir 'unins000.exe'))) { throw 'Installed files are missing.' }
           $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
           Write-Host "Installed $($info.ProductName) $($info.FileVersion)"
@@ -177,11 +177,11 @@ jobs:
           if (Test-Path "$stage\error.txt") { Get-Content "$stage\error.txt"; throw 'The v2.5.2 helper reported an error.' }
           if ($helper.ExitCode -ne 0) { throw "Helper exit code $($helper.ExitCode)" }
           if ((& $hash $app) -ne $job.DownloadHash) { throw 'The portable EXE was not replaced by the bridge.' }
-          $installed = "$env:LOCALAPPDATA\Programs\Music Library Manager\AlbumArtTool.exe"
+          $installed = "$env:LOCALAPPDATA\Programs\Muzikette\Muzikette.exe"
           $clock = [Diagnostics.Stopwatch]::StartNew()
-          while (-not (Get-Process AlbumArtTool -ErrorAction SilentlyContinue | Where-Object { try { $_.Path -eq $installed -and $_.MainWindowHandle -ne 0 } catch { $false } })) {
+          while (-not (Get-Process Muzikette -ErrorAction SilentlyContinue | Where-Object { try { $_.Path -eq $installed -and $_.MainWindowHandle -ne 0 } catch { $false } })) {
             if ($clock.Elapsed.TotalSeconds -gt 90) { throw 'The installed app did not start after the upgrade.' }; Start-Sleep -Milliseconds 250 }
-          $running = Get-Process AlbumArtTool | Where-Object { $_.Path -eq $installed }
+          $running = Get-Process Muzikette | Where-Object { $_.Path -eq $installed }
           $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId = $($running.Id)").CommandLine
           Write-Host "Upgraded and reopened: $cmd"
           if ($cmd -notlike "*$music*") { throw 'The music folder was not preserved.' }
@@ -189,20 +189,68 @@ jobs:
           # Later launches of the old portable EXE just open the installed app.
           $forward = Start-Process $app -PassThru; $null = $forward.WaitForExit(30000)
           Start-Sleep -Seconds 3
-          $again = Get-Process AlbumArtTool -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $installed }
+          $again = Get-Process Muzikette -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $installed }
           if (-not $again) { throw 'The old portable EXE did not forward to the installed app.' }
           $again | ForEach-Object { $null = $_.CloseMainWindow(); $null = $_.WaitForExit(10000) }
-          Start-Process "$env:LOCALAPPDATA\Programs\Music Library Manager\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES' -Wait
+          Start-Process "$env:LOCALAPPDATA\Programs\Muzikette\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES' -Wait
+
+      - name: Upgrade an installed Music Library Manager 3.12.1 to Muzikette
+        shell: pwsh
+        run: |
+          # The real 3.12.1 installer, then this build's installer over it, as "Get updates" does.
+          Remove-Item -Recurse -Force "$env:LOCALAPPDATA\Muzikette", "$env:LOCALAPPDATA\AlbumArtTool" -ErrorAction SilentlyContinue
+          $old = "$env:RUNNER_TEMP\v3\AlbumArtTool-Setup.exe"; New-Item -ItemType Directory -Force (Split-Path $old) | Out-Null
+          Invoke-WebRequest https://github.com/ISASTO/Album-Art-Tool/releases/download/v3.12.1/AlbumArtTool-Setup.exe -OutFile $old
+          $p = Start-Process $old -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER' -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "3.12.1 setup failed with $($p.ExitCode)" }
+          $oldDir = "$env:LOCALAPPDATA\Programs\Music Library Manager"
+          if (-not (Test-Path "$oldDir\AlbumArtTool.exe")) { throw '3.12.1 did not install where expected.' }
+          # Settings and an Undo journal written by 3.x, with paths inside its data folder.
+          $oldData = "$env:LOCALAPPDATA\AlbumArtTool"; $run = "$oldData\LibraryBackups\run-1"
+          New-Item -ItemType Directory -Force $run, "$oldData\New music" | Out-Null
+          Set-Content -Encoding utf8 "$oldData\appearance.txt" 'dark'
+          Set-Content -Encoding utf8 "$oldData\new-music-folder.txt" "$oldData\New music"
+          Set-Content -Encoding utf8 "$oldData\last-library-run.txt" "$run\journal.json"
+          @{ Root = "$env:RUNNER_TEMP\music"; Directory = $run; Entries = @(@{ Index = 0; Source = "$env:RUNNER_TEMP\music\a.mp3"; Target = "$env:RUNNER_TEMP\music\b.mp3"; Backup = "$run\files\a.mp3"; State = 'done' }) } |
+            ConvertTo-Json -Depth 4 | Set-Content -Encoding utf8 "$run\journal.json"
+          $p = Start-Process dist\Muzikette-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER' -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "Muzikette setup failed with $($p.ExitCode)" }
+          $newDir = "$env:LOCALAPPDATA\Programs\Muzikette"
+          if (-not (Test-Path "$newDir\Muzikette.exe")) { throw 'The upgrade did not install Muzikette.exe in the Muzikette folder.' }
+          if (Test-Path $oldDir) { Get-ChildItem $oldDir -Recurse | Format-Table FullName; throw 'The old Music Library Manager folder was not removed.' }
+          $menu = [Environment]::GetFolderPath('Programs')
+          if (Test-Path "$menu\Music Library Manager") { throw 'The old Start menu folder was not removed.' }
+          if (-not (Test-Path "$menu\Muzikette\Muzikette.lnk")) { throw 'The Muzikette Start menu shortcut is missing.' }
+          $uninstall = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6C4C3B4E-0F2B-4B5E-9E61-5C2B8D7A3A11}_is1'
+          Write-Host "Apps & features: $($uninstall.DisplayName) $($uninstall.DisplayVersion) in $($uninstall.InstallLocation)"
+          if ($uninstall.DisplayName -ne 'Muzikette') { throw 'Apps & features still shows the old name.' }
+          # First launch moves the data folder and rewrites the paths saved in it.
+          $music = New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\music"
+          $app = Start-Process "$newDir\Muzikette.exe" -ArgumentList ('"' + $music.FullName + '"') -PassThru
+          $clock = [Diagnostics.Stopwatch]::StartNew()
+          while ($clock.Elapsed.TotalSeconds -lt 30) { $app.Refresh(); if ($app.MainWindowHandle -ne 0) { break }; Start-Sleep -Milliseconds 100 }
+          $null = $app.CloseMainWindow(); if (-not $app.WaitForExit(10000)) { $app.Kill() }
+          $data = "$env:LOCALAPPDATA\Muzikette"
+          if (Test-Path $oldData) { throw 'The old data folder was not moved.' }
+          if ((Get-Content "$data\appearance.txt" -Raw).Trim() -ne 'dark') { throw 'Settings were not kept.' }
+          if ((Get-Content "$data\new-music-folder.txt" -Raw).Trim() -ne "$data\New music") { throw 'The New music folder path was not updated.' }
+          if ((Get-Content "$data\last-library-run.txt" -Raw).Trim() -ne "$data\LibraryBackups\run-1\journal.json") { throw 'The last Organize run path was not updated.' }
+          $journal = Get-Content "$data\LibraryBackups\run-1\journal.json" -Raw | ConvertFrom-Json
+          if ($journal.Directory -ne "$data\LibraryBackups\run-1" -or $journal.Entries[0].Backup -ne "$data\LibraryBackups\run-1\files\a.mp3" -or $journal.Entries[0].Source -ne "$env:RUNNER_TEMP\music\a.mp3") { throw 'The Undo journal paths were not updated.' }
+          Write-Host 'Upgraded 3.12.1 to Muzikette: program folder, shortcuts, uninstall entry and data folder moved.'
+          Start-Process "$newDir\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES' -Wait
 
       - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force release | Out-Null
-          Copy-Item dist\AlbumArtTool-Setup.exe release\
+          Copy-Item dist\Muzikette-Setup.exe release\
+          # The same installer under its pre-4.0 name, for copies of Music Library Manager 3.x to update from.
+          Copy-Item dist\Muzikette-Setup.exe release\AlbumArtTool-Setup.exe
           Copy-Item dist\bridge\AlbumArtTool.exe release\
           Copy-Item LICENSE, THIRD-PARTY-NOTICES.txt dist\app\
           Copy-Item licenses dist\app\licenses -Recurse -Force
-          Compress-Archive -Path dist\app\* -DestinationPath release\AlbumArtTool-Portable.zip
+          Compress-Archive -Path dist\app\* -DestinationPath release\Muzikette-Portable.zip
           Get-ChildItem release -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } | Set-Content -Encoding ascii release\SHA256SUMS.txt
           Get-Content release\SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
@@ -215,7 +263,7 @@ jobs:
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
-          name: AlbumArtTool-Windows
+          name: Muzikette-Windows
           path: release/*
           if-no-files-found: error
 
@@ -229,7 +277,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: AlbumArtTool-Windows
+          name: Muzikette-Windows
           path: release
       - name: Publish tested build
         env:
@@ -244,7 +292,7 @@ jobs:
           fi
           # Notes come from the release commit message (without the [release] marker).
           NOTES="$(printf '%s' "$COMMIT_MESSAGE" | sed -e 's/\[release\] *//' -e '/^Co-Authored-By:/d' -e '/^Claude-Session:/d')"
-          [ -n "$NOTES" ] || NOTES="Music Library Manager $RELEASE_TAG"
-          NOTES="$(printf '%s\n\nInstall AlbumArtTool-Setup.exe, or use Get updates in the app.' "$NOTES")"
-          gh release create "$RELEASE_TAG" release/AlbumArtTool-Setup.exe release/AlbumArtTool.exe release/AlbumArtTool-Portable.zip release/SHA256SUMS.txt \
-            --target "$RELEASE_COMMIT" --title "Music Library Manager $RELEASE_TAG" --notes "$NOTES"
+          [ -n "$NOTES" ] || NOTES="Muzikette $RELEASE_TAG"
+          NOTES="$(printf '%s\n\nInstall Muzikette-Setup.exe, or use Get updates in the app.' "$NOTES")"
+          gh release create "$RELEASE_TAG" release/Muzikette-Setup.exe release/AlbumArtTool-Setup.exe release/AlbumArtTool.exe release/Muzikette-Portable.zip release/SHA256SUMS.txt \
+            --target "$RELEASE_COMMIT" --title "Muzikette $RELEASE_TAG" --notes "$NOTES"

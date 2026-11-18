@@ -47,7 +47,7 @@ namespace AlbumArtTool
         private Control BuildSidebar()
         {
             // The wordmark, printed like a model name on a front panel.
-            var name = new TextBlock { Text = "MUZIKETTE", FontFamily = Theme.Legend, FontSize = 17, LetterSpacing = 1.2, VerticalAlignment = VerticalAlignment.Center };
+            var name = new TextBlock { Text = "MUZIKETTE", FontFamily = Skin.Legend, FontSize = 17, LetterSpacing = 1.2, VerticalAlignment = VerticalAlignment.Center };
             var brand = new Border { Child = name, Margin = new Thickness(12, 6, 0, 26) };
             brand.Named("Muzikette");
             // Pages grouped by what you are doing: your library, getting music, cleaning up.
@@ -90,7 +90,7 @@ namespace AlbumArtTool
         // A page key: an indicator light, its legend and, when there is something to count, a tiny amber display.
         private Button AddNav(Page page, string icon, string label, string tip)
         {
-            var badgeText = new TextBlock { FontFamily = Theme.Readout, FontWeight = FontWeight.Bold, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(Theme.Amber), Effect = Theme.Glow(Theme.Amber, 6, 0.5) };
+            var badgeText = new TextBlock { FontFamily = Skin.Readout, FontWeight = FontWeight.Bold, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(Skin.Amber), Effect = Skin.Glow(Skin.Amber, 6, 0.5) };
             var badge = new Border { Child = badgeText, CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 0, 6, 1), VerticalAlignment = VerticalAlignment.Center, IsVisible = false };
             badge.Brush(Border.BackgroundProperty, "Glass");
             var text = CapsText.Create(label); text.Margin = new Thickness(11, 0, 6, 0); text.LetterSpacing = 1;
@@ -349,8 +349,8 @@ namespace AlbumArtTool
             var item = nav[page];
             item.Badge.IsVisible = text != null;
             item.BadgeText.Text = text ?? "";
-            item.BadgeText.Foreground = new SolidColorBrush(warning ? Theme.Red : Theme.Amber);
-            item.BadgeText.Effect = Theme.Glow(warning ? Theme.Red : Theme.Amber, 6, 0.5);
+            item.BadgeText.Foreground = new SolidColorBrush(warning ? Skin.Red : Skin.Amber);
+            item.BadgeText.Effect = Skin.Glow(warning ? Skin.Red : Skin.Amber, 6, 0.5);
             ToolTip.SetTip(item.Badge, text == null ? null : tip);
             Avalonia.Automation.AutomationProperties.SetHelpText(item.Button, text == null ? null : tip);
         }

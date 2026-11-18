@@ -8,7 +8,7 @@ using SkiaSharp;
 namespace AlbumArtTool
 {
     // Exercises tag reading/writing in the shipped (native, trimmed) build:
-    //   AlbumArtTool.exe --self-test <folder with audio files> <report file>
+    //   Muzikette.exe --self-test <folder with audio files> <report file>
     // Used by CI; harmless for users. Works on a private copy of the folder.
     internal static class SelfTest
     {
@@ -16,7 +16,7 @@ namespace AlbumArtTool
         {
             try
             {
-                string work = Path.Combine(Path.GetTempPath(), "AlbumArtTool-selftest-" + Guid.NewGuid().ToString("N"));
+                string work = Path.Combine(Path.GetTempPath(), "Muzikette-selftest-" + Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(work);
                 foreach (string file in Directory.GetFiles(source)) File.Copy(file, Path.Combine(work, Path.GetFileName(file)));
                 File.WriteAllText(Path.Combine(work, "broken.mp3"), "not audio");

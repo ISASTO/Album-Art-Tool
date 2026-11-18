@@ -145,7 +145,7 @@ namespace AlbumArtTool
             footer.Children.Add(waitingText); footer.Children.Add(folderRow); footer.Children.Add(optional); footer.Children.Add(tidy); footer.Children.Add(edits); footer.Children.Add(merge); footer.Children.Add(mergeText); footer.Children.Add(undoMerge);
             var footerCard = new Border { Child = footer, BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(0, 10, 0, 0), Margin = new Thickness(0, 8, 0, 0) };
             footerCard.Brush(Border.BorderBrushProperty, "Border");
-            var right = Kit.Frost(Kit.Grid("*", "Auto,*,Auto").Add(queueTitle.Cell(0, 0), queueHost.Cell(1, 0), footerCard.Cell(2, 0)), new Thickness(16, 14, 16, 14), 16);
+            var right = Kit.Frost(Kit.Grid("*", "Auto,*,Auto").Add(queueTitle.Cell(0, 0), queueHost.Cell(1, 0), footerCard.Cell(2, 0)), new Thickness(16, 14, 16, 14));
             Content = Kit.Grid("*,340", "*").Add(left.Cell(0, 0), right.Cell(0, 1));
 
             Queue.Changed += SyncQueue;
@@ -340,7 +340,7 @@ namespace AlbumArtTool
             _ = SetThumbAsync(image, release.ThumbnailUrl);
             var tracks = release.Tracks ?? new List<YtmTrack>();
             var length = TimeSpan.FromSeconds(tracks.Sum(t => t.Duration.TotalSeconds));
-            var title = Kit.Label(release.Title, 24, true).Named("Release title"); title.TextWrapping = TextWrapping.Wrap; title.MaxLines = 2;
+            var title = Kit.Heading(release.Title, 22).Named("Release title"); title.TextWrapping = TextWrapping.Wrap; title.MaxLines = 2;
             var detail = Kit.Label(string.Join(" · ", new[] { release.Artist, release.Year, tracks.Count + (tracks.Count == 1 ? " song" : " songs"), (int)length.TotalMinutes + " min" }.Where(p => !string.IsNullOrWhiteSpace(p))), Kit.Body, cls: "muted");
             int videoOnly = tracks.Count(t => t.VideoOnly);
             var note = Kit.Label(videoOnly == 0 ? "Every song has an audio-only version." : videoOnly + (videoOnly == 1 ? " song is" : " songs are") + " only on YouTube Music as a music video, which can have intros, outros or silence. They are left out unless you tick them.",

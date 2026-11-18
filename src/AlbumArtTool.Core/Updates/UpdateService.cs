@@ -21,10 +21,15 @@ namespace AlbumArtTool.Updates
 
     internal sealed class UpdateService : IDisposable
     {
-        internal const string RepositoryUrl = "https://github.com/ISASTO/Album-Art-Tool";
-        internal const string LatestUrl = "https://api.github.com/repos/ISASTO/Album-Art-Tool/releases/latest";
-        internal const string InstallerName = "AlbumArtTool-Setup.exe";
-        internal const string ProductName = "Music Library Manager";
+        // Before 4.0 the app was Music Library Manager: repository Album-Art-Tool, installer AlbumArtTool-Setup.exe.
+        // Updates accept the old and the new names, so the repository can be renamed without stranding anyone.
+        internal const string Owner = "ISASTO";
+        internal static readonly string[] Repositories = { "Muzikette", "Album-Art-Tool" };
+        internal const string RepositoryUrl = "https://github.com/" + Owner + "/Muzikette";
+        internal const string LatestUrl = "https://api.github.com/repos/" + Owner + "/Muzikette/releases/latest";
+        internal const string InstallerName = "Muzikette-Setup.exe", LegacyInstallerName = "AlbumArtTool-Setup.exe";
+        internal const string ProductName = "Muzikette", LegacyProductName = "Music Library Manager";
+        internal static string LatestUrlFor(string repository) => "https://api.github.com/repos/" + Owner + "/" + repository + "/releases/latest";
         internal const int MaxDownload = 200 * 1024 * 1024;
         private readonly HttpClient client;
         internal static Version CurrentVersion => NormalizeVersion(typeof(UpdateService).Assembly.GetName().Version);
@@ -34,16 +39,26 @@ namespace AlbumArtTool.Updates
         {
             client = new HttpClient(handler ?? new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false });
             client.Timeout = Timeout.InfiniteTimeSpan;
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("AlbumArtTool/" + DisplayVersion);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Muzikette/" + DisplayVersion);
         }
 
         internal async Task<AppRelease> CheckAsync(CancellationToken token, Version installedVersion = null)
         {
-            using (var output = new MemoryStream())
+            // The new repository name first; until the repository is renamed it does not exist yet, so the old one answers.
+            for (int i = 0; ; i++)
             {
-                await GetAsync(LatestUrl, output, 1024 * 1024, null, token, TimeSpan.FromSeconds(25)).ConfigureAwait(false);
-                return ParseRelease(Encoding.UTF8.GetString(output.ToArray()), installedVersion ?? CurrentVersion);
+                using (var output = new MemoryStream())
+                {
+                    try { await GetAsync(LatestUrlFor(Repositories[i]), output, 1024 * 1024, null, token, TimeSpan.FromSeconds(25)).ConfigureAwait(false); }
+                    catch (NotFoundException) when (i + 1 < Repositories.Length) { continue; }
+                    return ParseRelease(Encoding.UTF8.GetString(output.ToArray()), installedVersion ?? CurrentVersion);
+                }
             }
+        }
+
+        private sealed class NotFoundException : HttpRequestException
+        {
+            internal NotFoundException() : base("The release download is not available. Please try again later.") { }
         }
 
         internal static AppRelease ParseRelease(string json, Version current)
@@ -61,12 +76,14 @@ namespace AlbumArtTool.Updates
                 if (version <= NormalizeVersion(current)) return null;
                 if (!data.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array)
                     throw new InvalidDataException("The release does not contain a Windows download yet. Try again shortly.");
+                // Muzikette-Setup.exe, or the installer's name before 4.0.
+                string name = InstallerName;
                 var matches = assets.EnumerateArray().Where(a => Json.String(a, "name") == InstallerName).ToList();
+                if (matches.Count == 0) { name = LegacyInstallerName; matches = assets.EnumerateArray().Where(a => Json.String(a, "name") == LegacyInstallerName).ToList(); }
                 if (matches.Count != 1) throw new InvalidDataException("The release does not contain a single Windows installer. Try again shortly.");
                 JsonElement? asset = matches[0];
                 string url = Json.String(asset, "browser_download_url"), digest = Json.String(asset, "digest");
-                string expectedUrl = RepositoryUrl + "/releases/download/" + Uri.EscapeDataString(tag) + "/" + InstallerName;
-                if (!string.Equals(url, expectedUrl, StringComparison.Ordinal) || !AllowedUrl(url))
+                if (!Repositories.Any(r => string.Equals(url, "https://github.com/" + Owner + "/" + r + "/releases/download/" + Uri.EscapeDataString(tag) + "/" + name, StringComparison.OrdinalIgnoreCase)) || !AllowedUrl(url))
                     throw new InvalidDataException("The update download is not from this app's GitHub release.");
                 if (!digest.StartsWith("sha256:", StringComparison.Ordinal) || !ValidHash(digest.Substring(7)))
                     throw new InvalidDataException("GitHub has not supplied a SHA-256 checksum for this download. Try again later.");
@@ -104,7 +121,7 @@ namespace AlbumArtTool.Updates
                         if (!AllowedUrl(url)) throw new InvalidDataException("GitHub redirected the download to an unsupported address.");
                         using (var request = new HttpRequestMessage(HttpMethod.Get, url))
                         {
-                            if (url == LatestUrl)
+                            if (new Uri(url).Host == "api.github.com")
                             {
                                 request.Headers.Accept.ParseAdd("application/vnd.github+json");
                                 request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
@@ -114,7 +131,7 @@ namespace AlbumArtTool.Updates
                             {
                                 int code = (int)response.StatusCode;
                                 if (code == 403 || code == 429) throw new HttpRequestException("GitHub is limiting update requests. Please try again later.");
-                                if (code == 404) throw new HttpRequestException("The release download is not available. Please try again later.");
+                                if (code == 404) throw new NotFoundException();
                                 if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308)
                                 {
                                     if (response.Headers.Location == null) throw new InvalidDataException("GitHub returned an invalid download redirect.");
@@ -156,8 +173,10 @@ namespace AlbumArtTool.Updates
         internal static bool AllowedUrl(string url)
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.Port != 443 || uri.UserInfo.Length != 0 || uri.Fragment.Length != 0) return false;
-            if (uri.Host == "api.github.com") return uri.AbsoluteUri == LatestUrl;
-            if (uri.Host == "github.com") return uri.AbsolutePath.StartsWith("/ISASTO/Album-Art-Tool/releases/download/", StringComparison.Ordinal) && uri.Query.Length == 0;
+            // GitHub answers a renamed repository's old address with a redirect to its numeric id.
+            if (uri.Host == "api.github.com") return uri.Query.Length == 0 && (Repositories.Any(r => string.Equals(uri.AbsoluteUri, LatestUrlFor(r), StringComparison.OrdinalIgnoreCase)) ||
+                System.Text.RegularExpressions.Regex.IsMatch(uri.AbsolutePath, "^/repositories/[0-9]{1,12}/releases/latest$"));
+            if (uri.Host == "github.com") return uri.Query.Length == 0 && Repositories.Any(r => uri.AbsolutePath.StartsWith("/" + Owner + "/" + r + "/releases/download/", StringComparison.OrdinalIgnoreCase));
             return uri.Host == "release-assets.githubusercontent.com" || uri.Host == "objects.githubusercontent.com";
         }
 
@@ -169,7 +188,8 @@ namespace AlbumArtTool.Updates
                 throw new InvalidDataException("The update checksum did not match. Your current app has not changed.");
             var info = FileVersionInfo.GetVersionInfo(path);
             var found = NormalizeVersion(new Version(Math.Max(0, info.FileMajorPart), Math.Max(0, info.FileMinorPart), Math.Max(0, info.FileBuildPart), Math.Max(0, info.FilePrivatePart)));
-            if (!string.Equals(info.ProductName?.Trim(), ProductName, StringComparison.Ordinal) || found != NormalizeVersion(version))
+            string product = info.ProductName?.Trim();
+            if (product != ProductName && product != LegacyProductName || found != NormalizeVersion(version))
                 throw new InvalidDataException("The downloaded installer does not match the expected app and version.");
         }
 

@@ -19,7 +19,7 @@ namespace AlbumArtTool
         private readonly TextBox mainArtist = new TextBox();
         private readonly Button applyArtist = Kit.Button("Set track artists", "primary");
         private readonly Button openArtistAlbum = Kit.IconButton(Icons.Folder, "Open folder", "ghost"), showArtistTrack = Kit.IconButton(Icons.Open, "Show track", "ghost");
-        private readonly TextBlock artistHeading = Kit.Label("Select an album", 17.33, true), artistSummary = Kit.Label("", Kit.Body, cls: "muted");
+        private readonly TextBlock artistHeading = Kit.Heading("Select an album", 22), artistSummary = Kit.Label("", Kit.Body, cls: "muted");
         private readonly ListBox artistPreview = new ListBox { Classes = { "grid" } };
         private List<ArtistRow> artistRows = new List<ArtistRow>();
         private Control artistPanel, coverPanel;

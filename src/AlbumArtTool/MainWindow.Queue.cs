@@ -117,7 +117,8 @@ namespace AlbumArtTool
                     // A failed download or write must not stop the remaining queued albums.
                     jobsFinished++; if (!succeeded) jobsWithIssues++;
                     job.LoadImage = null; queuedAlbums.Remove(job.Album.Key); currentJob = null;
-                    UpdateQueueControls(); job.Completion.TrySetResult(succeeded);
+                    job.Completion.TrySetResult(succeeded);
+                    Guard(UpdateQueueControls);
                 }
             }
             queueRunning = false;
@@ -125,6 +126,16 @@ namespace AlbumArtTool
             status.Text = "Queue finished · " + jobsFinished + " albums processed" +
                 (jobsWithIssues > 0 ? " · " + jobsWithIssues + " need attention (see Issues)." : " · Backups saved. Undo is available.");
             UpdateQueueControls();
+        }
+
+        /// <summary>The last error from refreshing the window after queued work (tests check it stays empty).</summary>
+        internal static Exception UiError;
+
+        // Refreshing the window must never stop the queue: the remaining albums still get their covers.
+        private static void Guard(Action refresh)
+        {
+            try { refresh(); }
+            catch (Exception e) { UiError = e; Console.Error.WriteLine("UI refresh failed: " + e); }
         }
 
         private void UpdateQueueControls()
@@ -186,7 +197,7 @@ namespace AlbumArtTool
             clearWaiting.Tip("Remove the albums still waiting in the queue. The album being updated now finishes safely.");
             var queueTitle = Kit.Caption("Covers and artists: queue and recent results"); queueTitle.Margin = new Thickness(0, 0, 0, 10);
             var table = Kit.Inset(list); table.Padding = new Thickness(0);
-            var queueCard = Kit.Frost(Kit.Grid("*", "Auto,*,Auto").Add(queueTitle.Cell(0, 0), table.Cell(1, 0), clearWaiting.Cell(2, 0)), new Thickness(16, 14, 16, 14), 16);
+            var queueCard = Kit.Frost(Kit.Grid("*", "Auto,*,Auto").Add(queueTitle.Cell(0, 0), table.Cell(1, 0), clearWaiting.Cell(2, 0)), new Thickness(16, 14, 16, 14));
             queueCard.Margin = new Thickness(0, 0, 14, 0);
 
             // Undo: the last cover or artist edit (this session) and the last Organize run (kept on this PC).
@@ -210,7 +221,7 @@ namespace AlbumArtTool
             undoStack.Children.Add(Kit.Label("Covers and artists", Kit.Body, true)); undoStack.Children.Add(lastChange); undoStack.Children.Add(undoFromActivity);
             undoStack.Children.Add(Kit.Label("Organize", Kit.Body, true).Also(c => c.Margin = new Thickness(0, 14, 0, 0))); undoStack.Children.Add(organizeNote); undoStack.Children.Add(openOrganizeUndo);
             undoStack.Children.Add(openBackups);
-            var undoCard = Kit.Frost(undoStack, new Thickness(16, 14, 16, 14), 16);
+            var undoCard = Kit.Frost(undoStack, new Thickness(16, 14, 16, 14));
 
             var problems = new ListBox { ItemsSource = issueLines, Classes = { "grid" } }.Named("Problems from the last scan or edit");
             problems.ItemTemplate = new Avalonia.Controls.Templates.FuncDataTemplate<string>((line, scope) =>
@@ -223,7 +234,7 @@ namespace AlbumArtTool
             problemsSummary.Margin = new Thickness(0, 0, 0, 8); problemsSummary.TextWrapping = Avalonia.Media.TextWrapping.Wrap;
             problemsSummary.Text = "No problems in the last scan or edit.";
             var problemTable = Kit.Inset(problems); problemTable.Padding = new Thickness(0);
-            var problemsCard = Kit.Frost(Kit.Grid("*", "Auto,Auto,*").Add(problemsTitle.Cell(0, 0), problemsSummary.Cell(1, 0), problemTable.Cell(2, 0)), new Thickness(16, 14, 16, 14), 16);
+            var problemsCard = Kit.Frost(Kit.Grid("*", "Auto,Auto,*").Add(problemsTitle.Cell(0, 0), problemsSummary.Cell(1, 0), problemTable.Cell(2, 0)), new Thickness(16, 14, 16, 14));
             problemsCard.Margin = new Thickness(0, 14, 0, 0);
             var right = Kit.Grid("*", "Auto,*").Add(undoCard.Cell(0, 0), problemsCard.Cell(1, 0));
             return Kit.Grid("1.25*,*", "*").Add(queueCard.Cell(0, 0), right.Cell(0, 1));
@@ -235,8 +246,7 @@ namespace AlbumArtTool
             int split = line.IndexOf(" · ", StringComparison.Ordinal);
             string state = split > 0 ? line.Substring(0, split) : "", rest = split > 0 ? line.Substring(split + 3) : line;
             string tone = state == "Done" ? "Positive" : state == "Failed" || state == "Needs attention" ? "Warning" : state == "Cancelled" ? "Muted" : "Accent";
-            var pill = new Pill(state, tone) { Width = 116, Margin = new Thickness(0, 0, 10, 0) };
-            pill.Label.HorizontalAlignment = HorizontalAlignment.Center;
+            var pill = new Pill(state, tone) { Width = 128, Margin = new Thickness(0, 0, 10, 0) };
             var text = new TextBlock { Text = rest, VerticalAlignment = VerticalAlignment.Center, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis };
             if (state.Length == 0) text.Classes.Add("muted");
             var row = Kit.Grid("Auto,*", "36").Add(pill.Cell(0, 0), text.Cell(0, 1));

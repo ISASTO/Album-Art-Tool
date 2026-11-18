@@ -16,7 +16,7 @@ namespace AlbumArtTool.Ui
 
         internal Pill(string value = "", string tone = "Accent")
         {
-            text.FontFamily = Theme.Key; text.FontWeight = FontWeight.SemiBold; text.FontSize = 10.5; text.LetterSpacing = 0.9;
+            text.FontFamily = Skin.Key; text.FontWeight = FontWeight.SemiBold; text.FontSize = 10.5; text.LetterSpacing = 0.9;
             led.Margin = new Thickness(0, 0, 7, 0);
             var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             row.Children.Add(led); row.Children.Add(text);
