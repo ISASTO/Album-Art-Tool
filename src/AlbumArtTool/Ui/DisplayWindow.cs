@@ -29,12 +29,14 @@ namespace AlbumArtTool.Ui
             this.Brush(BoxShadowProperty, "GlassDepth");
             CornerRadius = new CornerRadius(6); Padding = new Thickness(20, 9, 20, 10); MinHeight = 76; ClipToBounds = true;
             var dots = new Border { IsHitTestVisible = false, Margin = new Thickness(-20, -9, -20, -10) }.Brush(Border.BackgroundProperty, "DisplayDots");
-            message.TextTrimming = TextTrimming.CharacterEllipsis; message.HorizontalAlignment = HorizontalAlignment.Right; message.MaxWidth = 560;
+            message.TextTrimming = TextTrimming.CharacterEllipsis; message.HorizontalAlignment = HorizontalAlignment.Right; message.MaxWidth = 640;
             message.Named("Display message");
             activity.HorizontalAlignment = HorizontalAlignment.Right;
             meterHost.HorizontalAlignment = HorizontalAlignment.Right;
             right.Children.Add(activity); right.Children.Add(meterHost); right.Children.Add(message);
-            var grid = Kit.Grid("Auto,*,Auto", "*").Add(readouts.Cell(0, 0), right.Cell(0, 2));
+            // The readouts keep their width; the message takes what is left and trims with an ellipsis.
+            right.Margin = new Thickness(28, 0, 0, 0);
+            var grid = Kit.Grid("Auto,*", "*").Add(readouts.Cell(0, 0), right.Cell(0, 1));
             bootLane.Children.Add(bootText);
             var host = new Panel(); host.Children.Add(dots); host.Children.Add(grid); host.Children.Add(bootLane);
             Child = host;

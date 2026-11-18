@@ -87,7 +87,7 @@ internal static partial class Tests
                         window.DiscardStaged();
                         // Artists: guest credits to collapse into the album's main artist.
                         window.Navigate(MainWindow.Page.Artists); await Settle(200);
-                        await Pick("Dennis");
+                        await Pick("Romeo");
                         Shot(window, "artists-" + finish + ".png");
                         // Health: what needs attention, with the low-bitrate album measured.
                         window.Navigate(MainWindow.Page.Health); await window.Health.Verification; await Settle(200);

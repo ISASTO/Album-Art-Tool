@@ -155,6 +155,8 @@ namespace AlbumArtTool
                 else cancellation?.Cancel();
             };
             Closed += (s, e) => Shutdown();
+            // Once per launch the name scrolls across the display before the readouts light up (click to skip).
+            Opened += (s, e) => display.Boot("Muzikette");
             AddHandler(KeyDownEvent, OnKey, RoutingStrategies.Tunnel);
             AddHandler(PointerPressedEvent, (s, e) => lastModifiers = e.KeyModifiers, RoutingStrategies.Tunnel);
             AddHandler(KeyUpEvent, (s, e) => lastModifiers = e.KeyModifiers, RoutingStrategies.Tunnel);
@@ -168,7 +170,7 @@ namespace AlbumArtTool
         internal AlbumList Albums => albums;
         internal CoverSearchPanel Online => online;
         internal bool HasStagedCover => pending != null;
-        internal void DiscardStaged() => ShowSelection();
+        internal void DiscardStaged() { if (pending != null && !busy && !queueRunning) status.Text = "Ready"; ShowSelection(); }
 
         private void OnKey(object sender, KeyEventArgs e)
         {
@@ -187,7 +189,7 @@ namespace AlbumArtTool
             }
             else if (e.Key == Key.F5 && !busy) { _ = ScanAsync((e.KeyModifiers & KeyModifiers.Shift) != 0); e.Handled = true; }
             else if (control && e.Key == Key.Z && undo.IsEnabled && !(e.Source is TextBox)) { _ = UndoAsync(); e.Handled = true; }
-            else if (e.Key == Key.Escape && pending != null && !busy) { ShowSelection(); e.Handled = true; }
+            else if (e.Key == Key.Escape && pending != null && !busy) { DiscardStaged(); e.Handled = true; }
         }
 
         private Control BuildLayout()
@@ -217,7 +219,7 @@ namespace AlbumArtTool
             coverCaption.Width = 168; coverCaption.Margin = new Thickness(0, 7, 0, 0); coverCaption.FontSize = Kit.Small;
             discard.Named("Discard new cover").Tip("Forget the image you chose and show the album's current cover again (Esc). Nothing was written.");
             discard.HorizontalAlignment = HorizontalAlignment.Center; discard.IsVisible = false; discard.FontSize = 10; discard.Margin = new Thickness(0, 2, 0, 0);
-            discard.Click += (s, e) => { if (pending != null && !busy) ShowSelection(); };
+            discard.Click += (s, e) => { if (pending != null && !busy) DiscardStaged(); };
             var coverStack = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
             coverStack.Children.Add(coverFrame); coverStack.Children.Add(coverCaption); coverStack.Children.Add(discard);
             var kicker = Kit.Legend("Album", 8.5); kicker.Margin = new Thickness(1, 2, 0, 8);
@@ -235,10 +237,11 @@ namespace AlbumArtTool
             // One action bar: where the cover comes from, what it changes, and Apply.
             choose.Height = 38; choose.Padding = new Thickness(14, 2); choose.Margin = new Thickness(0); choose.VerticalAlignment = VerticalAlignment.Center;
             choose.Tip("Pick an image file (JPG, PNG, BMP or GIF) for this album. You can also drop one on the cover above or on the album in the list.");
-            var options = new StackPanel { Spacing = 2, Margin = new Thickness(16, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
-            foreach (var check in new[] { onlyMissing, folderCover }) { check.Margin = new Thickness(0); options.Children.Add(check); }
+            // What the cover changes sits above the keys that choose and apply it.
+            var options = new WrapPanel { Margin = new Thickness(0, 0, 0, 12), VerticalAlignment = VerticalAlignment.Center };
+            foreach (var check in new[] { onlyMissing, folderCover }) { check.Margin = new Thickness(0, 0, 22, 2); options.Children.Add(check); }
             apply.Height = 42; apply.MinWidth = 200; apply.Padding = new Thickness(18, 2); apply.Margin = new Thickness(0); apply.VerticalAlignment = VerticalAlignment.Center; apply.FontSize = 11.5;
-            var actionBar = Kit.Grid("Auto,*,Auto", "Auto").Add(choose.Cell(0, 0), options.Cell(0, 1), apply.Cell(0, 2));
+            var actionBar = Kit.Grid("Auto,*,Auto", "Auto,Auto").Add(options.Cell(0, 0, 3), choose.Cell(1, 0), apply.Cell(1, 2));
             var bar = new Border { Child = actionBar, Classes = { "actionbar" }, Margin = new Thickness(0, 14, 0, 0) };
             var sidebar = Kit.Grid("*", "Auto,*,Auto").Add(head.Cell(0, 0), online.Cell(1, 0), bar.Cell(2, 0));
             coverPanel = sidebar; artistPanel = BuildArtistPanel(); artistPanel.IsVisible = false;

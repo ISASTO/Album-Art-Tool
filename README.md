@@ -1,213 +1,147 @@
-# Music Library Manager (Album Art Tool)
+<p align="center"><img src="docs/icon.png" width="112" alt=""></p>
 
-One Windows app for album artwork, artist cleanup, MP3 conversion, duplicate removal, square embedded covers, and recursive music organization.
+<h1 align="center">Muzikette</h1>
 
-**[Download the Windows installer](https://github.com/ISASTO/Album-Art-Tool/releases/latest)** · `AlbumArtTool-Setup.exe` · Windows 10/11, 64-bit.
+<p align="center">A Windows app for keeping a music library in order: album covers, artist credits, tags, formats, duplicates and folders.<br>Every change is previewed first, backed up, and can be undone.</p>
 
-![Album Art Tool on Windows, showing online artwork suggestions](docs/screenshot.png)
+<p align="center"><b><a href="https://github.com/ISASTO/Muzikette/releases/latest">Download Muzikette-Setup.exe</a></b> · Windows 10 and 11, 64-bit · free and open source</p>
 
-*Interface shown with test albums and example search results.*
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/albums-black.png">
+  <img src="docs/albums-silver.png" alt="Muzikette's Albums page: a list of albums with their covers, and the selected album's cover, figures and online cover suggestions">
+</picture>
 
-[Light mode preview](docs/light-mode.png)
+Muzikette looks like a piece of hi-fi equipment: a brushed **Silver** finish, or **Black**, following Windows. The amber display at the top of each page shows where you are and what is running.
 
-The app starts in **dark mode**. Click **Light mode** in the header to switch, or **Dark mode** to switch back. Your choice is remembered on this PC and updates open tool windows without interrupting work or discarding a staged cover.
+Formerly **Music Library Manager** (Album Art Tool). Updating from it keeps your settings, backups and Undo history; see [Updating from Music Library Manager](#updating-from-music-library-manager).
 
-Switching themes is instant: every color is a theme resource, so the whole interface changes in one repaint, with a short gradient wipe (skipped when Windows reduced-motion is on). Open tool windows and staged covers are kept.
+## What it does
 
-The interface is GPU-rendered (Avalonia) and the app is compiled ahead of time to native code, so it starts quickly and stays responsive with large libraries: the album list is virtualized, thumbnails are decoded only for visible rows, and folders are scanned in parallel. Windows 11 adds native window corners and matching title-bar colors.
+| Page | |
+|---|---|
+| **Albums** | Find albums missing cover art, pick a cover from online suggestions or drop in an image, and apply it. Covers are saved in the background while you move on to the next album. |
+| **Artists** | Credit every song of an album to its main artist (collapsing "feat." guests), or rename an artist across the whole library. |
+| **Add music** | Search YouTube Music for artists, albums and songs and download them as MP3 320 into a New music folder, ready to tidy and add to your library. |
+| **Health** | What needs attention: missing titles and album artists, extra or oversized pictures, low-bitrate albums and duplicate copies, each with a fix. |
+| **Organize** | Convert, standardize, tidy and reorganize the whole library with presets. You review every change before it is applied. |
+| **Activity** | What is running, what finished, what went wrong, and Undo. |
 
-## Use it
+### Albums
 
-1. Download and run **AlbumArtTool-Setup.exe** from Releases. It installs for your Windows account only (no administrator prompt) with a Start menu entry and an uninstaller in **Settings → Apps**. Prefer no installer? `AlbumArtTool-Portable.zip` contains the same app: unzip it anywhere and it opens the folder it is in, like earlier versions.
-2. Open **Music Library Manager** and use **Choose folder** to pick the top folder of your music collection. The app scans that folder and every subfolder, and reopens it next time.
-3. **Add missing album art** shows albums where one or more tracks lack an embedded front cover. **Change existing album art** shows albums with embedded or folder artwork. Both artwork tabs open on **All albums in this tab**, without inheriting the track-artist cleanup filter.
-4. Select an album. Online suggestions automatically search its **album title + artist name** and display cover choices inside the app.
-5. **Click a cover or its Apply this cover button to add it to the work queue.** Continue selecting other albums while covers download and save in the background. Backups and Undo work for online changes too.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/new-cover-black.png">
+  <img src="docs/new-cover-silver.png" alt="A new cover staged for an album that has none, with the cover search results below">
+</picture>
 
-You can still drag a JPG, PNG, BMP or GIF from File Explorer onto an album row or the small cover preview, or use **Choose image**. Local images are staged first; click the larger **Apply cover** button to apply them.
+1. Choose your music folder. Muzikette scans it and every subfolder, and reopens it next time.
+2. **Missing art** lists albums where at least one song has no embedded cover; **Has art** and **All** show the rest.
+3. Select an album. Its cover search runs automatically (Bandcamp, Deezer and MusicBrainz's Cover Art Archive) and shows each cover's real resolution. Click one to queue it, or drop an image on the album, or **Choose image…**.
+4. **Apply** adds the album to the queue. Keep working: covers download and save one album at a time, and the album list shows what is queued and what is being written.
 
-If an album already has a folder cover, **Apply cover to X tracks** is enabled immediately. It uses the full-size image behind the preview, so you do not need to choose that file again. The same shortcut can copy the displayed embedded cover to tracks that are missing it.
+Covers are embedded as 600 px JPEGs (never enlarged or cropped) and replace any other pictures in the song, so each song ends up with exactly one front cover. **Only fill tracks missing covers** leaves songs that already have one alone. **Update folder cover images too** updates `cover.jpg`/`folder.jpg` and the like, or creates `cover.jpg`. Audio is never re-encoded for a cover or artist change.
 
-The **Queue** button shows active and waiting albums, recent results, and **Clear waiting jobs**. Albums in the list are marked **Queued** or **Applying cover…**. Jobs run one at a time; each keeps the album, image, and checkbox settings you chose when adding it. A failed job does not block later albums. You can browse both tabs, search, stage images and queue more work throughout. Folder switching, rescanning and Undo are available when the queue finishes. To close with work pending, clear waiting jobs and let the current update finish.
+### Artists
 
-No accounts, API keys or background service. Online suggestions use the internet; uncheck **Online suggestions** to work offline. The app is self-contained: no .NET runtime or other prerequisite needs to be installed.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/artists-black.png">
+  <img src="docs/artists-silver.png" alt="The Artists page, showing an album's songs with their current and cleaned-up artist credits">
+</picture>
 
-Scanning first counts supported music files using directory listings, without reading audio tags. It then shows a filling progress bar, a percentage, and an exact counter such as **2751/3867 tracks scanned**. Files that fail to open still count as checked and appear in Details. The initial counting phase can also be stopped. Disabled options keep readable text in both themes.
+Each album's songs are compared with its main artist. The suggestion uses the album artist tag, or a lead artist shared by every song; band names such as *Earth, Wind & Fire* stay whole, and compilations without a lead artist get no automatic suggestion. Compare **Current track artists** with **After cleanup**, edit the name if you like, and apply: only the songs that change are written. **Rename artists…** changes one or more artists to a single name everywhere in the library (Artist and Album Artist tags), with a preview in Organize.
 
-Folders are read several at a time. Unchanged folders reuse their scanned tags and artwork, and that cache is saved on this PC, so reopening the app on an unchanged library does not reopen every music file. File listings, sizes and modification times are checked each time; new, deleted or modified tracks and folder covers trigger a fresh folder scan. **Shift-click Rescan** (or Shift+F5) to force every file to be read again. Identical embedded covers are validated once per scan rather than decoded once for every track. Backups calculate source checksums while copying, then still verify the saved backup and recheck the source before replacement. The biggest repeat-scan benefit is avoiding audio-file opens; first-scan and write speeds still depend on the source and backup drives.
+### Health
 
-[Scan progress preview](docs/scanning.png) · [Background queue preview](docs/queue.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/health-black.png">
+  <img src="docs/health-silver.png" alt="The Health page, listing checks with indicator lights and the low-bitrate albums found">
+</picture>
 
-## Manage the whole library
+Health works from the last scan, so it opens instantly and never changes a file. Each check has a light: red when it found something, green when all is well.
 
-Click **Manage library** in the main window. Choose any combination of:
+- **Missing titles** and **No album artist**, with fixes that fill them in (titles from the filename, album artists from the album's artist).
+- **Extra pictures** (several embedded pictures, so players may show any of them) and **Large covers** (bigger than 600 px, so every song is larger than it needs to be).
+- **Low bitrate**: lossy albums below a threshold you choose. Header bitrates can be wrong, so each candidate is measured with FFmpeg. The fix is **Replace from YouTube Music…** (below).
+- **Duplicates**: copies of the same song or album, found by comparing the audio rather than names. Nothing is deleted here.
 
-- **Convert lossless / over 320 kbps to MP3 320.** Lossless sources and audio reporting more than 320 kbps are eligible. Existing MP3s at 320 kbps or below and lower-bitrate lossy sources are left alone. Bitrate is a practical rule, not a way to measure perceptual quality across codecs. If compatibility matters more than avoiding another lossy encode, explicitly check **Also convert other non-MP3 audio**. That option does not improve the quality of a low-bitrate source. Containers with a video track are skipped by automatic audio conversion and packet-hash-only duplicate removal. Conversion retains standard tags and embedded images, verifies the output's bitrate and duration, and decodes the complete new MP3 before replacing its source. Originals stay in the PC backup folder.
-- **Remove confirmed duplicate songs / albums.** Only verified matching file/audio contents within the same logical album and titled track are eligible. Conflicting known disc/track numbers are preserved. Copies on different albums, copies across folders without enough artist/album metadata, possible metadata-only matches, and distinct recordings are kept. A copy with embedded artwork is preferred; suffixes such as `(1)` or `copy` are disfavored. The preview names the retained copy. Removed copies go to verified PC backups, outside the active music tree. With FFmpeg available, matching demuxed audio packets can also verify retagged copies in other containers.
-- **Center-crop embedded artwork to squares.** Every nonsquare embedded image is cropped from its center at its native resolution. A 1800 × 1000 image becomes 1000 × 1000; it is not stretched or scaled down to a thumbnail. Already-square pictures keep their original image bytes. JPEG input stays JPEG; other input is saved as PNG. Cropping applies to all embedded pictures, including back covers; image order, types where supported by the format, and descriptions remain. Folder images are moved with albums but are not cropped by this option.
-- **Organize all folders into Artist / Album.** The app searches every level and builds a canonical path under the selected music root from embedded album-artist/artist and album tags. It does not trust or reproduce intermediate artist, year, downloads, or redundant folders. Existing filenames are preserved unless **Rename song files from Title tags** is selected, apart from a changed `.mp3` extension after conversion and conflict suffixes when necessary. Disc subfolders are retained for identified multidisc releases. Tagged Various Artists albums stay together. Missing usable artist/album tags leave that track in place with an explanation. Empty old directories are removed after successful changes.
-- **Rename song files from Title tags.** This optional setting uses the embedded song Title as the filename: `01 - World Eater.mp3` becomes `World Eater.mp3` when the Title tag is `World Eater`. It searches every subfolder and works on its own or alongside conversion, cropping and folder organization. The existing audio extension is kept unless conversion changes it to `.mp3`. Filename-only cleanup leaves all audio, artwork and metadata bytes intact. Missing, blank or unusable Title tags keep the existing filename with an explanation; the app does not guess a title from the old filename. Characters Windows cannot use in filenames are replaced, reserved device names are prefixed with `_`, and long title components are limited to 120 characters. Conflicting names preserve both files with suffixes such as ` (2)`. Capitalization changes are supported. Review the Source and Destination columns, uncheck unwanted renames, then apply. **Preview Undo** restores the original filenames after a restart too.
-- **Combine multi-disc albums.** Opt in to detect matching Disc/CD/Disk folders, numbered disc suffixes in album names, and disc tags inside a single folder. It supports any number of discs and orders them numerically. The preview combines available songs into one album folder, renumbers tracks consecutively from 1, sets the total track count, and resets disc tags to 1 of 1. Filenames are not changed by combining: songs keep their names (a clash between discs gets a numbered suffix such as ` (2)`). Select **Rename song files from Title tags** if you also want title-based names. Album-name disc suffixes are removed and album-artist grouping is made consistent; track artist credits stay intact. Select or clear a merge as a complete album in the preview. Matching is scoped to the album's source location so unrelated copies or releases are not combined solely because their names match. Ambiguous duplicate track numbers are reported for review. Artwork/booklets follow recognized albums, filename conflicts preserve both files, and persistent Undo restores the original files, tags and folder layout.
-- **Remove featured artists from titles.** Opt in to remove conventional `feat.`, `ft.`, and `featuring` credits, including capitalization and punctuation variants, parentheses, square/curly/full-width brackets, and trailing inline credits. Both the Title tag and filename are cleaned. Version labels such as `(Live)`, `(Remix)` and `(2014 Remaster)` remain. Artist tags are not changed by this option. Missing Title tags are left missing; a filename can be cleaned independently. Preview shows the old and new titles, avoids empty titles, resolves filename conflicts without overwriting, and keeps exact originals for Undo. It works on its own or together with disc merging and other library operations.
-- **Standardize embedded artwork.** Opt in to give every song exactly one embedded picture, in the front-cover (ID3 type 3) slot. When a song has several, the best cover is kept (a front cover first, then an unlabeled picture, then the largest image) and back covers, booklet pages and duplicates are removed. Pictures larger than 600 × 600, non-JPEG pictures, and JPEGs saved above quality 88 become JPEGs of at most 600 px at quality 88; smaller pictures are never enlarged. Pictures already in that form are left byte for byte. Leftover tag padding is removed, so the files really get smaller. With square cropping also selected, artwork is cropped at full resolution first, then resized. Audio and other tags are unchanged; Undo restores the originals exactly.
-- **Fill missing Title tags from filenames.** Opt in to give songs without a Title tag their filename as the title, minus the extension and any leading track number ("01 - Song.mp3" → "Song"). Songs that already have a title are left alone, and the file keeps its name. The Check library window has a **Fill titles from filenames…** button that opens this preview directly. Undo restores the originals exactly.
-- **Standardize MP3 tags to ID3v2.3 (Latin-1 / UTF-16).** Opt in to rewrite MP3 tags (and ID3 tags in AIFF/WAV files) as ID3v2.3, the version every player reads. Text Latin-1 can hold stays in, or is converted to, Latin-1; a field with any character Latin-1 cannot represent is written as UTF-16. Characters are never replaced to make text fit: each saved file is reread and every field compared before the original is replaced. ID3v2.4 dates are written as their v2.3 equivalents (TYER, TDAT, TIME, TORY), ID3v2.2 tags are upgraded, an MP3 with only an ID3v1 tag gets an ID3v2.3 tag with the same fields, and an extra APE tag is merged in and removed. Duplicate frames left by earlier versions are repaired. Files already in that form are left alone.
-- **Move old tool backups off the music player.** Old `.album-art-backups`, `.before-square-crop`, and `.covercrop-tmp-` backup files can be archived to the PC. Some players index hidden backup folders as more music, which can create apparent duplicates even when the active album itself is correct. This option is included in the preview and can be unchecked.
+### Organize
 
-![Preview of combined music-library changes](docs/library-manager.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/organize-black.png">
+  <img src="docs/organize-silver.png" alt="Organize, step 1: presets and options">
+</picture>
 
-Set **Backups** to a folder on your PC, outside the selected music folder. The default is `%LOCALAPPDATA%\AlbumArtTool\LibraryBackups`. The preview estimates backup space; original-changing operations require that space before starting. Choose the top music folder rather than a whole PC drive if the backup folder would otherwise be inside the source tree.
+Pick a preset (**Tidy tags**, **Standardize artwork**, **Full clean-up**) or your own combination, then **Preview**: nothing is touched until you review the list and apply it. You can uncheck any change.
 
-Click **Preview changes**. Nothing is moved, replaced, cropped or removed during the preview. Review the source/destination paths and uncheck unwanted actions. Then click **Apply selected changes**. You can stop the run; already completed work remains recorded and originals are protected. The rest of the app remains responsive, while conflicting artwork/artist writes and rescans wait for the bulk task to finish. A full scan refreshes the library afterward. During scanning and applying, the options panel stays stable and the preview remains readable and scrollable. Operation checkboxes are locked while work is running.
+- **Convert lossless to MP3 320** (optionally other lossy formats too). The new MP3 keeps tags and artwork and is decoded completely before the original is replaced.
+- **Crop artwork to squares**, **One front cover per song**, **Shrink covers over 600 px**.
+- **Fill missing titles from filenames**, **Fill missing album artists**, **Remove "feat." credits from titles**, **Standardize MP3 tags to ID3v2.3**.
+- **Sort into Artist / Album folders**, **Rename files from their titles**, **Combine multi-disc albums**.
+- **Remove confirmed duplicates** (identical audio on the same album only) and **Move old tool backups off the player**.
 
-For example, both `Music/Artist/Artist/Album/song.flac` and `Music/Artist/2020/Album/song.flac` resolve to `Music/Artist/Album/song.mp3` when their tags identify the same artist/album and conversion is selected. Loose tagged tracks in `Music/Downloads/Unsorted/` are organized under that same top-level `Music/Artist/Album/` structure. This differs deliberately from the old Python script's per-collection output: the selected music root is now the single destination root.
+Originals go to the backup folder on your PC, and **Preview Undo** (in Organize, or from Activity) restores the last run, even after a restart. Conflicting names never overwrite: both files are kept.
 
-Recognizable album folders keep artwork, booklets, cue sheets, lyrics and common sidecar files with their album. Ambiguous assets beside mixed loose collections stay in place. Playlist and cue-sheet references are preserved as written, not rewritten for changed filenames; review them after renames, conversion or moves. Conflicting filenames preserve both files using a numbered suffix; existing files are never silently overwritten. Unsupported files, unreadable directories, invalid artwork, stale previews and write failures are reported or skipped while their originals remain available.
+### Add music and Replace songs
 
-**Undo:** click **Preview Undo**, review/check the saved changes, then **Undo selected changes**. The last bulk run can be undone after an app restart. Undo uses a persistent journal and refuses to overwrite files edited afterward. **Open backups** opens the backup location. Each bulk run includes `journal.json`, an incremental operation log while running, original files when needed, and a readable `report.csv`. Simple moves keep location/history hashes rather than duplicating every song into the backup folder.
+Search YouTube Music (music.youtube.com) and add albums or songs. They download as MP3 320 with full tags and cover into **New music**; tidy them up with Organize and click **Add to library** to move them into your music folder (undoable). From **Health › Low bitrate**, **Replace songs** finds each low-bitrate album on YouTube Music, pairs your songs with its tracks by title, number and length, and replaces the ones you check, backing up the originals first.
 
-### FFmpeg setup
+The first time, Muzikette downloads yt-dlp, Deno and FFmpeg from their official GitHub releases and checks their SHA-256 checksums. YouTube Music's best free stream is about 130–160 kbps Opus; it is saved as MP3 320 for compatibility. Downloading from YouTube is subject to YouTube's terms of service; use it for music you are entitled to.
 
-Cropping, organization, artist edits and MP3/FLAC duplicate verification do not need an encoder. Conversion uses the separate **FFmpeg** command-line tool. **Download FFmpeg** installs a verified Windows static LGPL build from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) into the app's PC cache, including upstream license notices and download-source information. The one-time ZIP download is currently roughly 170 MB. The app checks GitHub's SHA-256 digest before extracting or launching it. Automatic setup requires 64-bit Windows.
+### Settings
 
-You can instead click **Choose FFmpeg** to select an existing `ffmpeg.exe`, or put it beside the app/on PATH. The chosen location is remembered. No Python, PowerShell scripts, ffprobe, account or separate installer is required. An internet connection is only needed for setup, artwork lookup or app updates; once FFmpeg is present, all library processing works locally. The app does not send music files to the internet. High sample rates and multichannel inputs are adapted to MP3's supported output; the original higher-quality file remains backed up.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/settings-black.png">
+  <img src="docs/settings-silver.png" alt="Settings: finish, folders, helper programs and updates">
+</picture>
 
-## Track artist cleanup
+Finish (Match Windows, Silver or Black), the music and backup folders, downloads at once, helper programs and **Check for updates**.
 
-Open **Track artists** to find albums whose track credits can be collapsed to the main artist. This tab includes albums with and without cover art. **Show → Artist cleanup available** lists albums with suggested changes; **Show → All albums in this tab** lets you review any album and enter an artist manually. **Sort → Artist changes first** puts albums with the most changes at the top. Artist/album and album-title sorting are also available.
+## Safety
 
-Select an album, compare **Current artist** with **After cleanup**, and edit **Main artist** if necessary. Already-correct tracks say **Unchanged**. Only actual track-artist differences count toward the cleanup filter and button; missing or different Album artist tags, capitalization and whitespace alone do not make a track eligible. Click **Set artists on X tracks** to queue the change, then continue with another album. For your BENEE example, tracks credited to BENEE and guests become a single **BENEE** credit. On the tracks that need cleanup, **Artist** is set to the entered name; existing **Album artist** and artist sort fields are updated too. Missing Album artist tags remain missing so partial cleanup does not split an album into separately tagged groups. Already-correct tracks are left byte-for-byte unchanged. Track titles, artwork, audio and other tags stay as they are.
+- Every change is made on a copy, checked, and swapped in only after a verified backup of the original is saved on your PC (outside the music folder, so players don't index it). The default backup folder is `%LOCALAPPDATA%\Muzikette\LibraryBackups`.
+- **Undo last change** restores the latest cover or artist edit; Organize's **Preview Undo** restores its last run, including moves, conversions and removals, after a restart too. Undo refuses to overwrite a file changed since.
+- Files that changed since the scan, read-only files and locked files are skipped with an explanation in Activity. One failed song never stops the rest.
+- No account, no background service. Searches send only the album title and artist; your music never leaves your PC.
 
-The suggestion uses a specific tagged album artist first, or a consistent lead artist across the tracks when album artist is missing or says Various Artists. A consistent band name such as **Earth, Wind & Fire** stays intact. Mixed-artist compilations without a consistent lead get no automatic suggestion; you can review them with the all-albums filter. Review inferred names before queueing.
+## Formats
 
-Artist jobs share the artwork queue, freeze the selected album/name at enqueue time, and use the same full-file backups, stale-file protection and **Undo last change**. Already-correct tracks are skipped. Failed writes are listed in Details. Artist cleanup does not rename or move files/folders. The cleanup filter removes an album once its artist fields match.
-
-Use **Open album folder** below the artist preview to open the selected album in File Explorer. Select a track row and click **Show selected track** to open its folder with that song highlighted. Large album lists are virtualized.
-
-[Track artist cleanup preview](docs/track-artists.png)
-
-## Check library
-
-Click **Check library…** after a scan to list:
-
-- **Songs missing a Title tag.** Players show these by filename. Blank titles count as missing.
-- **Songs with more than one embedded picture**, with a description such as *2 front covers, 1 back cover*. Songs with several front or unlabeled covers come first, because players may show any of them.
-- **Albums with lossy songs below a bitrate you choose** (96–320 kbps, 192 by default), one row per album with its song count, bitrate range and format — handy for finding albums to download again in better quality. Hover over an album to see each song's bitrate. Header bitrates can be wrong (common with VBR MP3s), so every candidate is measured with ffprobe or FFmpeg: the total size of its audio packets divided by their duration. Songs whose real bitrate is high enough are dropped and counted separately. Without FFmpeg, header bitrates are shown and marked as unverified. Lossless files (FLAC, WAV, AIFF, ALAC, WavPack) are never listed. **Download FFmpeg** in Manage library now also installs ffprobe.
-
-The check uses the last library scan, so it opens instantly and never changes a file. Select a song and click **Show selected file** to highlight it in File Explorer, or **Save report…** for a CSV. Rescan and click **Check again** after fixing files. **Fill titles from filenames…** and **Fix embedded pictures…** open Manage library with just the matching option selected and preview the fix.
-
-## Replace low-quality songs from YouTube Music
-
-In **Check library**, click **Replace from YouTube Music…** next to the low-bitrate threshold. Every album with low-bitrate songs is listed and searched on **YouTube Music** (music.youtube.com, not regular YouTube) automatically.
-
-- **Matching.** The likeliest albums are opened and compared with yours by title, artist and track count, and the release whose tracks pair best with your songs is chosen. Other results are shown as cards, so you can pick another release or search differently. Each of your songs is paired with its YouTube Music track by title (ignoring featured credits, punctuation and accents), track number and length.
-- **What gets checked.** Low-bitrate songs with an exact match (same title, length within 3 seconds) are checked. Songs that aren't low can be checked too ("All matched"). A track whose length differs, such as a music video with an intro, is highlighted in orange and never checked automatically. Double-click its YouTube Music title to listen first.
-- **Quality.** yt-dlp downloads YouTube Music's best free audio stream: Opus, about 130–160 kbps, which is clearly better than 96–128 kbps MP3. It is saved as an **MP3 320** with your own tags (title, artist, album, track number, year…) and cover, as ID3v2.3. YouTube Music does not offer 320 kbps itself, and re-encoding to 320 keeps compatibility without adding quality.
-- **Safety.** Each replacement uses the same backup and verified swap as Manage library. The original is copied to the PC backup folder first, and the new file must be 320 kbps, have the length YouTube Music lists and decode completely. Only then is the original replaced (a non-MP3 original becomes an .mp3 of the same name). **Undo replacements** puts the originals back, byte for byte; later, Manage library → **Preview Undo** can too.
-- **Setup.** The first time, **Set up** downloads yt-dlp and Deno (the JavaScript runtime yt-dlp needs for YouTube), about 60 MB, from their official GitHub releases, checking each SHA-256. FFmpeg is installed too if it's missing. yt-dlp is kept up to date automatically, because YouTube changes often.
-- **"Confirm you're not a bot".** If YouTube asks for this, choose **Cookies…** and pick a cookies.txt exported from a browser where you're signed in to YouTube. It is only passed to yt-dlp.
-
-Downloading from YouTube is subject to YouTube's terms of service; use it for music you're entitled to.
-
-## Find duplicate songs and albums
-
-After scanning a music folder, click **Find duplicates**. A separate window scans the successfully read tracks in that folder tree, with a progress bar, percentage, checked/total counter and Stop button. Album browsing remains available. **Open selected folder** takes you to a result's location, and **Save report** exports a CSV with paths and the evidence for each match. Rescan the main library to include newly added music, then click Scan again in the duplicate window.
-
-- **Confirmed song copies** have identical SHA-256 hashes of the entire file, or identical encoded MP3/FLAC audio data. MP3 tag blocks and FLAC metadata/artwork blocks are excluded from the audio comparison. Hover over a match to see which test confirmed it.
-- **Confirmed album copies** have the same complete set of verified song contents in different folders. A folder containing only part of an album is not labeled a complete copy. Repeated tracks count separately when comparing album contents.
-- **Possible song copies** match a tagged title, track artist and duration within two seconds. This can find different encodings and bitrates, but it can also include different recordings. **Possible album copies** match album/artist, track count, song titles, artists and durations. These require review.
-
-The scanner only reads music. It does **not** delete, move or select copies for removal. Repeated music on a compilation can be an intentional duplicate. Other codecs get whole-file verification and metadata comparisons; they do not get a claim of identical audio across retagging or re-encoding. MP3 and FLAC audio checks compare encoded data, not perceptual fingerprints, so a re-encode can appear only as a possible match. Missing, linked or changed files are skipped with an explanation. Backups and temporary editor files remain excluded.
-
-The first pass uses small audio samples and file sizes to find candidates; full hashes are then calculated for candidate files, rather than reading every complete song by default. Each run uses a snapshot of the main library scan. If you change tags or covers while it is working, changed files are skipped; rescan the library and click Scan again to get current results. App installation waits for an active duplicate scan before restarting.
-
-[Duplicate scanner preview](docs/duplicates.png)
-
-## App updates
-
-Click **Get updates** in the header. The app checks this repository's latest published stable release, downloads the newer installer with progress, verifies GitHub's SHA-256 checksum and the installer's product name and version, then closes and runs it. The installer waits for the app to exit, replaces the installed files (rolling back if anything fails) and reopens the app in the same music folder. If you are already current, it reports your installed version. Checks only happen when you click the button; there is no background update service or account requirement.
-
-You can keep working during the download. Installation waits for scans, library management/encoder setup, Undo, and every queued artwork job to finish. If you have a staged cover, apply it or press Esc to discard it before the update can restart. The update window has a Cancel button until installation starts. As with any restart, the in-memory artwork/artist queue history and its Undo session end; the bulk library journal and original backups remain available for Preview Undo.
-
-**Upgrading from v2.x (portable EXE):** click **Get updates** in the old version as usual. It downloads an `AlbumArtTool.exe` bridge, which installs the new version and reopens your music folder. Afterwards, the old portable EXE simply opens the installed app, so existing shortcuts keep working. Settings, the backup folder, FFmpeg setup and the last library Undo journal carry over. No music files are sent to GitHub.
-
-[Update window preview](docs/updates.png)
-
-## Online cover search
-
-- Only the selected album is searched. The query starts as `album title + artist name`; you can edit it and press Enter or Search if tags are incomplete or an edition needs clarification.
-- Sources are searched independently, so one failing source cannot prevent the others from returning covers. Good title-and-artist matches rank first; **Bandcamp is preferred among similarly strong matches**, followed by high-resolution Deezer album artwork and front covers from MusicBrainz's Cover Art Archive.
-- Bandcamp results depend on its public search page. If Bandcamp requires browser verification or blocks the request, the app reports that source as unavailable and stops retrying it for the session. The **Bandcamp ↗** button opens the same search in your browser. No CAPTCHA bypass, login or hidden API credentials are used.
-- Cover Art Archive requests previews up to 250 pixels and front covers up to 1200 pixels; actual dimensions depend on the available image. Deezer uses its `cover_xl` image. Bandcamp uses the original cover asset when its public search results are available. The existing 1600-pixel embedded-art limit still applies.
-- Each suggested cover shows the source image's resolution, such as **1000 × 1000 px**. Thumbnails appear first while the app checks the full-size image header. These checks read at most 128 KB per cover, with two running at a time. If a source cannot provide readable dimensions, the card says **Size unavailable**; the cover can still be selected.
-- Source names beneath covers link to their album pages. Compare the title, artist and artwork before clicking, especially for similar titles or alternate releases.
-- Results are cached for up to 24 queries during the current session. Rapid selection changes cancel stale searches. MusicBrainz requests are spaced at least 1.1 seconds apart; server rate-limit responses are respected.
-- Searches send the displayed query to the sources, then download image previews and the chosen cover. Audio files and full local folder paths are never uploaded. Turning off automatic suggestions cancels the search; the Search button can still run an explicit one-time lookup.
-- Offline connections, missing covers and failed downloads are shown inside the app. A failed download cannot change any music file. Local drag-and-drop remains available.
-
-## What gets changed
-
-- Artwork-only and artist-only edits do not re-encode audio. Optional MP3 conversion in Manage library does re-encode audio. Artwork is embedded into the audio files. Existing music metadata is preserved. Each song keeps exactly one embedded picture: the new front cover replaces every existing picture (back covers, booklet pages and disc pictures included).
-- On the missing-art tab, **Only fill tracks missing covers** starts checked. Tracks that already have an embedded cover are left alone. Uncheck it to give the whole album the same cover.
-- On the existing-art tab, the default is to replace the cover on every track in the selected album.
-- **Update folder cover images too** updates recognized `cover`, `folder`, `front`, `album` and `albumart` images in that album's folder, preserving their file format. If there are none, it creates `cover.jpg`. This option is disabled when multiple albums share the folder. Unrelated images are untouched.
-- A folder image alone does not mean the tracks have embedded covers. Those albums appear in the missing-art tab too, with a **Folder art only** label.
-- New embedded covers are quality-88 JPEGs of at most 600 × 600, with their aspect ratio preserved. Images are never cropped or enlarged; transparency is flattened onto white. A saved cover.jpg keeps up to 1600 pixels. Inputs are limited to 30 MB and 40 million pixels.
-- The existing-art preview shows the first readable embedded front cover, falling back to folder art. It does not imply that every track has the same cover.
-
-## Albums and formats
-
-Albums are grouped by **folder + album title + album artist**. Missing album tags fall back to the folder name. Track artist is not used as a grouping key, so compilations stay together. Separate folders and separate disc folders remain separate entries; this prevents one edition from changing another. Search also matches full folder paths.
-
-Supported extensions: MP3, FLAC, M4A, M4B, OGG/OGA, Opus, WMA, WAV, AIF/AIFF, APE and WV. Files must have writable metadata supported by TagLibSharp. Unsupported or damaged files appear in **Details**, not as successfully processed tracks. The test suite exercises real MP3, FLAC, M4A, Ogg, Opus, WMA, WAV, AIFF and WavPack files.
-
-Scans run in the background and can be stopped. Stopping keeps fully scanned folders; a partly scanned folder is excluded so it cannot be mistaken for a complete album. Directory junctions, symbolic links, system subfolders, backups and temporary copies are skipped. The app does not follow a link out of the selected music tree.
-
-## Backups and Undo
-
-Artwork/artist changes use temporary copies, verify the changed metadata, save and verify a full original in the PC backup folder, then replace the original safely. Backups can be on a different drive from the music player. New backups are no longer stored as playable files underneath each album. The default backup folder is `%LOCALAPPDATA%\AlbumArtTool\LibraryBackups`; **Manage library** shows the configured location. Bulk management also verifies original backups before removing or replacing source files.
-
-**Undo last change** restores the most recent completed artwork/artist edit in the current session once the queue is idle. **Preview Undo** in Manage library restores the last bulk run, including moves, removals, conversions and crops, and survives an app restart. Full originals remain in the PC backup folders for manual recovery. Backups use disk space; keep them until you have reviewed the results. Old album-local backups can be moved to the PC using the dedicated bulk option. A bulk run clears the artwork/artist Undo shortcut because those paths may have moved; the bulk journal records that run separately.
-
-Files changed since the scan, read-only files, and files locked against replacement are skipped with an explanation. Undo also refuses to overwrite a file edited by another program after this app's change. Changes are independent per file: if one track fails, successfully updated tracks stay updated and the remaining errors are listed in **Details**. Filesystems must support atomic file replacement; if they do not, the affected file is left unchanged.
+MP3, FLAC, M4A/M4B, Ogg, Opus, WMA, WAV, AIFF, APE and WavPack. Albums are grouped by folder, album title and album artist, so compilations stay together and separate editions stay separate. Scans run in the background, can be stopped, and are cached: reopening an unchanged library reads no music files (**Shift+F5** reads everything again).
 
 ## Keyboard
 
-- **Ctrl+F**: search
-- **F5**: rescan
-- **Ctrl+Z**: undo last change
-- **Esc**: discard the staged cover
-- Arrow keys: select an album
+**Ctrl+1 … Ctrl+6** Albums, Artists, Add music, Health, Organize, Activity · **Ctrl+,** Settings · **Ctrl+F** search · **Ctrl+O** choose a music folder · **F5** rescan · **Ctrl+Enter** apply · **Esc** discard a staged cover · **Ctrl+Z** undo · **F1** all shortcuts.
+
+## Install and update
+
+Run **Muzikette-Setup.exe**. It installs for your Windows account only (no administrator prompt), with a Start menu entry and an uninstaller in **Settings › Apps**. Prefer no installer? **Muzikette-Portable.zip** contains the same app. **Settings › Check for updates** downloads a newer release, verifies its SHA-256 checksum and version, and reopens the app in the same music folder.
+
+### Updating from Music Library Manager
+
+Use **Get updates** in Music Library Manager as usual (3.x and the old 2.x portable EXE both work). Muzikette replaces it: the program moves to a Muzikette folder with new shortcuts, and on first launch your settings, New music folder, backups and Undo history move from `%LOCALAPPDATA%\AlbumArtTool` to `%LOCALAPPDATA%\Muzikette`.
 
 ## Build and test
 
-Install the .NET 10 SDK. The core library and the full test suite (including headless checks of every window) also build and run on Linux and macOS.
+Install the .NET 10 SDK. The core library and the test suite (including headless checks of every page) also run on Linux and macOS.
 
 ```powershell
-# Run from source
-dotnet run --project src/AlbumArtTool
-
-# Native Windows build (ahead-of-time compiled)
-dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r win-x64 -o dist/app
-
-# Installer (Inno Setup 6)
-ISCC.exe /DAppVersion=3.0.0 /DSourceDir=dist\app /DOutputDir=dist installer\AlbumArtTool.iss
+dotnet run --project src/AlbumArtTool                                              # run from source
+dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r win-x64 -o dist/app   # native (AOT) build
+ISCC.exe /DAppVersion=4.0.0 /DSourceDir=dist\app /DOutputDir=dist installer\AlbumArtTool.iss
 ```
-
-To run the integration suite, install FFmpeg and point `ALBUMART_FFMPEG` at its executable. Screenshots of each window are saved to the folder you pass:
 
 ```powershell
 dotnet build tests/AlbumArtTool.Tests/AlbumArtTool.Tests.csproj -c Release
 $env:ALBUMART_FFMPEG = 'C:\path\to\ffmpeg.exe'
-dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll TestResults
+dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll TestResults   # screenshots land in TestResults
 ```
 
-Options: `--benchmark` times cold, cached and post-restart scans of a synthetic 720-track library; `--live-search`, `--live-update` and `--live-encoder` exercise the real online services. The tests use a private data folder (`ALBUMART_DATA`), never your real settings or backups.
+The suite covers real round trips in nine audio formats (decoded-audio hashes, preserved tags, byte-exact Undo), scanning, artist cleanup, duplicates, every Organize option with crash recovery, update verification, the data-folder move from Music Library Manager, and the pages themselves. CI also installs the real installer, upgrades a real Music Library Manager 3.12.1 install and a 2.5.2 portable copy, and measures startup. Test audio is synthesized tones; it contains no music.
 
-The suite covers real round trips in nine audio formats (decoded-audio hashes, preserved metadata, single front covers, byte-exact Undo), scanning (parallel progress, cancellation, corrupt files, stale scans, read-only files, folder art, the saved scan cache), artist cleanup, duplicate detection, every library-management operation together with persistent Undo and crash recovery, journals written by v2.x, online source parsing and safety checks, and update verification. Headless GUI checks drive the main window, queue, track-artist tab, duplicate window, library manager, theme switching and the update handoff. CI also installs and uninstalls the real installer, measures startup next to v2.5.2, and upgrades a real v2.5.2 portable copy through its own built-in updater. Test audio fixtures are short synthesized tones generated by `tests/AlbumArtTool.Tests/generate_fixtures.py`; they contain no copyrighted music.
+The README screenshots come from a manual CI run (**Actions › Build, test and package › Run workflow › showcase**) that fetches the covers and track lists of real albums on the build machine and builds a library of silent stand-in files. Nothing it downloads is committed.
 
-Push a `v*` tag, or include `[release]` in a commit message on `main`, to build, test and publish a release (installer, v2.x update bridge, portable ZIP and checksums). The version comes from `Directory.Build.props`. A release is published only after the Windows and Linux checks pass; existing releases are never replaced automatically.
+Push a `v*` tag, or merge a commit whose message contains `[release]` into `main`, to publish a release. The version comes from `Directory.Build.props`.
 
-## License
+## Credits and license
 
-The GUI app is MIT licensed. FFmpeg is a separate optional program with its own licenses; automatic setup retains its upstream notices and source URL in the encoder cache. TagLibSharp is LGPL-2.1-or-later and Avalonia/SkiaSharp are MIT; see `THIRD-PARTY-NOTICES.txt` and `licenses/`. The native build links TagLibSharp into the app, so the complete source and build instructions above are provided to let you rebuild the app with a modified TagLibSharp, as the LGPL permits.
+Muzikette is MIT licensed. TagLibSharp is LGPL-2.1-or-later (the native build links it; the full source and build steps above let you relink it with a modified TagLibSharp). Avalonia and SkiaSharp are MIT. The Archivo, Michroma and Doto fonts are under the SIL Open Font License. FFmpeg, yt-dlp and Deno are optional separate programs with their own licenses. See `THIRD-PARTY-NOTICES.txt` and `licenses/`.
+
+Album covers in the screenshots belong to their artists and labels and are shown only to illustrate the app.

@@ -32,7 +32,7 @@ from PIL import Image
 #   large      the full-size cover embedded (Health › Large covers), one track without a title (Missing titles)
 ALBUMS = [
     ("Sophia Stel", "the greatest album of all time", "flac", "cover"),
-    ("Masakatsu Takagi", "Kagayaki", "flac", "cover"),
+    ("Masakatsu Takagi", "Kagayaki", "flac", "cover", ["かがやき"]),
     ("KUNZITE", "SECRETS", "mp3-320", "cover"),
     ("Pomme", "consolation", "flac", "cover"),
     ("Pomme", "Saisons", "flac", "none"),
@@ -65,19 +65,39 @@ def get(url, binary=False):
 
 
 def norm(text):
-    text = unicodedata.normalize("NFKD", text or "").encode("ascii", "ignore").decode().casefold()
+    """Lower case, accents and punctuation removed; letters of every script are kept (かがやき stays かがやき)."""
+    text = "".join(c for c in unicodedata.normalize("NFKD", text or "") if not unicodedata.combining(c)).casefold()
     text = re.sub(r"\((deluxe|expanded|remaster(ed)?|bonus)[^)]*\)|\[[^\]]*\]", "", text)
-    return re.sub(r"[^a-z0-9]+", " ", text).strip()
+    return re.sub(r"[\W_]+", " ", text).strip()
 
 
-def deezer(artist, title):
-    query = urllib.parse.quote(f'artist:"{artist}" album:"{title}"')
-    results = get(f"https://api.deezer.com/search/album?q={query}&limit=25").get("data", [])
-    if not results:
-        results = get("https://api.deezer.com/search/album?q=" + urllib.parse.quote(f"{artist} {title}") + "&limit=25").get("data", [])
-    exact = [r for r in results if norm(r["artist"]["name"]) == norm(artist) and norm(r["title"]) == norm(title)]
-    close = [r for r in results if norm(r["artist"]["name"]) == norm(artist) and norm(r["title"]).startswith(norm(title))]
-    pick = (exact or close or [None])[0]
+def best(results, artists, titles, artist_of, title_of):
+    artists = {norm(a) for a in artists}; titles = [norm(t) for t in titles if norm(t)]
+    exact = [r for r in results if norm(artist_of(r)) in artists and norm(title_of(r)) in titles]
+    close = [r for r in results if norm(artist_of(r)) in artists and any(norm(title_of(r)).startswith(t) for t in titles)]
+    return (exact or close or [None])[0]
+
+
+def deezer(artist, title, aliases=()):
+    titles = [title] + list(aliases)
+    pick = None
+    for name in titles:
+        for query in (f'artist:"{artist}" album:"{name}"', f"{artist} {name}"):
+            results = get("https://api.deezer.com/search/album?q=" + urllib.parse.quote(query) + "&limit=25").get("data", [])
+            pick = best(results, [artist], titles, lambda r: r["artist"]["name"], lambda r: r["title"])
+            if pick:
+                break
+        if pick:
+            break
+    if pick is None:
+        # Search indexes miss some releases; the artist's own discography does not.
+        for found in get("https://api.deezer.com/search/artist?q=" + urllib.parse.quote(artist) + "&limit=5").get("data", []):
+            if norm(found["name"]) != norm(artist):
+                continue
+            releases = get(f"https://api.deezer.com/artist/{found['id']}/albums?limit=200").get("data", [])
+            pick = best(releases, [artist], titles, lambda r: artist, lambda r: r["title"])
+            if pick:
+                break
     if pick is None:
         return None
     album = get(f"https://api.deezer.com/album/{pick['id']}")
@@ -92,12 +112,13 @@ def deezer(artist, title):
     return out
 
 
-def apple(artist, title):
-    query = urllib.parse.quote(f"{artist} {title}")
-    results = get(f"https://itunes.apple.com/search?term={query}&entity=album&limit=25").get("results", [])
-    exact = [r for r in results if norm(r.get("artistName")) == norm(artist) and norm(r.get("collectionName")) == norm(title)]
-    close = [r for r in results if norm(r.get("artistName")) == norm(artist) and norm(r.get("collectionName")).startswith(norm(title))]
-    pick = (exact or close or [None])[0]
+def apple(artist, title, aliases=()):
+    pick = None
+    for name in [title] + list(aliases):
+        results = get("https://itunes.apple.com/search?term=" + urllib.parse.quote(f"{artist} {name}") + "&entity=album&limit=25").get("results", [])
+        pick = best(results, [artist], [title] + list(aliases), lambda r: r.get("artistName"), lambda r: r.get("collectionName"))
+        if pick:
+            break
     if pick is None:
         return None
     songs = [r for r in get(f"https://itunes.apple.com/lookup?id={pick['collectionId']}&entity=song").get("results", []) if r.get("wrapperType") == "track"]
@@ -169,11 +190,12 @@ def jpeg(data, side=None):
 def main(library, covers):
     os.makedirs(library, exist_ok=True); os.makedirs(covers, exist_ok=True)
     manifest = []
-    for index, (artist, title, kind, art) in enumerate(ALBUMS):
+    for index, (artist, title, kind, art, *rest) in enumerate(ALBUMS):
+        aliases = rest[0] if rest else []
         album = None
         for lookup in (deezer, apple):
             try:
-                album = lookup(artist, title)
+                album = lookup(artist, title, aliases)
             except Exception as error:
                 print(f"  {lookup.__name__} failed for {artist} - {title}: {error}")
             if album:

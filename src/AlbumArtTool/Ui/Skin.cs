@@ -19,9 +19,9 @@ namespace AlbumArtTool.Ui
         /// <summary>Everything you read: lists, descriptions, fields.</summary>
         internal static readonly FontFamily Text = new FontFamily(Assets + "Archivo");
         /// <summary>Keys, switches, navigation and status tags (drawn in capitals).</summary>
-        internal static readonly FontFamily Key = new FontFamily(Assets + "Archivo SemiExpanded");
+        internal static readonly FontFamily Key = new FontFamily(Assets + "ArchivoSemiExpanded");
         /// <summary>Album and artist names in details panes, dialog titles.</summary>
-        internal static readonly FontFamily Display = new FontFamily(Assets + "Archivo Expanded");
+        internal static readonly FontFamily Display = new FontFamily(Assets + "ArchivoExpanded");
         /// <summary>Printed legends: section labels, units, the wordmark.</summary>
         internal static readonly FontFamily Legend = new FontFamily(Assets + "Michroma");
         /// <summary>Dot-matrix readouts inside display windows only.</summary>
@@ -65,17 +65,24 @@ namespace AlbumArtTool.Ui
                 dark["MeterTrack"] = Segments(Color.Parse("#3A3A38"), 255, 6, 2, 8);
                 dark["FaceTexture"] = Brushes.Transparent;
             }
+            // Switches, steps and list keys latch when pressed: they sink, then spring back (sidebar keys latch in AddNav).
+            Button.ClickEvent.AddClassHandler<Button>((button, e) =>
+            {
+                if (button.Classes.Contains("chip") || button.Classes.Contains("step") || button.Classes.Contains("item")) Motion.Latch(button);
+            });
             // Keys print their labels in capitals; the label itself stays as written, for tests, tooltips and screen readers.
             application.Styles.Add(new Style(x => x.OfType<Button>()) { Setters = { new Setter(ContentControl.ContentTemplateProperty, Caps) } });
             application.Styles.Add(new Style(x => x.OfType<Button>().Class("chip")) { Setters = { new Setter(ContentControl.ContentTemplateProperty, Switch) } });
         }
 
         /// <summary>A string label drawn in tracked capitals.</summary>
-        internal static readonly IDataTemplate Caps = new FuncDataTemplate<object>((value, scope) => CapsText.Create(value?.ToString() ?? ""), false);
+        // A key whose content is already a control (an icon and label, a sidebar key) shows that control unchanged.
+        internal static readonly IDataTemplate Caps = new FuncDataTemplate<object>((value, scope) => value as Control ?? CapsText.Create(value?.ToString() ?? ""), false);
 
         /// <summary>A switch: an LED (lit when the switch is chosen) and its label in capitals.</summary>
         internal static readonly IDataTemplate Switch = new FuncDataTemplate<object>((value, scope) =>
         {
+            if (value is Control control) return control;
             var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             row.Children.Add(Kit.Led()); row.Children.Add(CapsText.Create(value?.ToString() ?? ""));
             return row;

@@ -116,10 +116,9 @@ namespace AlbumArtTool
             showArtistTrack.Tip("Select a track above, then open its folder with that song highlighted in File Explorer.");
             applyArtist.Click += async (s, e) => await ApplyArtistAsync();
             foreach (var b in new[] { openArtistAlbum, showArtistTrack }) { b.Height = 34; b.Margin = new Thickness(0, 0, 4, 0); b.HorizontalAlignment = HorizontalAlignment.Left; }
-            applyArtist.Height = 40; applyArtist.MinWidth = 196; applyArtist.Padding = new Thickness(18, 2); applyArtist.Margin = new Thickness(0); applyArtist.FontSize = Kit.Body;
+            applyArtist.Height = 42; applyArtist.MinWidth = 180; applyArtist.Padding = new Thickness(16, 2); applyArtist.Margin = new Thickness(0); applyArtist.FontSize = 11.5;
             var actions = Kit.Grid("Auto,Auto,*,Auto", "Auto").Add(openArtistAlbum.Cell(0, 0), showArtistTrack.Cell(0, 1), applyArtist.Cell(0, 3));
-            var bar = new Border { Child = actions, BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(0, 12, 0, 0), Margin = new Thickness(0, 12, 0, 0) };
-            bar.Brush(Border.BorderBrushProperty, "Border");
+            var bar = new Border { Child = actions, Classes = { "actionbar" }, Margin = new Thickness(0, 14, 0, 0) };
             var panel = Kit.Grid("*", "Auto,Auto,Auto,Auto,*,Auto").Add(head.Cell(0, 0), nameLabel.Cell(1, 0), mainArtist.Cell(2, 0), artistSummary.Cell(3, 0), trackSection.Cell(4, 0), bar.Cell(5, 0));
             return panel;
         }
