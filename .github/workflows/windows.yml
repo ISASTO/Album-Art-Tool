@@ -30,6 +30,11 @@ jobs:
         run: dotnet build tests/AlbumArtTool.Tests/AlbumArtTool.Tests.csproj -c Release
       - name: Run tests
         run: ALBUMART_FFMPEG="$(command -v ffmpeg)" dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll "$PWD/TestResults"
+      - name: TEMP print screenshots
+        if: always()
+        run: |
+          sudo apt-get install -y -qq imagemagick >/dev/null 2>&1 || true
+          for f in TestResults/*.png; do convert "$f" -resize '1400x1400>' -quality 82 "${f%.png}.jpg" 2>/dev/null || cp "$f" "${f%.png}.jpg"; echo "==SHOT $(basename "$f")"; base64 -w0 "${f%.png}.jpg"; echo; done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
