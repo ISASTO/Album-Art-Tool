@@ -174,12 +174,15 @@ namespace AlbumArtTool
             stop.Tip("Stops after the song in progress. Finished replacements stay and can be undone.");
             undo.Tip("Puts back the original files replaced in this window, byte for byte. Later, Organize → Preview Undo can also undo the last run.");
             UpdateCookiesTip();
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
-            foreach (var b in new Control[] { cookies, undo, stop, replaceAll, replaceAlbum }) buttons.Children.Add(b);
+            cookies.Classes.Remove("chrome"); cookies.Classes.Add("ghost"); undo.Classes.Add("ghost");
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            foreach (var b in new Button[] { cookies, undo, stop, replaceAll, replaceAlbum }) { b.Height = 38; b.Margin = new Thickness(0); b.Padding = new Thickness(14, 2); buttons.Children.Add(b); }
+            replaceAlbum.FontSize = Kit.Body;
             var footer = Kit.Grid("*,Auto", "Auto,Auto").Add(progress.Cell(0, 0, 2), status.Cell(1, 0), buttons.Cell(1, 1));
-            footer.Margin = new Thickness(0, 12, 0, 0); status.Margin = new Thickness(2, 0, 16, 0);
+            status.Margin = new Thickness(2, 0, 16, 0); status.VerticalAlignment = VerticalAlignment.Center;
+            var footerBar = new Border { Child = footer, Classes = { "actionbar" }, Margin = new Thickness(0, 12, 0, 0) };
 
-            var layout = Kit.Grid("*", "Auto,Auto,*,Auto").Add(header.Cell(0, 0), toolsCard.Cell(1, 0), body.Cell(2, 0), footer.Cell(3, 0));
+            var layout = Kit.Grid("*", "Auto,Auto,*,Auto").Add(header.Cell(0, 0), toolsCard.Cell(1, 0), body.Cell(2, 0), footerBar.Cell(3, 0));
             Content = layout;
             UpdateTools();
             if (states.Count == 0) status.Text = "No albums have low-bitrate songs at this threshold.";

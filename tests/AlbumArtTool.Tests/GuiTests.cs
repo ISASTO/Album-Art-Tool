@@ -255,19 +255,26 @@ internal static partial class Tests
         try
         {
             await window.ScanAsync();
+            Console.WriteLine("TRACE queue 1");
             var list = window.Albums;
             var apply = ButtonStarting(window, "Apply cover");
+            Console.WriteLine("TRACE queue 2");
             var sidecar = Controls(window).OfType<CheckBox>().Single(c => c.Content as string == "Update folder cover images too");
             var online = window.ApplyOnlineCoverAsync(SelectAt(list, 2).Key, new CoverCandidate { Source = "Test source", ImageUrl = "gated" });
+            Console.WriteLine("TRACE queue 3");
             await service.Started.Task;
+            Console.WriteLine("TRACE queue 4");
             Assert(!online.IsCompleted && list.IsEnabled, "album list stays interactive during a pending cover download");
             Assert(ButtonStarting(window, "Has art").IsEnabled, "tabs stay interactive while artwork is being applied");
             SelectAt(list, 0);
             Assert(apply.IsEnabled && apply.Text() == "Apply cover to 2 tracks", "a detected folder cover can be applied without choosing or dragging an image");
+            Console.WriteLine("TRACE queue 5");
             sidecar.IsChecked = false;
             var folderJob = window.ApplyAsync();
+            Console.WriteLine("TRACE queue 6");
             SelectAt(list, 1); window.StageImage(localImage);
             var localJob = window.ApplyAsync();
+            Console.WriteLine("TRACE queue 7");
             Assert(window.QueuedCount == 3 && !folderJob.IsCompleted && !localJob.IsCompleted, "multiple albums queue immediately behind active work");
             Assert(window.Badge(MainWindow.Page.Activity) == "3", "the Activity page shows how much work is queued");
             window.Navigate(MainWindow.Page.Activity);
@@ -275,6 +282,7 @@ internal static partial class Tests
             Shot(window, "activity.png");
             window.Navigate(MainWindow.Page.Albums);
             await window.ApplyOnlineCoverAsync(SelectAt(list, 2).Key, new CoverCandidate { Source = "Duplicate", ImageUrl = "gated" });
+            Console.WriteLine("TRACE queue 8");
             Assert(window.QueuedCount == 3, "duplicate clicks cannot queue the same album twice");
             SelectAt(list, 3); window.StageImage(nextImage);
             sidecar.IsChecked = true;
@@ -282,6 +290,7 @@ internal static partial class Tests
             Assert(!window.CanInstallUpdate, "active artwork queue prevents an update restart");
             service.Release.TrySetResult(true);
             await Task.WhenAll(online, folderJob, localJob); await window.QueueCompletion;
+            Console.WriteLine("TRACE queue 9");
             Assert(list.SelectedAlbum.Title == names[3] && window.HasStagedCover && apply.IsEnabled, "completed jobs preserve another album's selection and staged cover");
             foreach (string track in Directory.GetFiles(paths[0], "*.mp3"))
                 using (var audio = TagLib.File.Create(track)) Assert(Size(Artwork.GetCover(audio.Tag)).Width == 600, "folder-cover shortcut embeds the full image, not the scan thumbnail");
@@ -293,19 +302,27 @@ internal static partial class Tests
 
             // A failed download must not stop a later local-cover job.
             var failed = window.ApplyOnlineCoverAsync(list.SelectedAlbum.Key, new CoverCandidate { Source = "Broken", ImageUrl = "invalid" });
+            Console.WriteLine("TRACE queue 10");
             SelectAt(list, 1); window.StageImage(localImage); var following = window.ApplyAsync();
+            Console.WriteLine("TRACE queue 11");
             await Task.WhenAll(failed, following); await window.QueueCompletion;
+            Console.WriteLine("TRACE queue 12");
             Assert(ScanAlbum(paths[3]).MissingCount == 1 && ScanAlbum(paths[4]).MissingCount == 0, "failed queue jobs leave their files unchanged and later jobs continue");
 
             // Clear waiting work while an active job is paused, without cancelling the active edit.
             Click(ButtonStarting(window, "Has art"));
+            Console.WriteLine("TRACE queue 13");
             service.ResetGate();
             var active = window.ApplyOnlineCoverAsync(SelectAt(list, 0).Key, new CoverCandidate { Source = "Test source", ImageUrl = "gated" });
+            Console.WriteLine("TRACE queue 14");
             await service.Started.Task;
+            Console.WriteLine("TRACE queue 15");
             SelectAt(list, 1); window.StageImage(nextImage); string unchanged = CoverEditor.Hash(list.SelectedAlbum.Tracks[0].Path);
             var waiting = window.ApplyAsync(); window.ClearWaitingJobs();
+            Console.WriteLine("TRACE queue 16");
             Assert(window.QueuedCount == 1 && waiting.IsCompleted && !active.IsCompleted, "clearing the waiting queue preserves the active job");
             service.Release.TrySetResult(true); await active; await window.QueueCompletion;
+            Console.WriteLine("TRACE queue 17");
             Assert(CoverEditor.Hash(list.SelectedAlbum.Tracks[0].Path) == unchanged, "cancelled waiting jobs do not change their target files");
         }
         finally { service.Release.TrySetResult(true); window.ClearWaitingJobs(); await window.QueueCompletion; window.Close(); }
