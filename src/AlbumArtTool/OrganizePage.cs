@@ -46,6 +46,9 @@ namespace AlbumArtTool
         private readonly ListBox files = new ListBox { Classes = { "grid" } };
         private readonly EmptyState hint = new EmptyState("Organize preview", withAction: false);
         private readonly Control optionsPanel;
+        private readonly Control chooseView, reviewView;
+        private readonly Button chooseStep = Step(1, "Choose changes"), reviewStep = Step(2, "Review & apply"), back = Kit.IconButton(Icons.Back, "Back to options", "ghost");
+        internal int CurrentStep { get; private set; } = 1;
         private List<FileRow> rows = new List<FileRow>();
         private Dictionary<string, List<FileRow>> mergeGroups = new Dictionary<string, List<FileRow>>();
         private CancellationTokenSource source;
@@ -105,7 +108,7 @@ namespace AlbumArtTool
             var presetActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
             presetActions.Children.Add(savePreset); presetActions.Children.Add(deletePreset);
             var presets = Kit.Grid("Auto,*,Auto", "Auto").Add(presetLabel.Cell(0, 0), presetChips.Cell(0, 1), presetActions.Cell(0, 2));
-            presets.Margin = new Thickness(0, 0, 0, 6);
+            presets.Margin = new Thickness(0, 0, 0, 10);
             presetName.Margin = new Thickness(0, 0, 6, 0);
             var save = Kit.Grid("*,120,90", "34").Add(presetName.Cell(0, 0), confirmSave.Cell(0, 1), cancelSave.Cell(0, 2));
             save.Margin = new Thickness(0, 0, 0, 6);
@@ -122,11 +125,9 @@ namespace AlbumArtTool
                 Group("Tags", titleFromName, albumArtist, cleanTitles, id3v23).Cell(1, 0), Group("Files & folders", organize, rename, combine).Cell(1, 1), helper.Cell(1, 2)).Named("Library management options");
             helper.Margin = new Thickness(8, 8, 8, 4);
             optionsPanel = options;
-            var optionsCard = Kit.Frost(options, new Thickness(10, 6, 10, 6), 14); optionsCard.Margin = new Thickness(0, 0, 0, 8);
+            var optionsCard = Kit.Frost(options, new Thickness(12, 8, 12, 10), 14);
             foreach (var check in optionBoxes.Values) check.IsCheckedChanged += (s, e) => { if (!applyingPreset) { InvalidatePlan(); UpdatePresetState(); } };
 
-            var actions = Kit.Grid("Auto,Auto,*,90,165,180", "*").Add(undo.Cell(0, 0), openBackup.Cell(0, 1), stop.Cell(0, 3), preview.Cell(0, 4), apply.Cell(0, 5));
-            actions.Margin = new Thickness(0, 8, 0, 0);
             state.Text = "Pick a preset or the options you want, then Preview changes.";
             state.TextWrapping = TextWrapping.Wrap; state.TextTrimming = TextTrimming.CharacterEllipsis; state.MaxLines = 2;
             state.Named("Library management status");
@@ -137,11 +138,11 @@ namespace AlbumArtTool
             header.Margin = new Thickness(34, 0, 6, 0);
             var headerBar = new Border { Child = header, BorderThickness = new Thickness(0, 0, 0, 1) };
             headerBar.Brush(Border.BorderBrushProperty, "Border"); headerBar.Brush(Border.BackgroundProperty, "InsetHeader");
-            hint.Show(Icons.Organize, "Nothing to preview yet", "Choose a preset or the options you want, then click Preview changes. Every change is listed here before anything happens.");
+            hint.Show(Icons.Organize, "Nothing to review yet", "Choose a preset or the options you want in step 1, then click Preview changes. Every change is listed here before anything happens.");
             hint.Margin = new Thickness(24);
             var listHost = new Panel(); listHost.Children.Add(files); listHost.Children.Add(hint);
             var table = Kit.Inset(Kit.Grid("*", "Auto,*").Add(headerBar.Cell(0, 0), listHost.Cell(1, 0))); table.Padding = new Thickness(0);
-            table.Margin = new Thickness(0, 6, 0, 0);
+            reviewView = table;
             progress.Named("Library management progress"); progress.IsVisible = false;
             // A whole-library artist rename (started from Artists) is shown above the options until it is applied or cancelled.
             renameText.TextWrapping = TextWrapping.Wrap; renameText.TextTrimming = TextTrimming.None; renameText.Named("Artist rename");
@@ -157,14 +158,35 @@ namespace AlbumArtTool
             var targets = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
             targets.Children.Add(libraryTarget); targets.Children.Add(newTarget);
             folderText.Named("Organize folder"); folderText.Margin = new Thickness(12, 0, 0, 0);
-            var folderLabel = Kit.Caption("Folder"); folderLabel.Margin = new Thickness(2, 0, 12, 0);
+            var folderLabel = Kit.Caption("Working on"); folderLabel.Margin = new Thickness(2, 0, 12, 0);
             renameHere.Named("Rename artists in this folder").Tip("Change one or more artist names to a single name in every song of the folder shown here. The change is previewed in this list before anything is written.");
             renameHere.Click += (s, e) => { if (!IsWorking) RenameArtists?.Invoke(root); };
             var target = Kit.Grid("Auto,Auto,*,Auto", "Auto").Add(folderLabel.Cell(0, 0), targets.Cell(0, 1), folderText.Cell(0, 2), renameHere.Cell(0, 3));
-            target.Margin = new Thickness(0, 0, 0, 8);
-            var top = new StackPanel(); top.Children.Add(target); top.Children.Add(presets);
-            var layout = Kit.Grid("*", "Auto,Auto,Auto,Auto,Auto,*,Auto,Auto").Add(top.Cell(0, 0), saveRow.Cell(1, 0), renameBanner.Cell(2, 0), optionsCard.Cell(3, 0),
-                state.Cell(4, 0), table.Cell(5, 0), progress.Cell(6, 0), actions.Cell(7, 0));
+            target.Margin = new Thickness(0, 0, 0, 10);
+
+            // Two steps: choose what to change, then review the list and apply it. One action bar serves both.
+            chooseStep.Named("Step 1: choose changes").Tip("Pick a preset or tick the options you want. Nothing is changed in this step.");
+            reviewStep.Named("Step 2: review and apply").Tip("The list of every change the chosen options would make. Untick any you don't want, then apply the rest.");
+            chooseStep.Click += (s, e) => ShowStep(1); reviewStep.Click += (s, e) => ShowStep(2);
+            undo.Height = openBackup.Height = 34;
+            var steps = Kit.Grid("Auto,Auto,*,Auto,Auto", "Auto").Add(chooseStep.Cell(0, 0), reviewStep.Cell(0, 1), undo.Cell(0, 3), openBackup.Cell(0, 4));
+            var stepBar = new Border { Child = steps, BorderThickness = new Thickness(0, 0, 0, 1), Margin = new Thickness(0, 0, 0, 12) };
+            stepBar.Brush(Border.BorderBrushProperty, "Border");
+            var scroller = new ScrollViewer { Content = optionsCard, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
+            chooseView = Kit.Grid("*", "Auto,Auto,*").Add(presets.Cell(0, 0), saveRow.Cell(1, 0), scroller.Cell(2, 0));
+            var stepHost = new Panel(); stepHost.Children.Add(chooseView); stepHost.Children.Add(reviewView);
+            back.Named("Back to options").Tip("Go back to step 1 to change the options. The preview is kept until you change something.");
+            back.Click += (s, e) => ShowStep(1);
+            foreach (var b in new[] { back, stop, preview, apply }) { b.Height = 38; b.Margin = new Thickness(8, 0, 0, 0); b.Padding = new Thickness(16, 2); b.FontSize = Kit.Body; }
+            preview.MinWidth = 170; apply.MinWidth = 200;
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            foreach (var b in new[] { back, stop, preview, apply }) buttons.Children.Add(b);
+            state.Margin = new Thickness(2, 0, 16, 0);
+            progress.Margin = new Thickness(2, 6, 16, 0);
+            var status = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            status.Children.Add(state); status.Children.Add(progress);
+            var footer = new Border { Child = Kit.Grid("*,Auto", "Auto").Add(status.Cell(0, 0), buttons.Cell(0, 1)), Classes = { "actionbar" }, Margin = new Thickness(0, 12, 0, 0) };
+            var layout = Kit.Grid("*", "Auto,Auto,Auto,*,Auto").Add(target.Cell(0, 0), renameBanner.Cell(1, 0), stepBar.Cell(2, 0), stepHost.Cell(3, 0), footer.Cell(4, 0));
             Content = layout;
             preview.Click += async (s, e) => await PreviewAsync(); apply.Click += async (s, e) => await ApplyAsync();
             undo.Click += (s, e) => PreviewUndo(); stop.Click += (s, e) => source?.Cancel();
@@ -172,10 +194,30 @@ namespace AlbumArtTool
             AttachedToVisualTree += (s, e) => Refresh();
             try { customPresets = OrganizePresets.LoadCustom(); } catch (Exception) { customPresets = new List<OrganizePreset>(); }
             RebuildPresets();
-            encoder = Management.Encoder.Find(); UpdateEncoder(); SetWorking(false);
+            encoder = Management.Encoder.Find(); UpdateEncoder(); SetWorking(false); ShowStep(1);
         }
 
         internal string Root => root;
+
+        private static Button Step(int number, string text)
+        {
+            var digit = new TextBlock { Text = number.ToString(), FontSize = 11.5, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            var badge = new Border { Child = digit, Classes = { "stepNumber" }, Margin = new Thickness(0, 0, 9, 0), VerticalAlignment = VerticalAlignment.Center };
+            var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            row.Children.Add(badge); row.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
+            return new Button { Content = row, Classes = { "step" } };
+        }
+
+        /// <summary>Step 1 chooses the options; step 2 is the preview list with Apply.</summary>
+        internal void ShowStep(int step)
+        {
+            CurrentStep = step;
+            chooseView.IsVisible = step == 1; reviewView.IsVisible = step == 2;
+            chooseStep.Classes.Set("selected", step == 1); reviewStep.Classes.Set("selected", step == 2);
+            int changes = plan != null ? plan.Actions.Count(a => a.HasWork) : undoJournal != null ? rows.Count : 0;
+            reviewStep.SetText(changes > 0 ? "Review & apply (" + changes + ")" : "Review & apply");
+            preview.IsVisible = step == 1; apply.IsVisible = back.IsVisible = step == 2;
+        }
 
         private readonly Button libraryTarget = Kit.IconButton(Icons.Folder, "Music folder", "chip"), newTarget = Kit.IconButton(Icons.AddMusic, "New music", "chip");
         private readonly TextBlock folderText = Kit.Label("", Kit.Small, cls: "muted");
@@ -435,7 +477,7 @@ namespace AlbumArtTool
             encoderState.Text = encoder == null ? "Converting audio needs FFmpeg, a free helper program. Everything else works without it." : "FFmpeg is ready for converting audio.";
             setupEncoder.IsVisible = encoder == null && openSettings != null;
         }
-        private void InvalidatePlan() { if (IsWorking) return; plan = null; undoJournal = null; SetRows(new List<FileRow>()); UpdateApply(); }
+        private void InvalidatePlan() { if (IsWorking) return; plan = null; undoJournal = null; SetRows(new List<FileRow>()); UpdateApply(); if (chooseView != null) ShowStep(CurrentStep); }
 
         private void SetRows(List<FileRow> next)
         {
@@ -470,7 +512,9 @@ namespace AlbumArtTool
             IsWorking = value;
             foreach (var check in optionBoxes.Values) check.IsEnabled = !value;
             foreach (Control control in new Control[] { preview, undo, presetChips, savePreset, deletePreset, confirmSave, presetName, libraryTarget, newTarget, renameHere }) control.IsEnabled = !value;
-            stop.IsEnabled = value; progress.IsVisible = value; UpdateApply(); UpdatePresetState();
+            stop.IsEnabled = value; stop.IsVisible = value; progress.IsVisible = value; UpdateApply(); UpdatePresetState();
+            back.IsEnabled = chooseStep.IsEnabled = !value;
+            if (chooseView != null) ShowStep(CurrentStep);
             hint.IsVisible = rows.Count == 0 && !value;
         }
 
@@ -503,7 +547,7 @@ namespace AlbumArtTool
                 Square = square.On(), Shrink = shrink.On(), SingleCover = singleCover.On(), Duplicates = duplicates.On(), Organize = organize.On(), ArchiveOldBackups = archive.On(), RenameFromTitle = rename.On(), CombineDiscs = combine.On(), RemoveFeaturedTitles = cleanTitles.On(), TitleFromFilename = titleFromName.On(), Id3v23 = id3v23.On(),
                 AlbumArtistFromArtist = albumArtist.On(), RenameArtistsFrom = renameFrom, RenameArtistTo = renameTo, RenameAlbumArtists = renameAlbumArtists };
             source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
-            SetWorking(true); exclusive(true); SetRows(new List<FileRow>()); plan = null; undoJournal = null;
+            SetWorking(true); exclusive(true); SetRows(new List<FileRow>()); plan = null; undoJournal = null; ShowStep(2);
             try
             {
                 var reporter = Reporter();
@@ -524,7 +568,7 @@ namespace AlbumArtTool
                     return (made, list, size);
                 }, token);
                 plan = built;
-                SetRows(next);
+                SetRows(next); ShowStep(2);
                 state.Text = built.Actions.Count(a => a.HasWork) + " changes across " + built.Actions.Count + " files · originals need about " + (bytes / 1048576.0).ToString("N0") + " MB in the backup folder · " + built.Issues.Count + " skipped/problems. Review, uncheck unwanted changes, then Apply.";
             }
             catch (OperationCanceledException) { state.Text = "Preview stopped. No files were changed."; }
@@ -598,7 +642,8 @@ namespace AlbumArtTool
             }
         }
 
-        private void PreviewUndo()
+        /// <summary>Lists what the last library run changed, ready to restore (also opened from Activity).</summary>
+        internal void PreviewUndo()
         {
             try
             {
@@ -610,7 +655,7 @@ namespace AlbumArtTool
                     var row = new FileRow { Tag = entry, Action = "Restore original", Source = entry.Target ?? entry.Backup, Destination = entry.Source, Details = entry.Error ?? "Verified backup / move history" };
                     row.SetChecked(true); next.Add(row);
                 }
-                SetRows(next);
+                SetRows(next); ShowStep(2);
                 state.Text = "Undo preview for " + undoJournal.Root + ". Only files unchanged since that run will be restored. Check the changes to undo, then click Undo selected changes.";
             }
             catch (Exception e) { undoJournal = null; state.Text = "Could not read the last library journal: " + e.Message; }

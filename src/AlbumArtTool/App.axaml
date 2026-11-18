@@ -367,6 +367,78 @@
     <Style Selector="Button.nav:disabled /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent"/>
     </Style>
+    <!-- Selectable list items (Health checks) and numbered steps (Organize). -->
+    <Style Selector="Button.item">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="11"/>
+      <Setter Property="Padding" Value="10,8"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="MinHeight" Value="54"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="FontSize" Value="13.33"/>
+    </Style>
+    <Style Selector="Button.item:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.item.selected">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource SelectedBorder}"/>
+    </Style>
+    <Style Selector="Button.item.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource SelectedBorder}"/>
+    </Style>
+    <Style Selector="Button.step">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0,0,0,2"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+      <Setter Property="FontSize" Value="13.33"/>
+      <Setter Property="Padding" Value="4,0,10,0"/>
+      <Setter Property="Margin" Value="0,0,18,0"/>
+      <Setter Property="Height" Value="40"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+    </Style>
+    <Style Selector="Button.step:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button.step.selected">
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="Button.step.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="Button.step:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Border.stepNumber">
+      <Setter Property="Width" Value="22"/>
+      <Setter Property="Height" Value="22"/>
+      <Setter Property="CornerRadius" Value="11"/>
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+    </Style>
+    <Style Selector="Button.step.selected Border.stepNumber">
+      <Setter Property="Background" Value="{DynamicResource Primary}"/>
+    </Style>
+    <Style Selector="Button.step.selected Border.stepNumber TextBlock">
+      <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="Border.actionbar">
+      <Setter Property="BorderThickness" Value="0,1,0,0"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+      <Setter Property="Padding" Value="0,12,0,0"/>
+    </Style>
+
     <!-- Add music: release and artist tiles, track rows, the round add button. -->
     <Style Selector="Border.release">
       <Setter Property="Background" Value="Transparent"/>

@@ -110,13 +110,13 @@ namespace AlbumArtTool
             queueList.ItemsSource = groups;
             queueList.ItemTemplate = new FuncDataTemplate<DownloadGroup>((g, scope) => new QueueRow(this), true);
             ScrollViewer.SetHorizontalScrollBarVisibility(queueList, Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled);
-            queueEmpty.Show(Icons.Download, "Nothing downloading", "Albums and songs you add appear here and download one after another.");
-            queueEmpty.MaxWidth = 260;
+            queueEmpty.Show(Icons.Download, "Nothing downloading", "Albums and songs you add appear here and start downloading at once.");
+            queueEmpty.MaxWidth = 240;
             var queueHost = new Panel(); queueHost.Children.Add(queueList); queueHost.Children.Add(queueEmpty);
             var queueTitle = Kit.Grid("*,Auto", "Auto").Add(Kit.Caption("Downloads").Cell(0, 0), clearFinished.Cell(0, 1));
             clearFinished.Tip("Remove finished and cancelled items from this list. Their songs stay in New music.");
             clearFinished.Click += (s, e) => { Queue.ClearFinished(); SyncQueue(); };
-            waitingText.Named("Songs in New music");
+            waitingText.Named("Songs in New music"); waitingText.FontSize = 15;
             folderText.TextWrapping = TextWrapping.NoWrap;
             openNew.Tip("Open the New music folder in File Explorer."); openNew.Click += (s, e) => OpenNew();
             changeNew.Tip("Choose where new downloads are saved before they join your library. It must be outside the music folder.");
@@ -128,6 +128,7 @@ namespace AlbumArtTool
             undoMerge.Named("Undo last add").Tip("Move the songs from the last Add to library back into New music (songs changed since are left in place).");
             undoMerge.Click += async (s, e) => await UndoMergeAsync();
             foreach (var b in new[] { tidy, merge }) { b.Height = 36; b.HorizontalAlignment = HorizontalAlignment.Stretch; b.Margin = new Thickness(0, 6, 0, 0); }
+            merge.Height = 40; merge.FontSize = Kit.Body; merge.Margin = new Thickness(0, 10, 0, 0);
             mergeText.TextWrapping = TextWrapping.Wrap; mergeText.TextTrimming = TextTrimming.None; mergeText.Named("Add to library status");
             var folderRow = Kit.Grid("*,Auto,Auto", "Auto").Add(folderText.Cell(0, 0), openNew.Cell(0, 1), changeNew.Cell(0, 2));
             var footer = new StackPanel { Spacing = 2 };
@@ -139,11 +140,13 @@ namespace AlbumArtTool
             coversNew.Click += async (s, e) => { if (ChangeCovers != null) await ChangeCovers(); };
             coversNew.Height = 36; coversNew.HorizontalAlignment = HorizontalAlignment.Stretch; coversNew.Margin = new Thickness(0, 6, 0, 0);
             var edits = Kit.Grid("*,6,*", "Auto").Add(renameNew.Cell(0, 0), coversNew.Cell(0, 2));
-            footer.Children.Add(waitingText); footer.Children.Add(folderRow); footer.Children.Add(tidy); footer.Children.Add(edits); footer.Children.Add(merge); footer.Children.Add(mergeText); footer.Children.Add(undoMerge);
+            var optional = Kit.Label("Before adding, you can tidy up, rename artists or change covers here. Downloads wait in New music until you add them.", Kit.Small, cls: "muted");
+            optional.TextWrapping = TextWrapping.Wrap; optional.TextTrimming = TextTrimming.None; optional.Margin = new Thickness(0, 6, 0, 0);
+            footer.Children.Add(waitingText); footer.Children.Add(folderRow); footer.Children.Add(optional); footer.Children.Add(tidy); footer.Children.Add(edits); footer.Children.Add(merge); footer.Children.Add(mergeText); footer.Children.Add(undoMerge);
             var footerCard = new Border { Child = footer, BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(0, 10, 0, 0), Margin = new Thickness(0, 8, 0, 0) };
             footerCard.Brush(Border.BorderBrushProperty, "Border");
-            var right = Kit.Frost(Kit.Grid("*", "Auto,*,Auto").Add(queueTitle.Cell(0, 0), queueHost.Cell(1, 0), footerCard.Cell(2, 0)), new Thickness(14, 12, 14, 12), 14);
-            Content = Kit.Grid("*,330", "*").Add(left.Cell(0, 0), right.Cell(0, 1));
+            var right = Kit.Frost(Kit.Grid("*", "Auto,*,Auto").Add(queueTitle.Cell(0, 0), queueHost.Cell(1, 0), footerCard.Cell(2, 0)), new Thickness(16, 14, 16, 14), 16);
+            Content = Kit.Grid("*,340", "*").Add(left.Cell(0, 0), right.Cell(0, 1));
 
             Queue.Changed += SyncQueue;
             SyncQueue(); UpdateTools();

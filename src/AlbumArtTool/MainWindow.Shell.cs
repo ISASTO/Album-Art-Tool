@@ -51,15 +51,19 @@ namespace AlbumArtTool
             var brand = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 2, 0, 18) };
             brand.Children.Add(mark); brand.Children.Add(name);
             brand.Named("Music Library Manager");
+            // Pages grouped by what you are doing: your library, getting music, cleaning up.
             var pages = new StackPanel { Spacing = 2 };
+            pages.Children.Add(Group("Library", false));
             pages.Children.Add(AddNav(Page.Albums, Icons.Album, "Albums", "Add, change and standardize album covers (Ctrl+1)."));
-            pages.Children.Add(AddNav(Page.Artists, Icons.Artist, "Artists", "Collapse guest credits into each album's main artist (Ctrl+2)."));
+            pages.Children.Add(AddNav(Page.Artists, Icons.Artist, "Artists", "Collapse guest credits into each album's main artist, or rename artists everywhere (Ctrl+2)."));
+            pages.Children.Add(Group("Get music"));
             pages.Children.Add(AddNav(Page.AddMusic, Icons.AddMusic, "Add music", "Search YouTube Music for artists, albums and songs and add them to your library as MP3 320 (Ctrl+3)."));
-            pages.Children.Add(AddNav(Page.Health, Icons.Health, "Health", "Missing titles, extra pictures, low-bitrate albums and duplicates, each with a fix (Ctrl+4)."));
+            pages.Children.Add(Group("Clean up"));
+            pages.Children.Add(AddNav(Page.Health, Icons.Health, "Health", "Missing titles and album artists, extra or oversized pictures, low-bitrate albums and duplicates, each with a fix (Ctrl+4)."));
             pages.Children.Add(AddNav(Page.Organize, Icons.Organize, "Organize", "Convert, standardize, tidy and reorganize the whole library with presets. Every change is previewed and can be undone (Ctrl+5)."));
-            pages.Children.Add(AddNav(Page.YouTube, Icons.Download, "YouTube Music", "Replace low-bitrate songs with fresh downloads from YouTube Music. Opened from Health."));
-            pages.Children.Add(AddNav(Page.Activity, Icons.Activity, "Activity", "Work in progress, recent results, problems and Undo (Ctrl+6)."));
+            pages.Children.Add(AddNav(Page.YouTube, Icons.Download, "Replace songs", "Replace low-bitrate songs with fresh downloads from YouTube Music. Opened from Health › Low bitrate."));
             nav[Page.YouTube].Button.IsVisible = false;
+            var activity = AddNav(Page.Activity, Icons.Activity, "Activity", "Work in progress, recent results, problems and Undo (Ctrl+6).");
             var settings = AddNav(Page.Settings, Icons.Settings, "Settings", "Appearance, music and backup folders, helper programs and app updates (Ctrl+,).");
             // Where the music is, at the foot of the sidebar.
             browse.HorizontalAlignment = HorizontalAlignment.Stretch; browse.HorizontalContentAlignment = HorizontalAlignment.Left; browse.Height = 34;
@@ -68,13 +72,19 @@ namespace AlbumArtTool
             var divider = new Border { Height = 1, Margin = new Thickness(6, 8, 6, 8) };
             divider.Brush(Border.BackgroundProperty, "Border");
             var foot = new StackPanel { Spacing = 2 };
-            foot.Children.Add(settings); foot.Children.Add(divider); foot.Children.Add(Kit.Caption("Music folder").Also(c => c.Margin = new Thickness(10, 0, 0, 2))); foot.Children.Add(place);
+            foot.Children.Add(activity); foot.Children.Add(settings); foot.Children.Add(divider); foot.Children.Add(Kit.Caption("Music folder").Also(c => c.Margin = new Thickness(10, 0, 0, 2))); foot.Children.Add(place);
             var dock = new DockPanel();
             DockPanel.SetDock(brand, Dock.Top); DockPanel.SetDock(foot, Dock.Bottom);
             dock.Children.Add(brand); dock.Children.Add(foot); dock.Children.Add(pages);
             var panel = new Border { Child = dock, Padding = new Thickness(10, 16, 10, 12), BorderThickness = new Thickness(0, 0, 1, 0) };
             panel.Brush(Border.BackgroundProperty, "Sidebar"); panel.Brush(Border.BorderBrushProperty, "Border");
             return panel;
+        }
+
+        private static Control Group(string title, bool spaced = true)
+        {
+            var caption = Kit.Caption(title); caption.Margin = new Thickness(12, spaced ? 14 : 0, 0, 4);
+            return caption;
         }
 
         private Button AddNav(Page page, string icon, string label, string tip)
@@ -114,12 +124,23 @@ namespace AlbumArtTool
             foreach (Control child in pageHost.Children) child.IsVisible = ReferenceEquals(child, shown);
             if (changed) FadeIn(shown);
             if (viewChips != null) viewChips.IsVisible = !showingArtists;
+            if (artistChips != null) artistChips.IsVisible = showingArtists;
             foreach (var item in nav.Values) item.Button.Classes.Set("selected", item.Page == page);
             closePage.IsVisible = page == Page.YouTube;
             renameArtist.IsVisible = page == Page.Artists;
+            // Undo here reverses the last cover or artist edit, so it only shows where those are made.
+            undo.IsVisible = page == Page.Albums || page == Page.Artists;
+            UpdateStatusBar();
             if (page == Page.YouTube) youtubePage.Start();
             if (page == Page.Organize) organizePage.Refresh();
             UpdateHeader();
+        }
+
+        // The status line belongs to the album pages and Activity; elsewhere it only appears while library work runs.
+        private void UpdateStatusBar()
+        {
+            if (statusBar == null) return;
+            statusBar.IsVisible = current == Page.Albums || current == Page.Artists || current == Page.Activity || busy || queueRunning;
         }
 
         private void UpdateHeader()
@@ -128,17 +149,17 @@ namespace AlbumArtTool
             switch (current)
             {
                 case Page.Albums: pageTitle.Text = "Albums"; pageSubtitle.Text = !hasScanned ? "Scanning your music folder…" : albumsCount + (albumsCount == 1 ? " album · " : " albums · ") + tracks + (tracks == 1 ? " track" : " tracks"); break;
-                case Page.Artists: pageTitle.Text = "Artists"; pageSubtitle.Text = "Collapse guest credits into each album's main artist. Already-correct tracks are left alone."; break;
-                case Page.Health: pageTitle.Text = "Library health"; pageSubtitle.Text = "Based on the last scan. Nothing changes until you choose a fix and apply it."; break;
+                case Page.Artists: pageTitle.Text = "Artists"; pageSubtitle.Text = "Credit every song of an album to its main artist, or rename an artist everywhere."; break;
+                case Page.Health: pageTitle.Text = "Library health"; pageSubtitle.Text = "What needs attention, from the last scan. Nothing changes until you preview and apply a fix."; break;
                 case Page.Organize:
                     pageTitle.Text = "Organize";
                     pageSubtitle.Text = organizePage != null && organizePage.WorksOnNewMusic
-                        ? "Tidy up New music before it joins your library: pick your preset, preview, apply, then go back to Add music."
-                        : "Choose what to change in " + Kit.MiddleEllipsis(organizePage?.Root ?? Root, 60) + ". Every change is previewed first and every original is backed up.";
+                        ? "Tidy up New music before it joins your library, then go back to Add music and add it."
+                        : "Choose what to change, review every change, then apply. Originals are backed up and can be restored.";
                     break;
                 case Page.AddMusic: pageTitle.Text = "Add music"; pageSubtitle.Text = "Search YouTube Music and add albums or songs. They download as MP3 320 to New music, ready to tidy and add to your library."; break;
                 case Page.YouTube: pageTitle.Text = "Replace from YouTube Music"; pageSubtitle.Text = "Checked songs are downloaded at YouTube Music's best free quality and saved as MP3 320 with your tags and cover. Originals are backed up first."; break;
-                case Page.Activity: pageTitle.Text = "Activity"; pageSubtitle.Text = "Work in progress, recent results, problems and Undo."; break;
+                case Page.Activity: pageTitle.Text = "Activity"; pageSubtitle.Text = "What is running, what finished, what went wrong, and Undo."; break;
                 case Page.Welcome: pageTitle.Text = ""; pageSubtitle.Text = ""; break;
                 default: pageTitle.Text = "Settings"; pageSubtitle.Text = "Appearance, folders, helper programs and updates."; break;
             }
