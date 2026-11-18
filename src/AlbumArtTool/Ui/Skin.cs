@@ -70,6 +70,8 @@ namespace AlbumArtTool.Ui
             {
                 if (button.Classes.Contains("chip") || button.Classes.Contains("step") || button.Classes.Contains("item")) Motion.Latch(button);
             });
+            // Drop-down lists, menus and flyouts scale with the zoom of the window they open from.
+            application.Styles.Add(new Style(x => x.OfType<Avalonia.Controls.Primitives.Popup>()) { Setters = { new Setter(Avalonia.Controls.Primitives.Popup.InheritsTransformProperty, true) } });
             // Keys print their labels in capitals; the label itself stays as written, for tests, tooltips and screen readers.
             application.Styles.Add(new Style(x => x.OfType<Button>()) { Setters = { new Setter(ContentControl.ContentTemplateProperty, Caps) } });
             application.Styles.Add(new Style(x => x.OfType<Button>().Class("chip")) { Setters = { new Setter(ContentControl.ContentTemplateProperty, Switch) } });

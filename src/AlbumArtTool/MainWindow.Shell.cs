@@ -50,6 +50,7 @@ namespace AlbumArtTool
             var name = new TextBlock { Text = "MUZIKETTE", FontFamily = Skin.Legend, FontSize = 17, LetterSpacing = 1.2, VerticalAlignment = VerticalAlignment.Center };
             var brand = new Border { Child = name, Margin = new Thickness(12, 6, 0, 26) };
             brand.Named("Muzikette");
+            if (Chrome.Enabled) { Chrome.Drag(brand); brand.Margin = new Thickness(0, 0, 0, 20); brand.Padding = new Thickness(12, 6, 0, 6); }
             // Pages grouped by what you are doing: your library, getting music, cleaning up.
             var pages = new StackPanel { Spacing = 2 };
             pages.Children.Add(Group("Library", false));
@@ -141,6 +142,7 @@ namespace AlbumArtTool
         private void UpdateStatusBar()
         {
             if (statusBar == null) return;
+            if (DateTime.UtcNow < zoomShownUntil) { display.SetActivity("Zoom", Zoom.Percent); return; }
             bool running = busy || queueRunning;
             bool show = running || current == Page.Albums || current == Page.Artists || current == Page.Activity;
             string legend = busy ? (writing ? "Writing" : "Scanning") : queueRunning ? "Saving covers" : "Status";

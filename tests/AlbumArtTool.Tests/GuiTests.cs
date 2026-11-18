@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Threading;
@@ -35,6 +37,8 @@ internal static partial class Tests
             {
                 // Screenshots should show finished pages; the fade itself is checked in the first-run test.
                 MainWindow.PageFade = false; Motion.Enabled = false;
+                // The app's own title bar (Windows) is shown and checked on every platform; zoom is kept in memory.
+                Chrome.Enabled = true; Zoom.SettingsFile = Path.Combine(NewFolder("zoom-settings"), "zoom.txt");
                 await Gui("first run, shortcuts and empty states", FirstRunGui);
                 await Gui("main window and online covers", MainWindowGui);
                 await Gui("queue", QueueGui);
@@ -47,6 +51,7 @@ internal static partial class Tests
                 await Gui("add music", AddMusicGui);
                 await Gui("artist tags", ArtistTagsGui);
                 await Gui("click while busy", ClickWhileBusyGui);
+                await Gui("zoom and window keys", ZoomGui);
                 return 0;
             }, CancellationToken.None).GetAwaiter().GetResult();
     }
@@ -622,6 +627,54 @@ internal static partial class Tests
     }
 
     // A Preview click while other library work runs is remembered: the page waits, then starts by itself.
+    // Ctrl + plus / minus / 0 and Ctrl + mouse wheel scale every window; the window keys replace the system title bar.
+    private static async Task ZoomGui()
+    {
+        string root = NewFolder("zoom"), album = Path.Combine(root, "Artist", "Album"); Directory.CreateDirectory(album);
+        CopyTrack(album, "01.mp3", "Album", "Artist");
+        var window = new MainWindow(root, false, new FakeCoverSearch(Cover));
+        window.Show();
+        try
+        {
+            await window.ScanAsync(); await Settle();
+            foreach (string key in new[] { "Window minimize", "Window maximize", "Window close" })
+                Assert(Named<Button>(window, key).IsEffectivelyVisible, "the main window has its own " + key.ToLowerInvariant() + " key");
+            var shortcuts = window.ShowShortcuts(); await Settle();
+            Assert(Controls(shortcuts).OfType<CapsText>().Any(t => t.Source == "Keyboard shortcuts") && Named<Button>(shortcuts, "Window close").IsEffectivelyVisible &&
+                !Controls(shortcuts).OfType<Button>().Any(b => b.AccessibleName() == "Window maximize"), "a dialog's title strip shows its title and a close key, and no maximize key when it cannot resize");
+            double dialogWidth = shortcuts.Width;
+            Click(Named<Button>(shortcuts, "Window close")); await Settle();
+            Assert(!shortcuts.IsVisible, "the close key closes the dialog");
+
+            LayoutTransformControl ZoomHost(Window w) => Controls(w).OfType<LayoutTransformControl>().First();
+            double Scale(Window w) => (ZoomHost(w).LayoutTransform as ScaleTransform)?.ScaleX ?? 1;
+            void Press(Key key) => window.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = key, KeyModifiers = KeyModifiers.Control, Source = window });
+            Press(Key.OemPlus); await Settle();
+            Assert(Zoom.Level == 1.1 && Scale(window) == 1.1 && File.ReadAllText(Zoom.SettingsFile).Trim() == "1.1", "Ctrl + plus zooms in one step and remembers it");
+            Assert(window.Display.Message == "110%", "the display shows the zoom level (" + window.Display.Message + ")");
+            window.RaiseEvent(new PointerWheelEventArgs(window, new Avalonia.Input.Pointer(1, PointerType.Mouse, true), window, new Point(400, 400), 0, PointerPointProperties.None, KeyModifiers.Control, new Vector(0, 1)) { RoutedEvent = InputElement.PointerWheelChangedEvent });
+            await Settle();
+            Assert(Zoom.Level == 1.25 && Scale(window) == 1.25, "Ctrl + mouse wheel zooms in (" + Zoom.Level + ")");
+            var again = window.ShowShortcuts(); await Settle();
+            Assert(Scale(again) == 1.25 && Math.Abs(again.Width - dialogWidth * 1.25) < 0.5, "a dialog opens at the same zoom, sized to match");
+            Press(Key.OemMinus); await Settle();
+            Assert(Zoom.Level == 1.1 && Scale(again) == 1.1, "Ctrl + minus zooms out, in open dialogs too");
+            Shot(window, "zoom.png");
+            Press(Key.D0); await Settle();
+            Assert(Zoom.Level == 1 && ZoomHost(window).LayoutTransform == null && Math.Abs(again.Width - dialogWidth) < 0.5, "Ctrl + 0 resets the zoom");
+            for (int i = 0; i < 10; i++) Zoom.Step(-1);
+            Assert(Zoom.Level == Zoom.Levels[0], "zoom stops at its smallest step");
+            Zoom.Reset();
+            again.Close();
+            window.Navigate(MainWindow.Page.Settings); await Settle();
+            Click(Named<Button>(window, "Zoom in")); await Settle();
+            Assert(Zoom.Level == 1.1 && Named<TextBlock>(window, "Zoom level").Text == "110%", "Settings zooms in too and shows the level");
+            Click(Named<Button>(window, "Reset zoom")); await Settle();
+            Assert(Zoom.Level == 1 && Named<TextBlock>(window, "Zoom level").Text == "100%", "Settings resets the zoom");
+        }
+        finally { Zoom.Reset(); window.Close(); }
+    }
+
     private static async Task ClickWhileBusyGui()
     {
         string root = NewFolder("click-while-busy"), album = Path.Combine(root, "Artist", "Album"); Directory.CreateDirectory(album);

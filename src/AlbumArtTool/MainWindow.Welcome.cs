@@ -27,6 +27,7 @@ namespace AlbumArtTool
             ("Ctrl+Enter", "Apply the cover, or set the track artists"),
             ("Esc", "Discard the cover being previewed"),
             ("Ctrl+Z", "Undo the last cover or artist change"),
+            ("Ctrl + / Ctrl −", "Zoom in or out (or Ctrl + mouse wheel); Ctrl+0 resets"),
             ("F1", "Show these shortcuts"),
         };
 

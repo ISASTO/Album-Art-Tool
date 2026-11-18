@@ -57,7 +57,7 @@ internal static partial class Tests
         using (var session = HeadlessUnitTestSession.StartNew(typeof(Tests)))
             return session.Dispatch<int>(async () =>
             {
-                MainWindow.PageFade = false; Motion.Enabled = false;
+                MainWindow.PageFade = false; Motion.Enabled = false; Chrome.Enabled = true; Zoom.SettingsFile = null;
                 var window = new MainWindow(library, false, new ShowcaseCoverSearch(albums));
                 window.Show();
                 try

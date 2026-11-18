@@ -23,16 +23,49 @@ namespace AlbumArtTool
             Skin.Install(this);
         }
 
+        private static readonly System.Collections.Generic.HashSet<string> showing = new System.Collections.Generic.HashSet<string>();
+
+        private static async Task ReportAsync(Window owner, string message)
+        {
+            try { await Dialogs.ShowMessage(owner, "Something went wrong", message + "\n\nThe details are in errors.log in " + BackupSettings.AppData + "."); }
+            finally { showing.Remove(message); }
+        }
+
+        /// <summary>An exception thrown inside the UI framework itself (its first frame is Avalonia's), such as a text layout bug.</summary>
+        internal static bool IsFrameworkGlitch(Exception e)
+        {
+            string trace = (e.StackTrace ?? "").TrimStart();
+            return trace.StartsWith("at Avalonia.", StringComparison.Ordinal) && !(e is OutOfMemoryException);
+        }
+
+        private static void LogError(Exception e)
+        {
+            try
+            {
+                string log = Path.Combine(BackupSettings.AppData, "errors.log");
+                Directory.CreateDirectory(BackupSettings.AppData);
+                if (File.Exists(log) && new FileInfo(log).Length > 512 * 1024) File.Delete(log);
+                File.AppendAllText(log, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " Muzikette " + UpdateService.DisplayVersion + "\n" + e + "\n\n");
+            }
+            catch (Exception) { }
+        }
+
         public override void OnFrameworkInitializationCompleted()
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 Dispatcher.UIThread.UnhandledException += (s, e) =>
                 {
-                    // Mirror a WinForms ThreadException dialog: report and keep the app usable.
+                    // Keep the app usable: every error is written to errors.log in the data folder. A glitch inside the UI
+                    // framework's own layout or drawing (nothing you did, and nothing you can act on) is only logged;
+                    // anything else is reported once, however often it repeats while its message is open.
                     e.Handled = true;
+                    LogError(e.Exception);
+                    if (IsFrameworkGlitch(e.Exception)) return;
                     var owner = desktop.MainWindow;
-                    if (owner != null && owner.IsVisible) _ = Dialogs.ShowMessage(owner, "Muzikette", e.Exception.Message);
+                    string message = e.Exception.Message;
+                    if (owner == null || !owner.IsVisible || !showing.Add(message)) return;
+                    _ = ReportAsync(owner, message);
                 };
                 Task.Run(UpdateInstaller.CleanOldWorkspaces);
                 desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;

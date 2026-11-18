@@ -91,6 +91,7 @@ namespace AlbumArtTool.Ui
         }
 
         internal string Message => message.Text;
+        internal TextBlock MessageText => message;
 
         /// <summary>The start-up message: the name scrolls past in dot matrix once, then the readouts light up. Click to skip.</summary>
         internal void Boot(string text)

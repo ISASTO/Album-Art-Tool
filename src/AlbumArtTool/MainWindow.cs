@@ -43,6 +43,7 @@ namespace AlbumArtTool
         private readonly Button discard = Kit.Button("Discard", "link");
         private readonly Pill coverage = new Pill();
         private readonly DisplayWindow display = new DisplayWindow();
+        private DateTime zoomShownUntil;
         private readonly CoverWash wash = new CoverWash();
         private readonly StackPanel figures = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 20 };
         private Control statusBar;
@@ -105,7 +106,11 @@ namespace AlbumArtTool
             coverFrame = new Border { CornerRadius = new CornerRadius(3), ClipToBounds = true, Margin = new Thickness(4, 0, 8, 2), Cursor = new Cursor(StandardCursorType.Hand), Child = cover };
             coverFrame.Brush(Border.BackgroundProperty, "Input");
             coverFrame.Named("Album cover preview and image drop target");
-            Kit.Prepare(this, BuildLayout());
+            Kit.Prepare(this, BuildLayout(), main: true);
+            // Zooming shows its level on the display for a moment.
+            Action zoomed = () => { zoomShownUntil = DateTime.UtcNow.AddMilliseconds(1500); UpdateStatusBar(); DispatcherTimer.RunOnce(UpdateStatusBar, TimeSpan.FromMilliseconds(1600)); };
+            Zoom.Changed += zoomed;
+            Closed += (s, e) => Zoom.Changed -= zoomed;
             closePage.Named("Close YouTube Music").Tip("Close the YouTube Music page. Replacements already made stay, and can be undone from Organize › Preview Undo.");
             closePage.Click += (s, e) => CloseYouTube();
             albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? (currentJob.Artist == null ? "Writing cover" : "Writing artists") : "Queued", "Accent") :
@@ -266,7 +271,9 @@ namespace AlbumArtTool
             display.Named("Display");
             // The page's name and status line stay as text for screen readers and tests; the display shows them.
             var hidden = new Panel { IsVisible = false }; hidden.Children.Add(pageTitle); hidden.Children.Add(pageSubtitle); hidden.Children.Add(status);
-            var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+            var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(12, 0, 0, 0) };
+            // The window keys sit above the page keys, so the display never runs under them.
+            if (Chrome.Enabled) actions.MinWidth = 3 * Chrome.KeyWidth - 24;
             var help = Kit.IconButton(Icons.Keyboard, "", "ghost").Named("Keyboard shortcuts").Tip("Keyboard shortcuts (F1).");
             help.Click += (s, e) => ShowShortcuts();
             renameArtist.Named("Rename an artist").Tip("Change one or more artists to a single name in every song of your library (Artist and Album Artist tags), for example an artist who released under several names. You preview every change first.");
@@ -279,6 +286,15 @@ namespace AlbumArtTool
             var main = Kit.Grid("*", "Auto,*").Add(top.Cell(0, 0), pageHost.Cell(1, 0));
             main.Margin = new Thickness(24, 20, 24, 20);
             var shell = Kit.Grid("232,*", "*").Add(BuildSidebar().Cell(0, 0), main.Cell(0, 1));
+            // The app's own title bar: the window keys in the top-right corner; the strip above the display, the display
+            // itself and the wordmark are where the window is dragged from.
+            if (Chrome.Enabled)
+            {
+                Chrome.Drag(display); Chrome.Client(display.MessageText);
+                var strip = Chrome.Drag(new Border { Height = 20, VerticalAlignment = VerticalAlignment.Top });
+                var framed = new Panel(); framed.Children.Add(shell); framed.Children.Add(strip); framed.Children.Add(Chrome.Keys(this));
+                return framed;
+            }
             onlyMissing.Tip("Keeps existing embedded front covers. Uncheck to replace the cover on every track in this album.");
             folderCover.Tip("Updates recognized cover/folder/front/album/albumart images, or creates cover.jpg. Disabled when multiple albums share a folder.");
             undo.Named("Undo last change").Tip("Restore the files from your most recent cover or artist edit in this session (Ctrl+Z). Organize runs are undone in Organize.");

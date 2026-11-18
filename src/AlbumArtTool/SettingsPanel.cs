@@ -28,6 +28,8 @@ namespace AlbumArtTool
             downloadEncoder = Kit.Button("Download"), chooseEncoder = Kit.Button("Choose…"), downloadDownloader = Kit.Button("Download"),
             chooseCookies = Kit.Button("Choose…"), checkNow = Kit.Button("Check for updates");
         private readonly TextBlock message = Kit.Label("", Kit.Small, cls: "muted");
+        private readonly Button zoomOut = Kit.IconButton(Icons.Minimize, ""), zoomIn = Kit.IconButton(Icons.Add, ""), zoomReset = Kit.Button("Reset");
+        private readonly TextBlock zoomValue = Kit.Label("100%", Kit.Body, true);
         private readonly Slider parallel = new Slider { Minimum = 1, Maximum = AddMusic.MaxParallel, TickFrequency = 1, IsSnapToTickEnabled = true, TickPlacement = TickPlacement.BottomRight, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 360, HorizontalAlignment = HorizontalAlignment.Left, MinWidth = 260 };
         private readonly TextBlock parallelValue = Kit.Label("", Kit.Body, true);
         private CancellationTokenSource downloads;
@@ -65,7 +67,21 @@ namespace AlbumArtTool
             message.Named("Settings status"); message.TextWrapping = TextWrapping.Wrap; message.TextTrimming = TextTrimming.None;
 
             var sections = new StackPanel { Spacing = 12 };
-            sections.Children.Add(Section("Appearance", Row("Finish", themes)));
+            // Zoom: the same steps as Ctrl + mouse wheel and Ctrl + plus / minus.
+            zoomOut.Named("Zoom out").Tip("Make everything smaller (Ctrl + minus, or Ctrl + mouse wheel).");
+            zoomIn.Named("Zoom in").Tip("Make everything larger (Ctrl + plus, or Ctrl + mouse wheel).");
+            zoomReset.Named("Reset zoom").Tip("Back to 100% (Ctrl + 0).");
+            zoomOut.Click += (s, e) => Zoom.Step(-1); zoomIn.Click += (s, e) => Zoom.Step(1); zoomReset.Click += (s, e) => Zoom.Reset();
+            zoomValue.Named("Zoom level"); zoomValue.MinWidth = 52; zoomValue.TextAlignment = TextAlignment.Center; zoomValue.VerticalAlignment = VerticalAlignment.Center;
+            var zoom = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+            foreach (var c in new Control[] { zoomOut, zoomValue, zoomIn }) zoom.Children.Add(c);
+            foreach (var b in new[] { zoomOut, zoomIn }) { b.Width = 34; b.Height = 30; }
+            Action zoomChanged = () => zoomValue.Text = Zoom.Percent;
+            Zoom.Changed += zoomChanged;
+            DetachedFromVisualTree += (s, e) => Zoom.Changed -= zoomChanged;
+            AttachedToVisualTree += (s, e) => { Zoom.Changed -= zoomChanged; Zoom.Changed += zoomChanged; zoomChanged(); };
+            zoomChanged();
+            sections.Children.Add(Section("Appearance", Row("Finish", themes), Row("Zoom", zoom, zoomReset)));
             sections.Children.Add(Section("Library", Row("Music folder", folderValue, changeMusic), Row("Backups", backupValue, changeBackup, openBackup)));
             // Add music: how many songs download at once.
             parallel.Value = AddMusic.Parallel;
