@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.isasto.Muzikette</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Muzikette</name>
+  <summary>Keep a music library in order</summary>
+  <description>
+    <p>
+      Muzikette finds what needs attention in a music library and fixes it. Every change is previewed first,
+      the originals are backed up, and everything can be undone.
+    </p>
+    <ul>
+      <li>Find albums missing cover art and apply covers found on Bandcamp, Deezer and the Cover Art Archive</li>
+      <li>Credit each album's songs to its main artist, or rename an artist across the whole library</li>
+      <li>Health checks for missing titles and album artists, extra or oversized pictures, low-bitrate albums and duplicates</li>
+      <li>Organize: convert lossless files to MP3 320, standardize tags and artwork, and sort files into Artist and Album folders</li>
+      <li>Add albums and songs from YouTube Music, and replace low-bitrate songs</li>
+    </ul>
+    <p>
+      It looks like a piece of hi-fi equipment, in a brushed Silver or a Black finish that follows the system.
+    </p>
+  </description>
+  <developer id="io.github.isasto">
+    <name>ISASTO</name>
+  </developer>
+  <url type="homepage">https://github.com/ISASTO/Muzikette</url>
+  <url type="bugtracker">https://github.com/ISASTO/Muzikette/issues</url>
+  <url type="vcs-browser">https://github.com/ISASTO/Muzikette</url>
+  <launchable type="desktop-id">io.github.isasto.Muzikette.desktop</launchable>
+  <provides>
+    <binary>muzikette</binary>
+  </provides>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Albums, with covers found online for the selected album</caption>
+      <image>https://raw.githubusercontent.com/ISASTO/Muzikette/main/docs/albums-silver.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A new cover ready to apply, in the Black finish</caption>
+      <image>https://raw.githubusercontent.com/ISASTO/Muzikette/main/docs/new-cover-black.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Artists: guest credits collapsed into the album's main artist</caption>
+      <image>https://raw.githubusercontent.com/ISASTO/Muzikette/main/docs/artists-silver.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Health: what needs attention, each with a fix</caption>
+      <image>https://raw.githubusercontent.com/ISASTO/Muzikette/main/docs/health-black.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Organize: presets and options, previewed before anything changes</caption>
+      <image>https://raw.githubusercontent.com/ISASTO/Muzikette/main/docs/organize-silver.png</image>
+    </screenshot>
+  </screenshots>
+  <branding>
+    <color type="primary" scheme_preference="light">#dbdad5</color>
+    <color type="primary" scheme_preference="dark">#161616</color>
+  </branding>
+  <content_rating type="oars-1.1"/>
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <releases>
+    <release version="4.2.0" date="2026-11-18">
+      <description>
+        <p>Muzikette runs on Linux, as an AppImage that updates itself or as a Flatpak. FFmpeg, yt-dlp and Deno can be set up from inside the app there too.</p>
+      </description>
+    </release>
+    <release version="4.1.0" date="2026-11-18">
+      <description>
+        <p>Zoom with Ctrl and the mouse wheel or Ctrl with plus and minus, and the app's own title bar on Windows.</p>
+      </description>
+    </release>
+    <release version="4.0.0" date="2026-11-18">
+      <description>
+        <p>Music Library Manager is now Muzikette, with a new look and reworked pages.</p>
+      </description>
+    </release>
+  </releases>
+</component>

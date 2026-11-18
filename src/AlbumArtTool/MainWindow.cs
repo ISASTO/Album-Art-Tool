@@ -173,6 +173,8 @@ namespace AlbumArtTool
 
         private KeyModifiers lastModifiers;
         internal AlbumList Albums => albums;
+        /// <summary>True while a scan or a change to files runs; the scan that opens the library has finished once it is false.</summary>
+        internal bool IsBusy => busy || !hasScanned;
         internal CoverSearchPanel Online => online;
         internal bool HasStagedCover => pending != null;
         internal void DiscardStaged() { if (pending != null && !busy && !queueRunning) status.Text = "Ready"; ShowSelection(); }
@@ -386,7 +388,7 @@ namespace AlbumArtTool
             selectedTitle.Text = album?.Title ?? "Select an album";
             selectedArtist.Text = album?.Artist ?? "";
             selectedPath.Text = album == null ? "" : Kit.MiddleEllipsis(album.Folder, 64);
-            selectedTitle.Tip(album?.Title); selectedPath.Tip(album?.Folder); openFolder.Tip(album == null ? "Open this album's folder in File Explorer." : "Open " + album.Folder + " in File Explorer.");
+            selectedTitle.Tip(album?.Title); selectedPath.Tip(album?.Folder); openFolder.Tip(album == null ? "Open this album's folder in " + Platform.FileManager + "." : "Open " + album.Folder + " in " + Platform.FileManager + ".");
             detail.Text = album == null ? "Pick an album on the left to see its cover and find a new one." : "";
             detail.IsVisible = album == null;
             ShowFigures(album);
@@ -631,8 +633,7 @@ namespace AlbumArtTool
         {
             try
             {
-                StartExplorer(selectFile ? new ProcessStartInfo("explorer.exe", "/select," + Updates.UpdateInstaller.QuoteArgument(path)) { UseShellExecute = true } :
-                    new ProcessStartInfo(path) { UseShellExecute = true });
+                StartExplorer(Kit.Reveal(path, selectFile));
             }
             catch (Exception e) { _ = Dialogs.ShowMessage(this, "Could not open folder", e.Message); }
         }

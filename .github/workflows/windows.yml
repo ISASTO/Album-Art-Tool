@@ -269,6 +269,126 @@ jobs:
           path: release/*
           if-no-files-found: error
 
+  # The Linux app: a native build on an older glibc (so it runs on more distributions), tested on a real X server and
+  # packed as an AppImage and a tar.gz.
+  linux-package:
+    name: Linux build, AppImage and launch test
+    if: ${{ !inputs.showcase }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install build and test tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang zlib1g-dev xvfb xauth ffmpeg desktop-file-utils
+      - name: Publish native (AOT) app for Linux
+        run: |
+          dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r linux-x64 -o dist/linux
+          rm -f dist/linux/*.dbg
+          cp LICENSE THIRD-PARTY-NOTICES.txt dist/linux/
+          cp -r licenses dist/linux/licenses
+          ls -l dist/linux
+          echo "Newest glibc symbol: $(objdump -T dist/linux/Muzikette | grep -o 'GLIBC_[0-9.]*' | sort -Vu | tail -1)"
+      - name: Check the desktop file
+        run: desktop-file-validate packaging/linux/io.github.isasto.Muzikette.desktop
+      - name: Native self-test (tags in all nine formats)
+        run: |
+          code=0
+          dist/linux/Muzikette --self-test "$PWD/tests/AlbumArtTool.Tests/fixtures" "$RUNNER_TEMP/self-test.txt" || code=$?
+          echo "Native self-test: $(cat "$RUNNER_TEMP/self-test.txt")"
+          exit $code
+      - name: Build the AppImage and the tar.gz
+        run: packaging/linux/package.sh dist/linux dist
+      - name: Open a library in the AppImage (Xvfb)
+        run: |
+          packaging/linux/smoke-library.sh "$RUNNER_TEMP/library"
+          code=0
+          APPIMAGE_EXTRACT_AND_RUN=1 ALBUMART_DATA="$RUNNER_TEMP/data" timeout 120 xvfb-run -a -s "-screen 0 1600x1000x24" \
+            dist/Muzikette-x86_64.AppImage --smoke "$RUNNER_TEMP/library" "$RUNNER_TEMP/appimage.png" || code=$?
+          if [ -f "$RUNNER_TEMP/appimage.png" ]; then echo "==PNG linux-appimage.png"; base64 -w0 "$RUNNER_TEMP/appimage.png"; echo; fi
+          exit $code
+      - name: Open a library in invariant globalization mode (what the launcher uses without ICU)
+        run: |
+          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 ALBUMART_DATA="$RUNNER_TEMP/data-invariant" timeout 120 xvfb-run -a -s "-screen 0 1600x1000x24" \
+            dist/linux/Muzikette --smoke "$RUNNER_TEMP/library" "$RUNNER_TEMP/invariant.png"
+      - name: Keep the test library for the Flatpak check
+        run: tar -C "$RUNNER_TEMP" -cf smoke-library.tar library
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoke-library
+          path: smoke-library.tar
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Muzikette-Linux
+          path: |
+            dist/Muzikette-x86_64.AppImage
+            dist/Muzikette-linux-x64.tar.gz
+          if-no-files-found: error
+
+  # The Flatpak bundle for GitHub releases, packed from the tested Linux build (not built for or submitted to Flathub),
+  # then installed and opened on a real X server.
+  flatpak:
+    name: Flatpak bundle and launch test
+    needs: linux-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Muzikette-Linux
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: smoke-library
+          path: ${{ runner.temp }}
+      - name: Install Flatpak tools
+        timeout-minutes: 20
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo timeout 300 apt-get update -qq
+          # Without recommends: those pull in desktop portals and services that do not belong on a build machine.
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder xvfb xauth
+          # Ubuntu limits unprivileged user namespaces, which bubblewrap (Flatpak's sandbox) needs.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          flatpak --version; flatpak-builder --version
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Unpack the tested Linux build
+        run: |
+          mkdir -p dist/linux && tar -xzf dist/Muzikette-linux-x64.tar.gz -C dist/linux --strip-components=1
+          rm -rf dist/linux/share dist/linux/muzikette
+      - name: Build the bundle
+        timeout-minutes: 25
+        run: |
+          flatpak-builder --user --install-deps-from=flathub --disable-rofiles-fuse --force-clean --repo=repo build packaging/flatpak/io.github.isasto.Muzikette.yml
+          flatpak build-bundle repo dist/Muzikette.flatpak io.github.isasto.Muzikette --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+          ls -l dist/Muzikette.flatpak
+      - name: Check the AppStream metadata
+        run: |
+          flatpak run --user --filesystem="$PWD" --command=appstreamcli org.freedesktop.Sdk//25.08 \
+            validate --no-net --explain "$PWD/packaging/linux/io.github.isasto.Muzikette.metainfo.xml"
+      - name: Install the bundle and open a library in it (Xvfb)
+        timeout-minutes: 10
+        run: |
+          flatpak install --user -y --noninteractive dist/Muzikette.flatpak
+          tar -C "$RUNNER_TEMP" -xf "$RUNNER_TEMP/smoke-library.tar"
+          echo "Tools in the runtime: $(flatpak run --command=sh io.github.isasto.Muzikette -c 'for t in tar xz xdg-open; do command -v $t || echo "$t missing"; done' | tr '\n' ' ')"
+          code=0
+          timeout 180 xvfb-run -a -s "-screen 0 1600x1000x24" flatpak run --filesystem="$RUNNER_TEMP" io.github.isasto.Muzikette \
+            --smoke "$RUNNER_TEMP/library" "$RUNNER_TEMP/flatpak.png" || code=$?
+          if [ -f "$RUNNER_TEMP/flatpak.png" ]; then echo "==PNG linux-flatpak.png"; base64 -w0 "$RUNNER_TEMP/flatpak.png"; echo; fi
+          ls ~/.var/app/io.github.isasto.Muzikette/data/Muzikette || true
+          exit $code
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Muzikette-Flatpak
+          path: dist/Muzikette.flatpak
+          if-no-files-found: error
+
   # README screenshots on a library of real albums. Covers and track lists are fetched here, on the build machine, and
   # never committed; the audio is silence of each track's length. Run by hand: Actions › Run workflow › showcase.
   showcase:
@@ -304,7 +424,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]'))
-    needs: [linux, windows]
+    needs: [linux, windows, linux-package, flatpak]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -313,6 +433,14 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: Muzikette-Windows
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: Muzikette-Linux
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: Muzikette-Flatpak
           path: release
       - name: Publish tested build
         env:
@@ -325,9 +453,14 @@ jobs:
           if [ "$RELEASE_TAG" = "main" ]; then
             RELEASE_TAG="v$(python3 -c 'import xml.etree.ElementTree as e; print(e.parse("Directory.Build.props").find(".//Version").text)')"
           fi
+          # One checksum list for every package (the Windows job wrote its part).
+          sed -i 's/\r$//' release/SHA256SUMS.txt
+          (cd release && sha256sum Muzikette-x86_64.AppImage Muzikette.flatpak Muzikette-linux-x64.tar.gz) >> release/SHA256SUMS.txt
+          cat release/SHA256SUMS.txt
           # Notes come from the release commit message (without the [release] marker).
           NOTES="$(printf '%s' "$COMMIT_MESSAGE" | sed -e 's/\[release\] *//' -e '/^Co-Authored-By:/d' -e '/^Claude-Session:/d')"
           [ -n "$NOTES" ] || NOTES="Muzikette $RELEASE_TAG"
-          NOTES="$(printf '%s\n\nInstall Muzikette-Setup.exe, or update from inside the app (Settings › Check for updates; Get updates in Music Library Manager).' "$NOTES")"
-          gh release create "$RELEASE_TAG" release/Muzikette-Setup.exe release/AlbumArtTool-Setup.exe release/AlbumArtTool.exe release/Muzikette-Portable.zip release/SHA256SUMS.txt \
+          NOTES="$(printf '%s\n\n**Windows:** install Muzikette-Setup.exe, or update from inside the app (Settings › Check for updates; Get updates in Music Library Manager).\n\n**Linux (x86-64):** Muzikette-x86_64.AppImage runs on most distributions and updates itself (make it executable, then open it). Or install Muzikette.flatpak with `flatpak install --user Muzikette.flatpak`; it is not on Flathub.' "$NOTES")"
+          gh release create "$RELEASE_TAG" release/Muzikette-Setup.exe release/AlbumArtTool-Setup.exe release/AlbumArtTool.exe release/Muzikette-Portable.zip \
+            release/Muzikette-x86_64.AppImage release/Muzikette.flatpak release/Muzikette-linux-x64.tar.gz release/SHA256SUMS.txt \
             --target "$RELEASE_COMMIT" --title "Muzikette $RELEASE_TAG" --notes "$NOTES"

@@ -373,7 +373,7 @@ namespace AlbumArtTool
                 "an extra APE tag is merged in and removed (with its second copy of the cover). Duplicate frames left by older versions of this tool are repaired. ID3 tags in AIFF and WAV files are converted too. Files already in this form are left alone." + safe);
             encoderState.Tip("FFmpeg converts audio to MP3. It is only needed for the two Audio options; every other option works without it.");
             setupEncoder.Tip("Open Settings to download FFmpeg (about 170 MB, once, checksum-verified) or choose a copy you already have.");
-            openBackup.Tip("Opens the PC backup folder in File Explorer, where each run's originals, journal.json and report.csv are kept. Change its location in Settings.");
+            openBackup.Tip("Opens the PC backup folder in " + Platform.FileManager + ", where each run's originals, journal.json and report.csv are kept. Change its location in Settings.");
             savePreset.Tip("Save the options selected now as your own preset, so you can choose them again with one click. Presets are kept on this PC.");
             deletePreset.Tip("Delete your preset that matches the selected options. The options stay selected; built-in presets cannot be deleted.");
             presetName.Tip("A short name for your preset, up to " + OrganizePresets.MaxCustom + " presets of " + OrganizePresets.MaxName + " characters. Saving with an existing name replaces that preset.");

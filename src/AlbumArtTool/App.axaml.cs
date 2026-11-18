@@ -15,6 +15,8 @@ namespace AlbumArtTool
     public partial class App : Application
     {
         internal static string[] Arguments = Array.Empty<string>();
+        /// <summary>Set by --smoke: where to save a picture of the main window before exiting.</summary>
+        internal static string SmokeShot;
 
         public override void Initialize()
         {
@@ -71,9 +73,32 @@ namespace AlbumArtTool
                 desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
                 desktop.Exit += (s, e) => ScanCache.Flush();
                 string root = ResolveRoot(Arguments, out bool firstRun);
-                desktop.MainWindow = new MainWindow(root, firstRun: firstRun);
+                var main = new MainWindow(root, firstRun: firstRun);
+                desktop.MainWindow = main;
+                if (SmokeShot != null) main.Opened += async (s, e) => desktop.Shutdown(await SmokeAsync(main));
             }
             base.OnFrameworkInitializationCompleted();
+        }
+
+        private static async Task<int> SmokeAsync(MainWindow main)
+        {
+            try
+            {
+                var started = DateTime.UtcNow;
+                while (main.IsBusy && DateTime.UtcNow - started < TimeSpan.FromSeconds(60)) await Task.Delay(250);
+                await Task.Delay(1500);
+                double scale = main.RenderScaling;
+                var size = new PixelSize(Math.Max(1, (int)Math.Ceiling(main.Bounds.Width * scale)), Math.Max(1, (int)Math.Ceiling(main.Bounds.Height * scale)));
+                using (var shot = new Avalonia.Media.Imaging.RenderTargetBitmap(size, new Vector(96 * scale, 96 * scale)))
+                {
+                    shot.Render(main);
+                    shot.Save(SmokeShot);
+                }
+                int count = main.Albums.AlbumCount;
+                Console.WriteLine("Smoke: " + count + " albums, " + size.Width + "x" + size.Height + (main.IsBusy ? ", still scanning" : "") + (MainWindow.UiError != null ? ", UI error: " + MainWindow.UiError.Message : ""));
+                return main.IsBusy || MainWindow.UiError != null || count == 0 ? 1 : 0;
+            }
+            catch (Exception e) { Console.Error.WriteLine("Smoke failed: " + e); return 1; }
         }
 
         // A folder on the command line wins. A portable copy keeps the original behavior of
@@ -86,7 +111,9 @@ namespace AlbumArtTool
             firstRun = false;
             if (args.Length > 0 && Directory.Exists(args[0])) return Path.GetFullPath(args[0]);
             string baseDirectory = AppContext.BaseDirectory;
-            bool installed = File.Exists(Path.Combine(baseDirectory, "unins000.exe"));
+            // On Windows a portable copy (no uninstaller beside it) opens its own folder; on Linux the app's folder is an AppImage
+            // mount, a Flatpak or a package directory, so it behaves like an installed copy.
+            bool installed = File.Exists(Path.Combine(baseDirectory, "unins000.exe")) || !OperatingSystem.IsWindows();
             if (!installed) return baseDirectory;
             string last = AppSettings.LastFolder;
             if (last != null) return last;

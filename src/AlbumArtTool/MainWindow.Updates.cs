@@ -6,6 +6,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using AlbumArtTool.Core;
 using AlbumArtTool.Ui;
 using AlbumArtTool.Updates;
 
@@ -17,6 +18,17 @@ namespace AlbumArtTool
         private bool checkingUpdate, installingUpdate, restartForUpdate;
         internal Func<UpdateService> CreateUpdateService = () => new UpdateService();
         internal Version InstalledVersion;
+        /// <summary>How this copy updates (tests choose the Windows installer path on every platform).</summary>
+        internal UpdateService.Package UpdatePackage = UpdateService.CurrentPackage;
+        /// <summary>Opens the release page for an update to install by hand.</summary>
+        internal Action<string> OpenPage = url => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true })?.Dispose();
+        /// <summary>Starts the replaced AppImage in the current music folder.</summary>
+        internal Action<string, string> RelaunchAppImage = (appImage, folder) =>
+        {
+            var info = new System.Diagnostics.ProcessStartInfo(appImage) { UseShellExecute = false };
+            info.ArgumentList.Add(folder);
+            System.Diagnostics.Process.Start(info)?.Dispose();
+        };
         internal Func<string, string, System.Diagnostics.Process> LaunchInstaller = UpdateInstaller.Launch;
         internal bool CanInstallUpdate => !busy && !writing && !queueRunning && !maintenanceRunning && (organizePage == null || !organizePage.IsWorking) && pending == null &&
             (healthPage == null || !healthPage.IsScanning) && (youtubePage == null || !youtubePage.IsWorking) && (settingsPage == null || !settingsPage.IsWorking) &&
@@ -50,11 +62,28 @@ namespace AlbumArtTool
             {
                 using (var service = CreateUpdateService())
                 {
-                    var release = await service.CheckAsync(token, InstalledVersion);
+                    var release = await service.CheckAsync(token, InstalledVersion, UpdatePackage);
                     token.ThrowIfCancellationRequested();
                     if (release == null)
                     {
                         message.Text = "You are up to date. Version " + UpdateService.DisplayVersion + " is installed.";
+                        return;
+                    }
+                    // A Flatpak or a plain folder: the new version is downloaded from the release page.
+                    if (release.Manual)
+                    {
+                        message.Text = "Version " + release.Version.ToString(3) + " is available. " + (Platform.Flatpak
+                            ? "Download Muzikette.flatpak from the release page and open it to update."
+                            : "Download it from the release page.");
+                        var open = Kit.Button("Open release page", "primary"); open.MinWidth = 170; open.HorizontalAlignment = HorizontalAlignment.Left; open.Named("Open release page");
+                        open.Click += (s, e) => { try { OpenPage(release.PageUrl); } catch (Exception ex) { message.Text = "Could not open the page: " + ex.Message; } };
+                        layout.Children.Add(open.Cell(3, 0));
+                        return;
+                    }
+                    if (UpdatePackage == UpdateService.Package.AppImage)
+                    {
+                        await ReplaceAppImageAsync(service, release, message, downloadProgress, close, token);
+                        handedOff = restartForUpdate;
                         return;
                     }
                     directory = UpdateInstaller.CreateWorkspace();
@@ -101,6 +130,47 @@ namespace AlbumArtTool
                 downloadProgress.IsVisible = false; close.IsEnabled = true; close.Content = "Close";
                 dialog.Closed -= cancel; source.Dispose();
             }
+        }
+
+        // An AppImage updates itself: the new one is downloaded next to it, checked against GitHub's SHA-256, made
+        // executable and moved over the old file (the running copy keeps its own), then started in the same music folder.
+        internal string AppImagePath = Platform.AppImage;
+
+        private async Task ReplaceAppImageAsync(UpdateService service, AppRelease release, TextBlock message, ProgressBar bar, Button close, CancellationToken token)
+        {
+            string target = AppImagePath, temporary = target + ".update-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+            try
+            {
+                // The new file has to sit beside the old one so it can replace it in one move.
+                try { using (File.Create(temporary)) { } File.Delete(temporary); }
+                catch (Exception e) when (e is UnauthorizedAccessException || e is IOException)
+                {
+                    message.Text = "Version " + release.Version.ToString(3) + " is available, but the folder this AppImage is in cannot be written to. Download the new AppImage from the release page.";
+                    return;
+                }
+                bar.IsIndeterminate = false; bar.Value = 0;
+                message.Text = "Downloading version " + release.Version.ToString(3) + " · 0%";
+                var reporter = new Progress<int>(percent => { if (token.IsCancellationRequested) return; bar.Value = Math.Max(0, Math.Min(100, percent)); message.Text = "Downloading version " + release.Version.ToString(3) + " · " + percent + "%"; });
+                await Task.Run(() => service.DownloadAsync(release, temporary, reporter, token), token);
+                bar.Value = 100;
+                while (!CanInstallUpdate)
+                {
+                    message.Text = pending != null
+                        ? "Update downloaded. Apply or discard your staged cover to restart into it. You can cancel this update."
+                        : "Update downloaded. Waiting for background tasks to finish before restarting. You can cancel this update.";
+                    await Task.Delay(200, token);
+                }
+                token.ThrowIfCancellationRequested();
+                installingUpdate = true; IsEnabled = false; close.IsEnabled = false;
+                message.Text = "Installing version " + release.Version.ToString(3) + ". Muzikette will reopen in your current music folder…";
+                if (!UpdateService.Hash(temporary).Equals(release.Sha256, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("The downloaded AppImage's checksum did not match. Your current app has not changed.");
+                Platform.MakeExecutable(temporary);
+                File.Move(temporary, target, true);
+                RelaunchAppImage(target, Root);
+                restartForUpdate = true;
+                Close();
+            }
+            finally { try { if (File.Exists(temporary)) File.Delete(temporary); } catch { } }
         }
     }
 }

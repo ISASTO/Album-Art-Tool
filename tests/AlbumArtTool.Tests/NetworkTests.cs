@@ -229,6 +229,22 @@ internal static partial class Tests
         var wrongVersion = UpdateService.ParseRelease(ReleaseJson("v99.0.0", appBytes), old);
         using (var service = new UpdateService(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(appBytes) })))
             Assert(await Rejects(() => service.DownloadAsync(wrongVersion, download, null, CancellationToken.None)) && !File.Exists(download), "installer version must match the release tag");
+        // Linux: an AppImage is checked by its checksum and AppImage header; a Flatpak or plain folder gets the release page.
+        byte[] appImageBytes = new byte[2048]; new byte[] { 0x7F, (byte)'E', (byte)'L', (byte)'F', 2, 1, 1, 0, (byte)'A', (byte)'I', 2 }.CopyTo(appImageBytes, 0);
+        var appImageRelease = UpdateService.ParseRelease(ReleaseJson("v" + version, appImageBytes, name: UpdateService.AppImageName), old, UpdateService.Package.AppImage);
+        Assert(appImageRelease != null && appImageRelease.AppImage && appImageRelease.DownloadUrl.EndsWith("/" + UpdateService.AppImageName), "an AppImage copy updates from the release's AppImage");
+        Assert(Throws(() => UpdateService.ParseRelease(ReleaseJson("v" + version, appImageBytes), old, UpdateService.Package.AppImage)), "a release without an AppImage is not offered to an AppImage copy");
+        using (var service = new UpdateService(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(appImageBytes) })))
+        {
+            await service.DownloadAsync(appImageRelease, download, null, CancellationToken.None);
+            Assert(UpdateService.Hash(download) == appImageRelease.Sha256, "a verified AppImage download is kept");
+            File.Delete(download);
+        }
+        var notAppImage = UpdateService.ParseRelease(ReleaseJson("v" + version, appBytes, name: UpdateService.AppImageName), old, UpdateService.Package.AppImage);
+        using (var service = new UpdateService(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(appBytes) })))
+            Assert(await Rejects(() => service.DownloadAsync(notAppImage, download, null, CancellationToken.None)) && !File.Exists(download), "a download that is not an AppImage is removed, even with a matching checksum");
+        var manualRelease = UpdateService.ParseRelease(ReleaseJson("v" + version, appBytes), old, UpdateService.Package.Manual);
+        Assert(manualRelease != null && manualRelease.Manual && manualRelease.DownloadUrl == null && manualRelease.PageUrl.StartsWith("https://github.com/ISASTO/"), "a Flatpak or plain folder is pointed to the release page");
         int requests = 0;
         using (var service = new UpdateService(new FakeHandler(_ => { requests++; var r = new HttpResponseMessage(HttpStatusCode.Redirect); r.Headers.Location = new Uri("https://evil.test/update.exe"); return r; })))
             Assert(await Rejects(() => service.DownloadAsync(release, download, null, CancellationToken.None)) && requests == 1, "unsafe redirects are rejected before a second request");

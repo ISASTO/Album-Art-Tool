@@ -2,16 +2,16 @@
 
 <h1 align="center">Muzikette</h1>
 
-<p align="center">A Windows app for keeping a music library in order: album covers, artist credits, tags, formats, duplicates and folders.<br>Every change is previewed first, backed up, and can be undone.</p>
+<p align="center">An app for Windows and Linux that keeps a music library in order: album covers, artist credits, tags, formats, duplicates and folders.<br>Every change is previewed first, backed up, and can be undone.</p>
 
-<p align="center"><b><a href="https://github.com/ISASTO/Muzikette/releases/latest">Download Muzikette-Setup.exe</a></b> · Windows 10 and 11, 64-bit · free and open source</p>
+<p align="center"><b><a href="https://github.com/ISASTO/Muzikette/releases/latest">Download</a></b> · Windows 10 and 11 (Muzikette-Setup.exe) · Linux (AppImage or Flatpak), x86-64 · free and open source</p>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/albums-black.png">
   <img src="docs/albums-silver.png" alt="Muzikette's Albums page: a list of albums with their covers, and the selected album's cover, figures and online cover suggestions">
 </picture>
 
-Muzikette looks like a piece of hi-fi equipment: a brushed **Silver** finish, or **Black**, following Windows. The amber display at the top of each page shows where you are and what is running.
+Muzikette looks like a piece of hi-fi equipment: a brushed **Silver** finish, or **Black**, following your system's light or dark mode. The amber display at the top of each page shows where you are and what is running.
 
 Formerly **Music Library Manager** (Album Art Tool). Updating from it keeps your settings, backups and Undo history; see [Updating from Music Library Manager](#updating-from-music-library-manager).
 
@@ -93,11 +93,11 @@ The first time, Muzikette downloads yt-dlp, Deno and FFmpeg from their official 
   <img src="docs/settings-silver.png" alt="Settings: finish, folders, helper programs and updates">
 </picture>
 
-Finish (Match Windows, Silver or Black), zoom, the music and backup folders, downloads at once, helper programs and **Check for updates**.
+Finish (match the system, Silver or Black), zoom, the music and backup folders, downloads at once, helper programs and **Check for updates**.
 
 ## Safety
 
-- Every change is made on a copy, checked, and swapped in only after a verified backup of the original is saved on your PC (outside the music folder, so players don't index it). The default backup folder is `%LOCALAPPDATA%\Muzikette\LibraryBackups`.
+- Every change is made on a copy, checked, and swapped in only after a verified backup of the original is saved on your PC (outside the music folder, so players don't index it). The default backup folder is `%LOCALAPPDATA%\Muzikette\LibraryBackups` on Windows and `~/.local/share/Muzikette/LibraryBackups` on Linux.
 - **Undo last change** restores the latest cover or artist edit; Organize's **Preview Undo** restores its last run, including moves, conversions and removals, after a restart too. Undo refuses to overwrite a file changed since.
 - Files that changed since the scan, read-only files and locked files are skipped with an explanation in Activity. One failed song never stops the rest.
 - No account, no background service. Searches send only the album title and artist; your music never leaves your PC.
@@ -112,7 +112,19 @@ MP3, FLAC, M4A/M4B, Ogg, Opus, WMA, WAV, AIFF, APE and WavPack. Albums are group
 
 ## Install and update
 
+### Windows
+
 Run **Muzikette-Setup.exe**. It installs for your Windows account only (no administrator prompt), with a Start menu entry and an uninstaller in **Settings › Apps**. Prefer no installer? **Muzikette-Portable.zip** contains the same app. **Settings › Check for updates** downloads a newer release, verifies its SHA-256 checksum and version, and reopens the app in the same music folder.
+
+### Linux
+
+Muzikette runs on 64-bit x86 Linux with an X11 or Wayland desktop (through XWayland) and glibc 2.35 or newer: Ubuntu 22.04, Debian 12, Fedora 36 and later, and their relatives.
+
+- **AppImage** (no install): download **Muzikette-x86_64.AppImage**, make it executable (`chmod +x Muzikette-x86_64.AppImage`, or Properties › Allow executing as a program) and open it. **Check for updates** replaces the AppImage with the new version and reopens it.
+- **Flatpak**: download **Muzikette.flatpak** and run `flatpak install --user Muzikette.flatpak` (Flathub's runtime is fetched if needed). It reads and writes your Music folder and drives under `/media`, `/run/media` and `/mnt`; choose any other folder with the folder picker. **Check for updates** opens the release page, where you download the new bundle and install it the same way. Muzikette is not on Flathub.
+- **tar.gz**: **Muzikette-linux-x64.tar.gz** holds the plain app folder. Run `./muzikette` inside it; `share/` has the desktop file and icons for your own install.
+
+FFmpeg, yt-dlp and Deno are downloaded as Linux builds when you first need them, as on Windows, or Muzikette uses the ones on your `PATH`. Settings and backups live in `~/.local/share/Muzikette` (`~/.var/app/io.github.isasto.Muzikette/data/Muzikette` for the Flatpak).
 
 ### Updating from Music Library Manager
 
@@ -120,7 +132,7 @@ Use **Get updates** in Music Library Manager as usual (3.x and the old 2.x porta
 
 ## Build and test
 
-Install the .NET 10 SDK. The core library and the test suite (including headless checks of every page) also run on Linux and macOS.
+Install the .NET 10 SDK. The app, the core library and the test suite (including headless checks of every page) run on Windows and Linux; the tests run on macOS too.
 
 ```powershell
 dotnet run --project src/AlbumArtTool                                              # run from source
@@ -128,13 +140,22 @@ dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r win-x64 -o dis
 ISCC.exe /DAppVersion=4.0.0 /DSourceDir=dist\app /DOutputDir=dist installer\AlbumArtTool.iss
 ```
 
+On Linux (the native build needs `clang` and `zlib1g-dev`):
+
+```sh
+dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r linux-x64 -o dist/linux
+packaging/linux/package.sh dist/linux dist        # Muzikette-x86_64.AppImage and Muzikette-linux-x64.tar.gz
+```
+
+`packaging/flatpak/` packs that build into the release's Flatpak bundle; it is not a Flathub manifest.
+
 ```powershell
 dotnet build tests/AlbumArtTool.Tests/AlbumArtTool.Tests.csproj -c Release
 $env:ALBUMART_FFMPEG = 'C:\path\to\ffmpeg.exe'
 dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll TestResults   # screenshots land in TestResults
 ```
 
-The suite covers real round trips in nine audio formats (decoded-audio hashes, preserved tags, byte-exact Undo), scanning, artist cleanup, duplicates, every Organize option with crash recovery, update verification, the data-folder move from Music Library Manager, and the pages themselves. CI also installs the real installer, upgrades a real Music Library Manager 3.12.1 install and a 2.5.2 portable copy, and measures startup. Test audio is synthesized tones; it contains no music.
+The suite covers real round trips in nine audio formats (decoded-audio hashes, preserved tags, byte-exact Undo), scanning, artist cleanup, duplicates, every Organize option with crash recovery, update verification, the data-folder move from Music Library Manager, and the pages themselves. CI also installs the real installer, upgrades a real Music Library Manager 3.12.1 install and a 2.5.2 portable copy, and measures startup. On Linux it builds on an older glibc, runs the native self-test, and opens a library in the AppImage and in the installed Flatpak on a real X server. Test audio is synthesized tones; it contains no music.
 
 The README screenshots come from a manual CI run (**Actions › Build, test and package › Run workflow › showcase**) that fetches the covers and track lists of real albums on the build machine and builds a library of silent stand-in files. Nothing it downloads is committed.
 

@@ -26,8 +26,8 @@ namespace AlbumArtTool.Management
 
         internal async Task<string> InstallAsync(IProgress<int> progress, CancellationToken token)
         {
-            if (!Environment.Is64BitOperatingSystem || !OperatingSystem.IsWindows())
-                throw new IOException("Automatic FFmpeg setup needs 64-bit Windows. Choose a compatible local FFmpeg folder instead.");
+            if (!Supported)
+                throw new IOException("Automatic FFmpeg setup needs 64-bit Windows or Linux on x86-64. Install FFmpeg yourself and choose its ffmpeg program instead.");
             string stage = Path.Combine(Path.GetTempPath(), "Muzikette-encoder-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
             try
             {
@@ -40,9 +40,9 @@ namespace AlbumArtTool.Management
                     // GitHub may have moved the builds to a new address: the release names its repository, and downloads come from there.
                     source = RepositoryOf(Json.String(document.RootElement, "html_url")) ?? Repository;
                     JsonElement? asset = Json.Array(document.RootElement, "assets")
-                        .Where(a => Json.String(a, "name").StartsWith("ffmpeg-", StringComparison.Ordinal) && Json.String(a, "name").EndsWith("-win64-lgpl.zip", StringComparison.Ordinal))
-                        .OrderBy(a => Json.String(a, "name") == "ffmpeg-master-latest-win64-lgpl.zip" ? 0 : 1).Select(a => (JsonElement?)a).FirstOrDefault();
-                    if (asset == null) throw new IOException("The latest encoder release does not contain the Windows static LGPL build yet. Try again shortly or choose a local ffmpeg.exe.");
+                        .Where(a => Json.String(a, "name").StartsWith("ffmpeg-", StringComparison.Ordinal) && Json.String(a, "name").EndsWith(BuildSuffix, StringComparison.Ordinal))
+                        .OrderBy(a => Json.String(a, "name") == "ffmpeg-master-latest" + BuildSuffix ? 0 : 1).Select(a => (JsonElement?)a).FirstOrDefault();
+                    if (asset == null) throw new IOException("The latest encoder release does not contain the static LGPL build for this system yet. Try again shortly or choose a local FFmpeg.");
                     url = Json.String(asset, "browser_download_url"); digest = Json.String(asset, "digest");
                     long.TryParse(Json.String(asset, "size"), out size);
                 }
@@ -50,13 +50,13 @@ namespace AlbumArtTool.Management
                     !digest.StartsWith("sha256:", StringComparison.Ordinal) || !UpdateService.ValidHash(digest.Substring(7)))
                     throw new IOException("The FFmpeg download does not have valid release metadata/checksum (" + Address(url) + ", " + (digest.Length == 0 ? "no checksum" : "checksum " + digest.Split(':')[0]) + ").");
                 downloads = new Uri(source).AbsolutePath + "/releases/download/";
-                string zip = Path.Combine(stage, "encoder.zip");
+                string zip = Path.Combine(stage, OperatingSystem.IsWindows() ? "encoder.zip" : "encoder.tar.xz");
                 using (var output = File.Create(zip)) { await Fetch(url, output, size, progress, token).ConfigureAwait(false); if (output.Length != size) throw new IOException("The FFmpeg download was incomplete."); }
                 if (!UpdateService.Hash(zip).Equals(digest.Substring(7), StringComparison.OrdinalIgnoreCase)) throw new IOException("FFmpeg's SHA-256 checksum did not match.");
                 token.ThrowIfCancellationRequested();
                 string extracted = Path.Combine(stage, "tools"); Directory.CreateDirectory(extracted);
-                Extract(zip, extracted);
-                string exe = Path.Combine(extracted, "ffmpeg.exe"); Encoder.Validate(exe, token);
+                if (OperatingSystem.IsWindows()) Extract(zip, extracted); else ExtractTarXz(zip, extracted, token);
+                string exe = Path.Combine(extracted, Encoder.ExecutableName); Encoder.Validate(exe, token);
                 Directory.CreateDirectory(Encoder.Cache);
                 foreach (string file in Directory.GetFiles(extracted))
                 {
@@ -64,11 +64,51 @@ namespace AlbumArtTool.Management
                     string temp = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
                     File.Copy(file, temp);
                     if (File.Exists(destination)) File.Replace(temp, destination, null); else File.Move(temp, destination);
+                    if (!destination.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) && !Path.GetFileName(destination).Contains("LICENSE") && !Path.GetFileName(destination).Contains("COPYING")) Platform.MakeExecutable(destination);
                 }
                 File.WriteAllText(Path.Combine(Encoder.Cache, "SOURCE.txt"), source + "\r\n" + url + "\r\n" + digest + "\r\nFFmpeg is a separate command-line program. Its license notices are supplied here.\r\n");
-                return Path.Combine(Encoder.Cache, "ffmpeg.exe");
+                return Path.Combine(Encoder.Cache, Encoder.ExecutableName);
             }
             finally { try { Directory.Delete(stage, true); } catch { } }
+        }
+
+        /// <summary>64-bit Windows, or Linux on x86-64: the systems BtbN builds static LGPL FFmpeg for.</summary>
+        internal static bool Supported => OperatingSystem.IsWindows() && Environment.Is64BitOperatingSystem || OperatingSystem.IsLinux() && Platform.X64;
+        private static string BuildSuffix => OperatingSystem.IsWindows() ? "-win64-lgpl.zip" : "-linux64-lgpl.tar.xz";
+
+        // Linux builds come as .tar.xz, which .NET cannot read itself: the system's tar unpacks it into a scratch folder,
+        // then ffmpeg, ffprobe and the license notices are picked out exactly as from the Windows zip.
+        internal static void ExtractTarXz(string archive, string output, CancellationToken token)
+        {
+            string scratch = Path.Combine(Path.GetDirectoryName(archive), "unpacked"); Directory.CreateDirectory(scratch);
+            var info = new System.Diagnostics.ProcessStartInfo("tar") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
+            foreach (string argument in new[] { "-xJf", archive, "-C", scratch, "--no-same-owner" }) info.ArgumentList.Add(argument);
+            System.Diagnostics.Process started;
+            try { started = System.Diagnostics.Process.Start(info); }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                throw new IOException("Unpacking FFmpeg needs the tar program, which this system does not have. Install FFmpeg with your package manager instead; Muzikette uses the one on your PATH.");
+            }
+            using (var tar = started)
+            {
+                string error = tar.StandardError.ReadToEnd();
+                if (!tar.WaitForExit(300000)) { try { tar.Kill(); } catch { } throw new IOException("Unpacking FFmpeg took too long."); }
+                if (tar.ExitCode != 0) throw new IOException("Could not unpack FFmpeg: " + error.Trim());
+            }
+            token.ThrowIfCancellationRequested();
+            var files = Directory.GetFiles(scratch, "*", SearchOption.AllDirectories);
+            string Find(string name) => files.SingleOrDefault(f => Path.GetFileName(f) == name && Path.GetFileName(Path.GetDirectoryName(f)) == "bin");
+            string ffmpeg = Find("ffmpeg") ?? throw new IOException("The FFmpeg archive did not contain bin/ffmpeg.");
+            if (new FileInfo(ffmpeg).Length > 350L * 1024 * 1024) throw new IOException("The FFmpeg executable is too large.");
+            File.Copy(ffmpeg, Path.Combine(output, "ffmpeg"));
+            string probe = Find("ffprobe");
+            if (probe != null && new FileInfo(probe).Length <= 350L * 1024 * 1024) File.Copy(probe, Path.Combine(output, "ffprobe"));
+            int count = 0;
+            foreach (string notice in files.Where(f => { var n = Path.GetFileName(f); long length = new FileInfo(f).Length; return length > 0 && length < 2 * 1024 * 1024 &&
+                (n.StartsWith("LICENSE", StringComparison.OrdinalIgnoreCase) || n.StartsWith("COPYING", StringComparison.OrdinalIgnoreCase)); }))
+                File.Copy(notice, Path.Combine(output, (++count) + "-" + Path.GetFileName(notice)));
+            if (count == 0) throw new IOException("The encoder archive did not include license notices.");
+            foreach (string program in new[] { "ffmpeg", "ffprobe" }) if (File.Exists(Path.Combine(output, program))) Platform.MakeExecutable(Path.Combine(output, program));
         }
 
         internal static void Extract(string zip, string output)

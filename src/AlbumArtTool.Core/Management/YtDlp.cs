@@ -153,6 +153,9 @@ namespace AlbumArtTool.Management
             client.Timeout = Timeout.InfiniteTimeSpan; client.DefaultRequestHeaders.UserAgent.ParseAdd("Muzikette/" + UpdateService.DisplayVersion);
         }
 
+        /// <summary>64-bit Windows, or Linux on x86-64: the systems yt-dlp and Deno publish standalone builds for.</summary>
+        internal static bool Supported => OperatingSystem.IsWindows() && Environment.Is64BitOperatingSystem || OperatingSystem.IsLinux() && Platform.X64;
+
         internal static bool Installed => File.Exists(Path.Combine(YtDlp.Cache, YtDlp.ExecutableName)) && File.Exists(Path.Combine(YtDlp.Cache, YtDlp.DenoName));
         internal static string InstalledTag { get { try { return File.ReadAllText(VersionFile).Trim(); } catch { return ""; } } }
 
@@ -165,30 +168,34 @@ namespace AlbumArtTool.Management
         /// <summary>Downloads yt-dlp (and Deno when missing or asked for). Progress is 0–100 over both downloads.</summary>
         internal async Task<string> InstallAsync(bool includeDeno, IProgress<int> progress, CancellationToken token)
         {
-            if (!Environment.Is64BitOperatingSystem || !OperatingSystem.IsWindows())
-                throw new IOException("Automatic setup needs 64-bit Windows. Put yt-dlp and deno on PATH instead.");
+            if (!Supported)
+                throw new IOException("Automatic setup needs 64-bit Windows or Linux on x86-64. Put yt-dlp and deno on PATH instead.");
             string stage = Path.Combine(Path.GetTempPath(), "Muzikette-downloader-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
             try
             {
                 string tag;
-                string ytdlp = Path.Combine(stage, "yt-dlp.exe");
+                // yt-dlp.exe on Windows; on Linux the standalone yt-dlp_linux build, saved as yt-dlp.
+                string ytdlp = Path.Combine(stage, YtDlp.ExecutableName);
                 using (var release = await ReleaseAsync(YtDlpApi, token).ConfigureAwait(false))
                 {
                     tag = Json.String(release.RootElement, "tag_name");
-                    await FetchAsset(release.RootElement, "yt-dlp.exe", ytdlp, 64L * 1024 * 1024, new Progress<int>(p => progress?.Report(includeDeno ? p / 3 : p)), token).ConfigureAwait(false);
+                    await FetchAsset(release.RootElement, OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp_linux", ytdlp, 64L * 1024 * 1024, new Progress<int>(p => progress?.Report(includeDeno ? p / 3 : p)), token).ConfigureAwait(false);
                 }
+                Platform.MakeExecutable(ytdlp);
                 bool deno = includeDeno || !File.Exists(Path.Combine(YtDlp.Cache, YtDlp.DenoName));
                 if (deno)
                     using (var release = await ReleaseAsync(DenoApi, token).ConfigureAwait(false))
                     {
                         string zip = Path.Combine(stage, "deno.zip");
-                        await FetchAsset(release.RootElement, "deno-x86_64-pc-windows-msvc.zip", zip, 256L * 1024 * 1024, new Progress<int>(p => progress?.Report(33 + p * 2 / 3)), token).ConfigureAwait(false);
+                        await FetchAsset(release.RootElement, OperatingSystem.IsWindows() ? "deno-x86_64-pc-windows-msvc.zip" : "deno-x86_64-unknown-linux-gnu.zip", zip, 256L * 1024 * 1024,
+                            new Progress<int>(p => progress?.Report(33 + p * 2 / 3)), token).ConfigureAwait(false);
                         using (var archive = ZipFile.OpenRead(zip))
                         {
-                            var exe = archive.Entries.Single(e => e.FullName.Equals("deno.exe", StringComparison.OrdinalIgnoreCase));
+                            var exe = archive.Entries.Single(e => e.FullName.Equals(YtDlp.DenoName, StringComparison.OrdinalIgnoreCase));
                             if (exe.Length > 512L * 1024 * 1024) throw new IOException("The Deno executable is too large.");
-                            exe.ExtractToFile(Path.Combine(stage, "deno.exe"));
+                            exe.ExtractToFile(Path.Combine(stage, YtDlp.DenoName));
                         }
+                        Platform.MakeExecutable(Path.Combine(stage, YtDlp.DenoName));
                         File.Delete(zip);
                     }
                 if (!YtDlp.Version(ytdlp, token).StartsWith(tag.Substring(0, Math.Min(4, tag.Length)), StringComparison.Ordinal)) throw new IOException("The downloaded yt-dlp did not start correctly.");
@@ -199,6 +206,7 @@ namespace AlbumArtTool.Management
                     string temp = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
                     File.Copy(file, temp);
                     if (File.Exists(destination)) File.Replace(temp, destination, null); else File.Move(temp, destination);
+                    Platform.MakeExecutable(destination);
                 }
                 File.WriteAllText(VersionFile, tag);
                 File.WriteAllText(Path.Combine(YtDlp.Cache, "SOURCE.txt"), "yt-dlp " + tag + " from https://github.com/yt-dlp/yt-dlp (Unlicense)\r\nDeno from https://github.com/denoland/deno (MIT)\r\n" +
