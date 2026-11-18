@@ -286,6 +286,9 @@ namespace AlbumArtTool
             var main = Kit.Grid("*", "Auto,*").Add(top.Cell(0, 0), pageHost.Cell(1, 0));
             main.Margin = new Thickness(24, 20, 24, 20);
             var shell = Kit.Grid("232,*", "*").Add(BuildSidebar().Cell(0, 0), main.Cell(0, 1));
+            onlyMissing.Tip("Keeps existing embedded front covers. Uncheck to replace the cover on every track in this album.");
+            folderCover.Tip("Updates recognized cover/folder/front/album/albumart images, or creates cover.jpg. Disabled when multiple albums share a folder.");
+            undo.Named("Undo last change").Tip("Restore the files from your most recent cover or artist edit in this session (Ctrl+Z). Organize runs are undone in Organize.");
             // The app's own title bar: the window keys in the top-right corner; the strip above the display, the display
             // itself and the wordmark are where the window is dragged from.
             if (Chrome.Enabled)
@@ -295,9 +298,6 @@ namespace AlbumArtTool
                 var framed = new Panel(); framed.Children.Add(shell); framed.Children.Add(strip); framed.Children.Add(Chrome.Keys(this));
                 return framed;
             }
-            onlyMissing.Tip("Keeps existing embedded front covers. Uncheck to replace the cover on every track in this album.");
-            folderCover.Tip("Updates recognized cover/folder/front/album/albumart images, or creates cover.jpg. Disabled when multiple albums share a folder.");
-            undo.Named("Undo last change").Tip("Restore the files from your most recent cover or artist edit in this session (Ctrl+Z). Organize runs are undone in Organize.");
             return shell;
         }
 
