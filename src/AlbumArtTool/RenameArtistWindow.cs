@@ -74,7 +74,7 @@ namespace AlbumArtTool
                 "originals are backed up, and Organize › Preview Undo restores them.", Kit.Small);
             warning.TextWrapping = TextWrapping.Wrap; warning.TextTrimming = TextTrimming.None; warning.Named("Rename warning");
             var warningIcon = Kit.Glyph(Icons.Warning, 18); warningIcon.Margin = new Thickness(0, 0, 10, 0); warningIcon.VerticalAlignment = VerticalAlignment.Top;
-            var warningBox = new Border { Child = Kit.Grid("Auto,*", "Auto").Add(warningIcon.Cell(0, 0), warning.Cell(0, 1)), CornerRadius = new CornerRadius(10), Padding = new Thickness(12, 10), Margin = new Thickness(0, 12, 0, 0) };
+            var warningBox = new Border { Child = Kit.Grid("Auto,*", "Auto").Add(warningIcon.Cell(0, 0), warning.Cell(0, 1)), CornerRadius = new CornerRadius(6), Padding = new Thickness(12, 10), Margin = new Thickness(0, 12, 0, 0) };
             warningBox.Brush(Border.BackgroundProperty, "BadgeWarning");
             preview.Named("Preview artist rename").Tip("Open Organize with this rename only and list every song it changes. Nothing is written until you click Apply there.");
             cancel.Click += (s, e) => Close();
@@ -92,7 +92,7 @@ namespace AlbumArtTool
             var intro = Kit.Label("Tick every name to change (for example all the names one artist released under) and type the one name they should become.", Kit.Small, cls: "muted");
             intro.TextWrapping = TextWrapping.Wrap; intro.TextTrimming = TextTrimming.None;
             var layout = new StackPanel { Margin = new Thickness(22, 18, 22, 16), Spacing = 4 };
-            layout.Children.Add(Kit.Label(folderName == null ? "Rename artists everywhere" : "Rename artists in " + folderName, 17.33, true).Named("Rename title"));
+            layout.Children.Add(Kit.Heading(folderName == null ? "Rename artists everywhere" : "Rename artists in " + folderName, 18).Named("Rename title"));
             layout.Children.Add(intro);
             layout.Children.Add(Kit.Label("Artists", Kit.Small, cls: "muted").Also(l => l.Margin = new Thickness(0, 10, 0, 0))); layout.Children.Add(find);
             layout.Children.Add(Kit.Inset(list).Also(b => b.Padding = new Thickness(2))); layout.Children.Add(pickedRow);

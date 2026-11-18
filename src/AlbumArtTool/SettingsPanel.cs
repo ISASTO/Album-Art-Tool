@@ -22,7 +22,7 @@ namespace AlbumArtTool
     {
         private readonly Func<string> musicFolder;
         private readonly Func<Task> changeFolder, checkUpdates;
-        private readonly Button systemTheme = Kit.Button("Match Windows", "chip"), lightTheme = Kit.Button("Light", "chip"), darkTheme = Kit.Button("Dark", "chip");
+        private readonly Button systemTheme = Kit.Button("Match Windows", "chip"), lightTheme = Kit.Button("Silver", "chip"), darkTheme = Kit.Button("Black", "chip");
         private readonly TextBlock folderValue = Value(), backupValue = Value(), encoderValue = Value(), downloaderValue = Value(), cookiesValue = Value(), versionValue = Value();
         private readonly Button changeMusic = Kit.Button("Change…"), changeBackup = Kit.Button("Change…"), openBackup = Kit.Button("Open"),
             downloadEncoder = Kit.Button("Download"), chooseEncoder = Kit.Button("Choose…"), downloadDownloader = Kit.Button("Download"),
@@ -37,9 +37,9 @@ namespace AlbumArtTool
         internal SettingsPanel(Func<string> musicFolder, Func<Task> changeFolder, Func<Task> checkUpdates)
         {
             this.musicFolder = musicFolder; this.changeFolder = changeFolder; this.checkUpdates = checkUpdates;
-            systemTheme.Named("Appearance: Match Windows").Tip("Follow the light or dark setting in Windows, switching automatically when Windows does.");
-            lightTheme.Named("Appearance: Light").Tip("Always use the light appearance, whatever Windows uses.");
-            darkTheme.Named("Appearance: Dark").Tip("Always use the dark appearance, whatever Windows uses.");
+            systemTheme.Named("Appearance: Match Windows").Tip("Silver when Windows is light, Black when it is dark, switching automatically when Windows does.");
+            lightTheme.Named("Appearance: Light").Tip("Always use the Silver finish (light), whatever Windows uses.");
+            darkTheme.Named("Appearance: Dark").Tip("Always use the Black finish (dark), whatever Windows uses.");
             systemTheme.Click += (s, e) => SetTheme(ThemeMode.System);
             lightTheme.Click += (s, e) => SetTheme(ThemeMode.Light);
             darkTheme.Click += (s, e) => SetTheme(ThemeMode.Dark);
@@ -65,7 +65,7 @@ namespace AlbumArtTool
             message.Named("Settings status"); message.TextWrapping = TextWrapping.Wrap; message.TextTrimming = TextTrimming.None;
 
             var sections = new StackPanel { Spacing = 12 };
-            sections.Children.Add(Section("Appearance", Row("Theme", themes)));
+            sections.Children.Add(Section("Appearance", Row("Finish", themes)));
             sections.Children.Add(Section("Library", Row("Music folder", folderValue, changeMusic), Row("Backups", backupValue, changeBackup, openBackup)));
             // Add music: how many songs download at once.
             parallel.Value = AddMusic.Parallel;
@@ -104,7 +104,7 @@ namespace AlbumArtTool
             var caption = Kit.Caption(title); caption.Margin = new Thickness(2, 0, 0, 6);
             stack.Children.Add(caption);
             foreach (var row in rows) stack.Children.Add(row);
-            return Kit.Frost(stack, new Thickness(16, 12, 12, 12), 14);
+            return Kit.Frost(stack, new Thickness(16, 12, 12, 12));
         }
 
         private static Control Row(string label, Control value, params Button[] buttons)

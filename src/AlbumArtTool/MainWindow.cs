@@ -39,10 +39,17 @@ namespace AlbumArtTool
         private readonly Button missingTab = Kit.Button("Missing art", "chip");
         private readonly Button existingTab = Kit.Button("Has art", "chip");
         private readonly Button allTab = Kit.Button("All", "chip");
-        private readonly Button choose = Kit.Button("Choose image…");
+        private readonly Button choose = Kit.IconButton(Icons.Image, "Choose image…");
+        private readonly Button discard = Kit.Button("Discard", "link");
+        private readonly Pill coverage = new Pill();
+        private readonly DisplayWindow display = new DisplayWindow();
+        private readonly CoverWash wash = new CoverWash();
+        private readonly StackPanel figures = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 20 };
+        private Control statusBar;
+        internal DisplayWindow Display => display;
         private readonly Button apply = Kit.Button("Apply cover", "primary");
         private readonly Button undo = Kit.IconButton(Icons.Undo, "Undo", "ghost");
-        private readonly Button openFolder = Kit.Button("Open album folder");
+        private readonly Button openFolder = Kit.IconButton(Icons.Folder, "Open album folder");
         // Only shown when something went wrong, labelled with how many problems there are.
         private readonly Button issuesButton = Kit.Button("Issues");
         private readonly AlbumList albums = new AlbumList();
@@ -52,7 +59,7 @@ namespace AlbumArtTool
         private readonly Border coverFrame;
         private readonly TextBlock selectedTitle = Kit.Label("Select an album", 17.33, true);
         private readonly TextBlock selectedArtist = Kit.Label("", Kit.Body, cls: "muted");
-        private readonly TextBlock coverCaption = Kit.Label("Drop a cover image here", Kit.Tiny, cls: "muted");
+        private readonly TextBlock coverCaption = Kit.Label("Drop a cover image here", 11.33, cls: "muted");
         private readonly TextBlock detail = Kit.Label("", Kit.Tiny, cls: "muted");
         private readonly TextBlock selectedPath = Kit.Label("", 11.33, cls: "muted");
         private readonly EmptyState empty = new EmptyState();
@@ -90,19 +97,19 @@ namespace AlbumArtTool
         {
             coverSearch = onlineService ?? new CoverSearchService();
             online = new CoverSearchPanel(coverSearch) { UseCover = ApplyOnlineCoverAsync };
-            Title = "Music Library Manager";
+            Title = "Muzikette";
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             Width = 1320; Height = 840; MinWidth = 1140; MinHeight = 720;
             Root = root;
             browse.Named("Music folder"); search.Named("Search albums, artists or folders");
-            coverFrame = new Border { CornerRadius = new CornerRadius(10), ClipToBounds = true, Margin = new Thickness(4, 0, 8, 2), Cursor = new Cursor(StandardCursorType.Hand), Child = cover };
+            coverFrame = new Border { CornerRadius = new CornerRadius(3), ClipToBounds = true, Margin = new Thickness(4, 0, 8, 2), Cursor = new Cursor(StandardCursorType.Hand), Child = cover };
             coverFrame.Brush(Border.BackgroundProperty, "Input");
             coverFrame.Named("Album cover preview and image drop target");
             Kit.Prepare(this, BuildLayout());
             closePage.Named("Close YouTube Music").Tip("Close the YouTube Music page. Replacements already made stay, and can be undone from Organize › Preview Undo.");
             closePage.Click += (s, e) => CloseYouTube();
-            albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? (currentJob.Artist == null ? "Applying cover…" : "Updating artists…") : "Queued") :
-                showingArtists ? (album.ArtistChangeCount > 0 ? album.ArtistChangeCount + (album.ArtistChangeCount == 1 ? " track with artist changes" : " tracks with artist changes") : "No artist changes suggested") : null;
+            albums.WorkStatus = album => queuedAlbums.Contains(album.Key) ? (currentJob?.Album.Key == album.Key ? (currentJob.Artist == null ? "Writing cover" : "Writing artists") : "Queued", "Accent") :
+                showingArtists ? (album.ArtistChangeCount > 0 ? (album.ArtistChangeCount + " to credit", "Warning") : ("Credited", "Positive")) : ((string, string)?)null;
             browse.Click += async (s, e) => await ChangeFolderAsync();
             SetScanButton(false);
             scan.Click += async (s, e) =>
@@ -148,6 +155,8 @@ namespace AlbumArtTool
                 else cancellation?.Cancel();
             };
             Closed += (s, e) => Shutdown();
+            // Once per launch the name scrolls across the display before the readouts light up (click to skip).
+            Opened += (s, e) => display.Boot("Muzikette");
             AddHandler(KeyDownEvent, OnKey, RoutingStrategies.Tunnel);
             AddHandler(PointerPressedEvent, (s, e) => lastModifiers = e.KeyModifiers, RoutingStrategies.Tunnel);
             AddHandler(KeyUpEvent, (s, e) => lastModifiers = e.KeyModifiers, RoutingStrategies.Tunnel);
@@ -161,7 +170,7 @@ namespace AlbumArtTool
         internal AlbumList Albums => albums;
         internal CoverSearchPanel Online => online;
         internal bool HasStagedCover => pending != null;
-        internal void DiscardStaged() => ShowSelection();
+        internal void DiscardStaged() { if (pending != null && !busy && !queueRunning) status.Text = "Ready"; ShowSelection(); }
 
         private void OnKey(object sender, KeyEventArgs e)
         {
@@ -180,7 +189,7 @@ namespace AlbumArtTool
             }
             else if (e.Key == Key.F5 && !busy) { _ = ScanAsync((e.KeyModifiers & KeyModifiers.Shift) != 0); e.Handled = true; }
             else if (control && e.Key == Key.Z && undo.IsEnabled && !(e.Source is TextBox)) { _ = UndoAsync(); e.Handled = true; }
-            else if (e.Key == Key.Escape && pending != null && !busy) { ShowSelection(); e.Handled = true; }
+            else if (e.Key == Key.Escape && pending != null && !busy) { DiscardStaged(); e.Handled = true; }
         }
 
         private Control BuildLayout()
@@ -193,55 +202,83 @@ namespace AlbumArtTool
                 chips.Children.Add(tab);
             }
             viewChips = chips;
+            artistChips = BuildArtistChips();
+            var chipHost = new Panel(); chipHost.Children.Add(chips); chipHost.Children.Add(artistChips);
             search.Width = 300; search.Margin = new Thickness(3, 0, 0, 0);
-            var tabs = Kit.Grid("*,Auto", "Auto").Add(chips.Cell(0, 0), search.Cell(0, 1));
-            tabs.Margin = new Thickness(0, 0, 0, 10);
+            var tabs = Kit.Grid("*,Auto", "Auto").Add(chipHost.Cell(0, 0), search.Cell(0, 1));
+            tabs.Margin = new Thickness(0, 0, 0, 12);
             empty.Margin = new Thickness(30);
             empty.Show(Icons.Refresh, "Scanning your music…", "Albums appear when the scan finishes.");
             var listHost = new Panel(); listHost.Children.Add(albums); listHost.Children.Add(empty);
-            var listLayout = Kit.Grid("*", "57,*").Add(BuildLibraryToolbar().Cell(0, 0), listHost.Cell(1, 0));
-            var listPanel = Kit.Frost(listLayout, new Thickness(8, 10, 8, 10)); listPanel.Margin = new Thickness(0, 0, 16, 0);
-            selectedArtist.Margin = new Thickness(0, 0, 0, 2);
-            coverCaption.HorizontalAlignment = HorizontalAlignment.Center; detail.HorizontalAlignment = HorizontalAlignment.Center;
-            var preview = Kit.Grid("*", "*,19,19").Add(coverFrame.Cell(0, 0), coverCaption.Cell(1, 0), detail.Cell(2, 0));
-            foreach (var check in new[] { onlyMissing, folderCover }) check.Margin = new Thickness(5, 0, 0, 0);
-            var editing = Kit.Grid("*", "32,28,28,36").Add(choose.Cell(0, 0), onlyMissing.Cell(1, 0), folderCover.Cell(2, 0), apply.Cell(3, 0));
-            var manual = Kit.Grid("145,*", "*").Add(preview.Cell(0, 0), editing.Cell(0, 1));
-            manual.Margin = new Thickness(0, 8, 0, 0);
-            openFolder.Classes.Add("link");
-            var path = Kit.Grid("*,Auto", "*").Add(selectedPath.Cell(0, 0), openFolder.Cell(0, 1));
-            var sidebar = Kit.Grid("*", "29,23,*,141,30").Add(selectedTitle.Cell(0, 0), selectedArtist.Cell(1, 0), online.Cell(2, 0), manual.Cell(3, 0), path.Cell(4, 0));
+            var listLayout = Kit.Grid("*", "Auto,*").Add(BuildLibraryToolbar().Cell(0, 0), listHost.Cell(1, 0));
+            var listPanel = Kit.Frost(listLayout, new Thickness(8, 8, 8, 10)); listPanel.Margin = new Thickness(0, 0, 14, 0);
+
+            // The cover you have, or the new one you are about to apply, is the first thing in the details pane.
+            coverFrame.Width = coverFrame.Height = 168; coverFrame.Margin = new Thickness(0); coverFrame.CornerRadius = new CornerRadius(3);
+            coverCaption.HorizontalAlignment = HorizontalAlignment.Center; coverCaption.TextAlignment = TextAlignment.Center;
+            coverCaption.Width = 168; coverCaption.Margin = new Thickness(0, 7, 0, 0); coverCaption.FontSize = Kit.Small;
+            discard.Named("Discard new cover").Tip("Forget the image you chose and show the album's current cover again (Esc). Nothing was written.");
+            discard.HorizontalAlignment = HorizontalAlignment.Center; discard.IsVisible = false; discard.FontSize = 10; discard.Margin = new Thickness(0, 2, 0, 0);
+            discard.Click += (s, e) => { if (pending != null && !busy) DiscardStaged(); };
+            var coverStack = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
+            coverStack.Children.Add(coverFrame); coverStack.Children.Add(coverCaption); coverStack.Children.Add(discard);
+            var kicker = Kit.Legend("Album", 8.5); kicker.Margin = new Thickness(1, 2, 0, 8);
+            selectedTitle.FontFamily = Skin.Display; selectedTitle.FontWeight = FontWeight.ExtraBold; selectedTitle.FontSize = 25;
+            selectedTitle.TextWrapping = TextWrapping.Wrap; selectedTitle.MaxLines = 2; selectedTitle.LineHeight = 28;
+            selectedArtist.FontSize = 15; selectedArtist.Margin = new Thickness(0, 4, 0, 0);
+            detail.FontSize = Kit.Small; detail.TextWrapping = TextWrapping.Wrap; selectedPath.FontSize = 11;
+            figures.Margin = new Thickness(0, 14, 0, 0);
+            coverage.Margin = new Thickness(0, 12, 0, 4);
+            openFolder.Classes.Add("ghost"); openFolder.Margin = new Thickness(-10, 4, 0, 0); openFolder.HorizontalAlignment = HorizontalAlignment.Left; openFolder.Height = 30;
+            var info = new StackPanel { Spacing = 0, Margin = new Thickness(20, 0, 0, 0), VerticalAlignment = VerticalAlignment.Top };
+            foreach (var c in new Control[] { kicker, selectedTitle, selectedArtist, detail, figures, coverage, selectedPath, openFolder }) info.Children.Add(c);
+            var head = Kit.Grid("Auto,*", "Auto").Add(coverStack.Cell(0, 0), info.Cell(0, 1));
+            online.Margin = new Thickness(0, 18, 0, 0);
+            // One action bar: where the cover comes from, what it changes, and Apply.
+            choose.Height = 38; choose.Padding = new Thickness(14, 2); choose.Margin = new Thickness(0); choose.VerticalAlignment = VerticalAlignment.Center;
+            choose.Tip("Pick an image file (JPG, PNG, BMP or GIF) for this album. You can also drop one on the cover above or on the album in the list.");
+            // What the cover changes sits above the keys that choose and apply it.
+            var options = new WrapPanel { Margin = new Thickness(0, 0, 0, 12), VerticalAlignment = VerticalAlignment.Center };
+            foreach (var check in new[] { onlyMissing, folderCover }) { check.Margin = new Thickness(0, 0, 22, 2); options.Children.Add(check); }
+            apply.Height = 42; apply.MinWidth = 200; apply.Padding = new Thickness(18, 2); apply.Margin = new Thickness(0); apply.VerticalAlignment = VerticalAlignment.Center; apply.FontSize = 11.5;
+            var actionBar = Kit.Grid("Auto,*,Auto", "Auto,Auto").Add(options.Cell(0, 0, 3), choose.Cell(1, 0), apply.Cell(1, 2));
+            var bar = new Border { Child = actionBar, Classes = { "actionbar" }, Margin = new Thickness(0, 14, 0, 0) };
+            var sidebar = Kit.Grid("*", "Auto,*,Auto").Add(head.Cell(0, 0), online.Cell(1, 0), bar.Cell(2, 0));
             coverPanel = sidebar; artistPanel = BuildArtistPanel(); artistPanel.IsVisible = false;
             var detailHost = new Panel(); detailHost.Children.Add(sidebar); detailHost.Children.Add(artistPanel);
-            var details = Kit.Frost(detailHost, new Thickness(9, 9, 9, 11));
+            // The selected album lends its details a faint wash of its cover's colors.
+            var washed = new Panel(); washed.Children.Add(wash); washed.Children.Add(new Border { Child = detailHost, Padding = new Thickness(20, 18, 20, 18) });
+            var details = Kit.Frost(washed, new Thickness(0)); details.ClipToBounds = true;
             var body = Kit.Grid("*,560", "*").Add(listPanel.Cell(0, 0), details.Cell(0, 1));
             libraryView = Kit.Grid("*", "Auto,*").Add(tabs.Cell(0, 0), body.Cell(1, 0));
             pageHost.Children.Add(libraryView);
             activityPage = BuildActivityPage(); AddPage(activityPage);
 
-            // Page header: what this page is, plus Undo, which works from every page.
-            var titles = new StackPanel { Spacing = 1, VerticalAlignment = VerticalAlignment.Center };
-            titles.Children.Add(pageTitle); titles.Children.Add(pageSubtitle);
+            // The display window: the page and its counts glow on the left, whatever is running on the right.
+            // Page keys (Undo, Rename artists, Close) sit beside it on the faceplate.
             pageTitle.Named("Page title");
-            var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+            status.Named("Operation status and track counter");
+            status.PropertyChanged += (s, e) => { if (e.Property == TextBlock.TextProperty) UpdateStatusBar(); };
+            progress.Named("Scan and update progress"); progress.IsVisible = false; progress.Classes.Add("display"); progress.Width = 230;
+            progressPercent.Named("Progress percentage"); progressPercent.FontFamily = Skin.Readout; progressPercent.FontWeight = FontWeight.Bold; progressPercent.FontSize = 15;
+            progressPercent.Foreground = new SolidColorBrush(Skin.Amber); progressPercent.Effect = Skin.Glow(Skin.Amber, 6, 0.5); progressPercent.MinWidth = 40; progressPercent.TextAlignment = TextAlignment.Right;
+            display.SetMeter(progress, progressPercent);
+            display.Named("Display");
+            // The page's name and status line stay as text for screen readers and tests; the display shows them.
+            var hidden = new Panel { IsVisible = false }; hidden.Children.Add(pageTitle); hidden.Children.Add(pageSubtitle); hidden.Children.Add(status);
+            var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
             var help = Kit.IconButton(Icons.Keyboard, "", "ghost").Named("Keyboard shortcuts").Tip("Keyboard shortcuts (F1).");
             help.Click += (s, e) => ShowShortcuts();
             renameArtist.Named("Rename an artist").Tip("Change one or more artists to a single name in every song of your library (Artist and Album Artist tags), for example an artist who released under several names. You preview every change first.");
             renameArtist.Click += (s, e) => ShowRenameArtist();
-            foreach (var b in new[] { renameArtist, closePage, undo, help }) { b.Height = 34; actions.Children.Add(b); }
-            var header = Kit.Grid("*,Auto", "Auto").Add(titles.Cell(0, 0), actions.Cell(0, 1));
-            header.Margin = new Thickness(0, 0, 0, 14);
-
-            status.Named("Operation status and track counter");
-            progress.Named("Scan and update progress"); progress.IsVisible = false;
-            progressPercent.HorizontalAlignment = HorizontalAlignment.Right; progressPercent.Named("Progress percentage");
-            var progressArea = Kit.Grid("*,44", "*").Add(progress.Cell(0, 0), progressPercent.Cell(0, 1));
-            progressArea.Width = 200;
-            var bottom = Kit.Grid("*,Auto,Auto", "*").Add(status.Cell(0, 0), progressArea.Cell(0, 1), issuesButton.Cell(0, 2));
-            bottom.Margin = new Thickness(0, 8, 0, 0);
-            var main = Kit.Grid("*", "Auto,*,36").Add(header.Cell(0, 0), pageHost.Cell(1, 0), bottom.Cell(2, 0));
-            main.Margin = new Thickness(24, 18, 24, 8);
-            var shell = Kit.Grid("240,*", "*").Add(BuildSidebar().Cell(0, 0), main.Cell(0, 1));
+            issuesButton.Classes.Add("ghost"); issuesButton.Margin = new Thickness(0); issuesButton.Padding = new Thickness(12, 2);
+            foreach (var b in new[] { issuesButton, renameArtist, closePage, undo, help }) { b.Height = 34; actions.Children.Add(b); }
+            var top = Kit.Grid("*,Auto,0", "Auto").Add(display.Cell(0, 0), actions.Cell(0, 1), hidden.Cell(0, 2));
+            top.Margin = new Thickness(0, 0, 0, 16);
+            statusBar = display;
+            var main = Kit.Grid("*", "Auto,*").Add(top.Cell(0, 0), pageHost.Cell(1, 0));
+            main.Margin = new Thickness(24, 20, 24, 20);
+            var shell = Kit.Grid("232,*", "*").Add(BuildSidebar().Cell(0, 0), main.Cell(0, 1));
             onlyMissing.Tip("Keeps existing embedded front covers. Uncheck to replace the cover on every track in this album.");
             folderCover.Tip("Updates recognized cover/folder/front/album/albumart images, or creates cover.jpg. Disabled when multiple albums share a folder.");
             undo.Named("Undo last change").Tip("Restore the files from your most recent cover or artist edit in this session (Ctrl+Z). Organize runs are undone in Organize.");
@@ -304,6 +341,9 @@ namespace AlbumArtTool
             missingTab.Content = "Missing art (" + missingCount + ")";
             existingTab.Content = "Has art (" + existingCount + ")";
             allTab.Content = "All (" + library.Albums.Count + ")";
+            cleanupTab.Content = "Needs cleanup (" + artistCount + ")";
+            everyTab.Content = "All albums (" + library.Albums.Count + ")";
+            listCount.Text = !hasScanned ? "" : Count(visible.Count, "album") + (query.Length > 0 ? " match “" + query + "”" : "");
             UpdateBadges();
             if (current == Page.Albums) UpdateHeader();
             empty.IsVisible = visible.Count == 0;
@@ -325,14 +365,19 @@ namespace AlbumArtTool
             var album = albums.SelectedAlbum;
             if (showingArtists)
             {
-                online.SetAlbum(null, false); ShowArtistSelection(); UpdateLibraryTools(); return;
+                online.SetAlbum(null, false); wash.Show(album?.Key, album?.Thumbnail); ShowArtistSelection(); UpdateLibraryTools(); return;
             }
             selectedTitle.Text = album?.Title ?? "Select an album";
             selectedArtist.Text = album?.Artist ?? "";
-            selectedPath.Text = album?.Folder ?? "";
-            selectedTitle.Tip(album?.Title); selectedPath.Tip(album?.Folder);
-            detail.Text = album == null ? "" : album.Tracks.Count + " tracks · " + album.MissingCount + " missing covers";
-            coverCaption.Text = album?.Thumbnail != null ? (album.PreviewTrack != null ? "Current embedded cover" : "Current folder cover") : "Drop a cover image here";
+            selectedPath.Text = album == null ? "" : Kit.MiddleEllipsis(album.Folder, 64);
+            selectedTitle.Tip(album?.Title); selectedPath.Tip(album?.Folder); openFolder.Tip(album == null ? "Open this album's folder in File Explorer." : "Open " + album.Folder + " in File Explorer.");
+            detail.Text = album == null ? "Pick an album on the left to see its cover and find a new one." : "";
+            detail.IsVisible = album == null;
+            ShowFigures(album);
+            wash.Show(album?.Key, album?.Thumbnail);
+            coverCaption.Text = album?.Thumbnail != null ? (album.PreviewTrack != null ? "Current cover" : "Current folder image") : album != null ? "Drop an image here" : "";
+            coverage.Set(album == null ? null : album.Coverage, album == null ? null : album.MissingCount > 0 ? "Warning" : "Positive");
+            discard.IsVisible = false; openFolder.IsVisible = selectedPath.IsVisible = album != null;
             SetPreview(album?.Thumbnail);
             if (album?.Thumbnail != null) _ = LoadPreviewAsync(album, version);
             bool shared = album != null && SharedFolder(album);
@@ -345,6 +390,24 @@ namespace AlbumArtTool
             online.SetAlbum(album, !busy && !maintenanceRunning && (album == null || !queuedAlbums.Contains(album.Key)));
             UpdateLibraryTools();
         }
+
+        // The album's vital numbers, printed on the panel: tracks, running time, and format with its bitrate.
+        private void ShowFigures(Album album)
+        {
+            figures.Children.Clear();
+            figures.IsVisible = album != null && album.Tracks.Count > 0;
+            if (!figures.IsVisible) return;
+            var minutes = TimeSpan.FromTicks(album.Tracks.Sum(t => t.Duration.Ticks));
+            var formats = album.Tracks.Select(t => Path.GetExtension(t.Path).TrimStart('.').ToUpperInvariant()).Where(f => f.Length > 0).Distinct().ToList();
+            bool lossless = album.Tracks.All(t => t.Lossless);
+            var rates = album.Tracks.Where(t => t.Bitrate > 0).Select(t => t.Bitrate).ToList();
+            string quality = lossless ? "Lossless" : rates.Count > 0 ? (int)Math.Round(rates.Average()) + " kbps" : "";
+            figures.Children.Add(Kit.Figure(album.Tracks.Count.ToString(), album.Tracks.Count == 1 ? "Track" : "Tracks", out _));
+            if (minutes.TotalSeconds >= 1) figures.Children.Add(Kit.Figure(minutes.TotalHours >= 1 ? (int)minutes.TotalHours + ":" + minutes.Minutes.ToString("00") : ((int)minutes.TotalMinutes).ToString(), minutes.TotalHours >= 1 ? "Hours" : "Min", out _));
+            if (formats.Count > 0) figures.Children.Add(Kit.Figure(formats.Count == 1 ? formats[0] : "Mixed", quality, out _).Tip(string.Join(", ", formats) + (rates.Count > 0 && !lossless ? " · average " + quality : "")));
+        }
+
+        private static string Count(int n, string noun) => n + " " + noun + (n == 1 ? "" : "s");
 
         private bool SharedFolder(Album album)
         {
@@ -395,9 +458,11 @@ namespace AlbumArtTool
         private void SetPendingImage(byte[] image)
         {
             ++previewVersion; pending = image; SetPreview(image);
-            coverCaption.Text = "New cover · ready to apply";
             var size = Artwork.ReadInfo(image);
-            detail.Text = size.Width + " × " + size.Height + " · " + image.Length / 1024 + " KB";
+            coverCaption.Text = "New cover · " + size.Width + " × " + size.Height;
+            coverage.Set("New cover ready to apply", "Accent"); discard.IsVisible = true;
+            Motion.Drop(coverFrame.Child as Visual);
+            wash.Show("new " + previewVersion, image);
             UpdateApplyButton();
         }
 
@@ -434,7 +499,7 @@ namespace AlbumArtTool
                 empty.Show(Icons.Refresh, "Scanning your music…", "Albums appear when the scan finishes.");
                 albums.IsVisible = false; empty.IsVisible = true;
             }
-            UpdateIssues();
+            UpdateIssues(); UpdateStatusBar();
             UpdateApplyButton(); UpdateLibraryTools();
         }
 

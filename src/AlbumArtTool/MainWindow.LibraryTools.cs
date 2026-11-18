@@ -18,8 +18,8 @@ namespace AlbumArtTool
         private readonly ComboBox albumFilter = new ComboBox(), albumSort = new ComboBox();
         private readonly TextBox mainArtist = new TextBox();
         private readonly Button applyArtist = Kit.Button("Set track artists", "primary");
-        private readonly Button openArtistAlbum = Kit.Button("Open album folder"), showArtistTrack = Kit.Button("Show selected track");
-        private readonly TextBlock artistHeading = Kit.Label("Select an album", 17.33, true), artistSummary = Kit.Label("", Kit.Body, cls: "muted");
+        private readonly Button openArtistAlbum = Kit.IconButton(Icons.Folder, "Open folder", "ghost"), showArtistTrack = Kit.IconButton(Icons.Open, "Show track", "ghost");
+        private readonly TextBlock artistHeading = Kit.Heading("Select an album", 22), artistSummary = Kit.Label("", Kit.Body, cls: "muted");
         private readonly ListBox artistPreview = new ListBox { Classes = { "grid" } };
         private List<ArtistRow> artistRows = new List<ArtistRow>();
         private Control artistPanel, coverPanel;
@@ -34,31 +34,75 @@ namespace AlbumArtTool
             internal void Set(string after, bool changes) { if (after == After && changes == Changes) return; After = after; Changes = changes; Changed?.Invoke(); }
         }
 
+        // Above the list: how many albums it shows and how they are sorted. Which albums it shows is chosen by the chips above it.
         private Control BuildLibraryToolbar()
         {
-            foreach (var combo in new[] { albumFilter, albumSort }) { combo.HorizontalAlignment = HorizontalAlignment.Stretch; }
             albumFilter.Named("Album filter"); albumSort.Named("Album sort order");
             albumFilter.Items.Add("All albums in this view"); albumFilter.Items.Add("Artist cleanup available");
             albumSort.Items.Add("Artist and album"); albumSort.Items.Add("Album title"); albumSort.Items.Add("Artist changes first");
             albumFilter.SelectedIndex = albumSort.SelectedIndex = 0;
-            albumFilter.SelectionChanged += (s, e) => { if (!busy && !changingAlbumView) RefreshAlbums(); };
+            // The filter is the model behind the Artists chips; it is not shown on its own.
+            albumFilter.IsVisible = false;
+            albumFilter.SelectionChanged += (s, e) => { StyleArtistChips(); if (!busy && !changingAlbumView) RefreshAlbums(); };
             albumSort.SelectionChanged += (s, e) => { if (!busy && !changingAlbumView) RefreshAlbums(); };
-            var showLabel = Kit.Label("SHOW", cls: "caption"); var sortLabel = Kit.Label("SORT BY", cls: "caption");
-            showLabel.Margin = sortLabel.Margin = new Thickness(8, 0, 0, 0);
-            return Kit.Grid("*,*", "18,*").Add(showLabel.Cell(0, 0), sortLabel.Cell(0, 1), albumFilter.Cell(1, 0), albumSort.Cell(1, 1));
+            albumSort.Width = 170; albumSort.Margin = new Thickness(0); albumSort.MinHeight = 28;
+            albumSort.Tip("Sort the album list by artist, by album title, or with the albums that have artist changes first.");
+            listCount.Margin = new Thickness(8, 0, 0, 0);
+            var sortLabel = Kit.Label("Sort", Kit.Small, cls: "muted"); sortLabel.Margin = new Thickness(0, 0, 8, 0);
+            var bar = Kit.Grid("*,Auto,Auto,0", "36").Add(listCount.Cell(0, 0), sortLabel.Cell(0, 1), albumSort.Cell(0, 2), albumFilter.Cell(0, 3));
+            bar.Margin = new Thickness(0, 0, 4, 6);
+            return bar;
         }
+
+        private readonly TextBlock listCount = Kit.Label("", Kit.Small, true, "muted");
+        private readonly Button cleanupTab = Kit.Button("Needs cleanup", "chip"), everyTab = Kit.Button("All albums", "chip");
+        private Control artistChips;
+
+        private Control BuildArtistChips()
+        {
+            cleanupTab.Named("Albums that need artist cleanup").Tip("Albums where some tracks credit guests or a different spelling of the main artist.");
+            everyTab.Named("Every album for artist cleanup").Tip("Every album, to set the track artists by hand, even when nothing is suggested.");
+            cleanupTab.Click += (s, e) => { if (!busy) albumFilter.SelectedIndex = 1; };
+            everyTab.Click += (s, e) => { if (!busy) albumFilter.SelectedIndex = 0; };
+            var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center, IsVisible = false };
+            foreach (var tab in new[] { cleanupTab, everyTab })
+            {
+                Avalonia.Automation.AutomationProperties.SetControlTypeOverride(tab, Avalonia.Automation.Peers.AutomationControlType.TabItem);
+                chips.Children.Add(tab);
+            }
+            return chips;
+        }
+
+        private void StyleArtistChips()
+        {
+            cleanupTab.Classes.Set("selected", albumFilter.SelectedIndex == 1);
+            everyTab.Classes.Set("selected", albumFilter.SelectedIndex != 1);
+        }
+
+        private readonly Image artistCover = new Image { Stretch = Stretch.UniformToFill };
+        private readonly TextBlock artistAlbumArtist = Kit.Label("", 14, cls: "muted");
 
         private Control BuildArtistPanel()
         {
             artistHeading.Named("Selected album for artist cleanup");
-            var help = Kit.Label("Collapse guest credits into the main artist. Already-correct track artists are left alone; review the proposed changes below.", Kit.Body, cls: "muted");
-            help.TextWrapping = TextWrapping.Wrap; help.TextTrimming = TextTrimming.None;
+            artistHeading.FontSize = 19; artistHeading.TextWrapping = TextWrapping.Wrap; artistHeading.MaxLines = 2;
+            var help = Kit.Label("Guest credits are collapsed into the main artist, so players file every song under one name. Tracks that already match are left alone.", Kit.Small, cls: "muted");
+            help.TextWrapping = TextWrapping.Wrap; help.TextTrimming = TextTrimming.None; help.Margin = new Thickness(0, 4, 0, 0);
+            var coverBox = new Border { Width = 84, Height = 84, CornerRadius = new CornerRadius(3), ClipToBounds = true, Child = artistCover, VerticalAlignment = VerticalAlignment.Top };
+            coverBox.Brush(Border.BackgroundProperty, "CoverPlaceholder");
+            var titles = new StackPanel { Spacing = 2, Margin = new Thickness(16, 0, 0, 0) };
+            titles.Children.Add(artistHeading); titles.Children.Add(artistAlbumArtist); titles.Children.Add(help);
+            var head = Kit.Grid("Auto,*", "Auto").Add(coverBox.Cell(0, 0), titles.Cell(0, 1));
             mainArtist.Named("Main artist for this album");
+            mainArtist.Margin = new Thickness(0, 4, 0, 4); mainArtist.MinHeight = 34;
+            mainArtist.Tip("The name every track should credit. Edit it if the suggestion is wrong; a generic name like \"Various artists\" cannot be used.");
             mainArtist.TextChanged += (s, e) => { if (!refreshingArtist) UpdateArtistPreview(); };
+            var nameLabel = Kit.Label("Main artist", Kit.Body, true); nameLabel.Margin = new Thickness(0, 16, 0, 0);
+            artistSummary.FontSize = Kit.Small; artistSummary.Margin = new Thickness(0, 0, 0, 8);
             artistPreview.Named("Current track artists");
             artistPreview.ItemTemplate = new FuncDataTemplate<ArtistRow>((row, scope) => new ArtistRowView(), true);
             artistPreview.SelectionChanged += (s, e) => UpdateArtistLocations();
-            var header = Kit.Grid("36*,34*,30*", "28").Add(Kit.Label("Track", Kit.Small, cls: "muted").Cell(0, 0), Kit.Label("Current artist", Kit.Small, cls: "muted").Cell(0, 1), Kit.Label("After cleanup", Kit.Small, cls: "muted").Cell(0, 2));
+            var header = Kit.Grid("36*,34*,30*", "28").Add(Kit.Label("Track", Kit.Small, cls: "muted").Cell(0, 0), Kit.Label("Now", Kit.Small, cls: "muted").Cell(0, 1), Kit.Label("After cleanup", Kit.Small, cls: "muted").Cell(0, 2));
             header.Margin = new Thickness(10, 0, 6, 0);
             var headerBar = new Border { Child = header, BorderThickness = new Thickness(0, 0, 0, 1) };
             headerBar.Brush(Border.BorderBrushProperty, "Border"); headerBar.Brush(Border.BackgroundProperty, "InsetHeader");
@@ -70,11 +114,12 @@ namespace AlbumArtTool
             showArtistTrack.Click += (s, e) => { if (artistPreview.SelectedItem is ArtistRow row) OpenLocation(row.Track.Path, true); };
             openArtistAlbum.Tip("Open this album's folder in File Explorer.");
             showArtistTrack.Tip("Select a track above, then open its folder with that song highlighted in File Explorer.");
-            var locations = Kit.Grid("*,*", "*").Add(openArtistAlbum.Cell(0, 0), showArtistTrack.Cell(0, 1));
             applyArtist.Click += async (s, e) => await ApplyArtistAsync();
-            var panel = Kit.Grid("*", "32,60,30,38,40,*,36,44").Add(artistHeading.Cell(0, 0), help.Cell(1, 0), Kit.Label("Main artist", Kit.Body, true).Cell(2, 0),
-                mainArtist.Cell(3, 0), artistSummary.Cell(4, 0), trackSection.Cell(5, 0), locations.Cell(6, 0), applyArtist.Cell(7, 0));
-            panel.Margin = new Thickness(15);
+            foreach (var b in new[] { openArtistAlbum, showArtistTrack }) { b.Height = 34; b.Margin = new Thickness(0, 0, 4, 0); b.HorizontalAlignment = HorizontalAlignment.Left; }
+            applyArtist.Height = 42; applyArtist.MinWidth = 180; applyArtist.Padding = new Thickness(16, 2); applyArtist.Margin = new Thickness(0); applyArtist.FontSize = 11.5;
+            var actions = Kit.Grid("Auto,Auto,*,Auto", "Auto").Add(openArtistAlbum.Cell(0, 0), showArtistTrack.Cell(0, 1), applyArtist.Cell(0, 3));
+            var bar = new Border { Child = actions, Classes = { "actionbar" }, Margin = new Thickness(0, 14, 0, 0) };
+            var panel = Kit.Grid("*", "Auto,Auto,Auto,Auto,*,Auto").Add(head.Cell(0, 0), nameLabel.Cell(1, 0), mainArtist.Cell(2, 0), artistSummary.Cell(3, 0), trackSection.Cell(4, 0), bar.Cell(5, 0));
             return panel;
         }
 
@@ -128,6 +173,9 @@ namespace AlbumArtTool
                 bool selected = tab == missingTab ? view == View.Missing : tab == existingTab ? view == View.HasArt : view == View.All;
                 tab.Classes.Set("selected", selected);
             }
+            StyleArtistChips();
+            if (viewChips != null) viewChips.IsVisible = !showingArtists;
+            if (artistChips != null) artistChips.IsVisible = showingArtists;
             if (coverPanel != null) coverPanel.IsVisible = !showingArtists;
             if (artistPanel != null) artistPanel.IsVisible = showingArtists;
         }
@@ -139,6 +187,10 @@ namespace AlbumArtTool
             try
             {
                 artistHeading.Text = album?.Title ?? "Select an album";
+                artistAlbumArtist.Text = album == null ? "" : album.Artist + " · " + album.Tracks.Count + (album.Tracks.Count == 1 ? " track" : " tracks");
+                var old = artistCover.Source as Avalonia.Media.Imaging.Bitmap; Avalonia.Media.Imaging.Bitmap next = null;
+                try { next = Kit.Decode(album?.Thumbnail); } catch (Exception) { }
+                artistCover.Source = next; if (old != null && !ReferenceEquals(old, next)) old.Dispose();
                 mainArtist.Text = album?.MainArtist ?? "";
                 artistRows = album == null ? new List<ArtistRow>() : album.Tracks.Select(t => new ArtistRow { Track = t, After = "" }).ToList();
                 artistPreview.ItemsSource = artistRows;
@@ -185,7 +237,7 @@ namespace AlbumArtTool
 
         private void UpdateLibraryTools()
         {
-            albumFilter.IsEnabled = albumSort.IsEnabled = !busy;
+            albumFilter.IsEnabled = albumSort.IsEnabled = cleanupTab.IsEnabled = everyTab.IsEnabled = !busy;
             UpdateBadges();
             if (showingArtists) UpdateArtistPreview();
         }

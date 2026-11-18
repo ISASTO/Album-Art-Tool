@@ -21,12 +21,18 @@ namespace AlbumArtTool.Ui
         internal string Tone { get; private set; }
         internal event Action Changed;
         internal AlbumRow(Album album) { Album = album; }
-        internal void Update(string work)
+
+        /// <summary>The row's status tag: work in progress when there is some, otherwise its cover coverage.</summary>
+        internal void Update((string Text, string Tone)? work)
         {
-            string badge = work ?? Album.Coverage, tone = work != null ? "Accent" : Album.MissingCount > 0 ? "Warning" : "Positive";
+            string badge = work?.Text ?? Short(Album), tone = work?.Tone ?? (Album.MissingCount > 0 ? "Warning" : "Positive");
             if (badge == Badge && tone == Tone) return;
             Badge = badge; Tone = tone; Changed?.Invoke();
         }
+
+        private static string Short(Album album) => album.MissingCount == 0 ? "Complete" :
+            album.MissingCount == album.Tracks.Count ? (album.FolderCovers.Count > 0 ? "Folder art" : "No cover") :
+            album.MissingCount + "/" + album.Tracks.Count + " missing";
     }
 
     // Virtualized album list. Only visible rows exist as controls; thumbnails are decoded
@@ -35,8 +41,9 @@ namespace AlbumArtTool.Ui
     {
         protected override Type StyleKeyOverride => typeof(ListBox);
         private List<AlbumRow> rows = new List<AlbumRow>();
+        private (long At, bool Keyboard) input;
         internal event Action<Album, string> CoverDropped;
-        internal Func<Album, string> WorkStatus { get; set; }
+        internal Func<Album, (string Text, string Tone)?> WorkStatus { get; set; }
         internal Album SelectedAlbum => (SelectedItem as AlbumRow)?.Album;
         internal int AlbumCount => rows.Count;
         internal Album AlbumAt(int index) => rows[index].Album;
@@ -48,6 +55,14 @@ namespace AlbumArtTool.Ui
             ItemTemplate = new FuncDataTemplate<AlbumRow>((row, scope) => new AlbumRowView(), true);
             ScrollViewer.SetHorizontalScrollBarVisibility(this, Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled);
             DragDrop.SetAllowDrop(this, true);
+            // A row chosen with the mouse or keyboard latches: it sinks, then springs back up and stays pressed in.
+            AddHandler(PointerPressedEvent, (s, e) => input = (Environment.TickCount64, false), Avalonia.Interactivity.RoutingStrategies.Tunnel);
+            AddHandler(KeyDownEvent, (s, e) => input = (Environment.TickCount64, true), Avalonia.Interactivity.RoutingStrategies.Tunnel);
+            SelectionChanged += (s, e) =>
+            {
+                if (SelectedIndex < 0 || Environment.TickCount64 - input.At > 400) return;
+                Motion.Latch(ContainerFromIndex(SelectedIndex), input.Keyboard);
+            };
             AddHandler(DragDrop.DragOverEvent, (s, e) => e.DragEffects = RowAt(e) != null && SingleImagePath(e.Data) != null ? DragDropEffects.Copy : DragDropEffects.None);
             AddHandler(DragDrop.DropEvent, (s, e) =>
             {
@@ -129,32 +144,38 @@ namespace AlbumArtTool.Ui
         }
     }
 
+    // One album: its cover, title and artist, and a status tag. Rows are separated by seams; the selected row is
+    // pressed into the panel with a glowing orange edge.
     internal sealed class AlbumRowView : Border
     {
-        private readonly Border tile, placeholder, badge;
+        private readonly Border tile, frame;
         private readonly Image cover;
-        private readonly TextBlock title, detail, badgeText, note;
+        private readonly PathIcon note;
+        private readonly TextBlock title, detail;
+        private readonly Pill tag = new Pill();
         private AlbumRow row;
-        private IDisposable badgeBrush, toneBrush;
 
         internal AlbumRowView()
         {
-            Height = 86; Padding = new Thickness(3); Background = Brushes.Transparent;
-            cover = new Image { Stretch = Stretch.Uniform };
-            note = new TextBlock { Text = "♪", FontWeight = FontWeight.Bold, FontSize = 14, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-            note.Brush(TextBlock.ForegroundProperty, "Accent");
+            Height = 64; Padding = new Thickness(0, 0, 0, 1); Background = Brushes.Transparent; BorderThickness = new Thickness(0, 0, 0, 1);
+            this.Brush(BorderBrushProperty, "Seam");
+            cover = new Image { Stretch = Stretch.UniformToFill };
+            note = Kit.Glyph(Icons.Album, 16); note.HorizontalAlignment = HorizontalAlignment.Center; note.Brush(PathIcon.ForegroundProperty, "Muted");
             var coverBox = new Panel(); coverBox.Children.Add(note); coverBox.Children.Add(cover);
-            placeholder = new Border { Width = 64, Height = 64, CornerRadius = new CornerRadius(9), ClipToBounds = true, Child = coverBox, Margin = new Thickness(9, 8, 13, 8),
-                BoxShadow = BoxShadows.Parse("0 2 0 0 #14273958"), VerticalAlignment = VerticalAlignment.Center };
-            placeholder.Brush(Border.BackgroundProperty, "CoverPlaceholder");
-            title = Kit.Label("", 14, true); title.Margin = new Thickness(0, 6, 12, 0);
-            detail = Kit.Label("", Kit.Small, cls: "muted"); detail.Margin = new Thickness(0, 2, 12, 0);
-            badgeText = new TextBlock { FontSize = Kit.Small, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-            badge = new Border { CornerRadius = new CornerRadius(6), Padding = new Thickness(6, 1, 7, 2), Margin = new Thickness(-1, 5, 12, 0), HorizontalAlignment = HorizontalAlignment.Left, Child = badgeText };
-            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Top };
-            text.Children.Add(title); text.Children.Add(detail); text.Children.Add(badge);
-            var grid = Kit.Grid("Auto,*", null).Add(placeholder.Cell(0, 0), text.Cell(0, 1));
-            tile = new Border { CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), Child = grid, Classes = { "tile" } };
+            frame = new Border { Width = 44, Height = 44, CornerRadius = new CornerRadius(3), ClipToBounds = true, Child = coverBox, Margin = new Thickness(12, 0, 14, 0),
+                VerticalAlignment = VerticalAlignment.Center, BorderThickness = new Thickness(1) };
+            frame.Brush(Border.BackgroundProperty, "CoverPlaceholder"); frame.Brush(Border.BorderBrushProperty, "Seam");
+            title = Kit.Label("", 13.5, true); title.FontWeight = FontWeight.SemiBold; title.Margin = new Thickness(0, 0, 12, 0);
+            detail = Kit.Label("", Kit.Small, cls: "muted"); detail.Margin = new Thickness(0, 3, 12, 0);
+            var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            text.Children.Add(title); text.Children.Add(detail);
+            tag.Margin = new Thickness(0, 0, 16, 0); tag.MaxWidth = 190; tag.Label.FontSize = 9.5;
+            var edge = new Border { Classes = { "edge" }, Width = 3, CornerRadius = new CornerRadius(2), Margin = new Thickness(0, 12, 0, 12), HorizontalAlignment = HorizontalAlignment.Left,
+                Effect = Skin.Glow(Skin.Orange, 8, 0.85), IsHitTestVisible = false };
+            edge.Brush(Border.BackgroundProperty, "Primary");
+            var grid = Kit.Grid("Auto,*,Auto", null).Add(frame.Cell(0, 0), text.Cell(0, 1), tag.Cell(0, 2));
+            var layers = new Panel(); layers.Children.Add(grid); layers.Children.Add(edge);
+            tile = new Border { CornerRadius = new CornerRadius(6), Child = layers, Classes = { "tile" }, Margin = new Thickness(2, 1) };
             Child = tile;
             DataContextChanged += (s, e) => Bind(DataContext as AlbumRow);
         }
@@ -177,10 +198,8 @@ namespace AlbumArtTool.Ui
         private void UpdateBadge()
         {
             if (row == null) return;
-            badgeText.Text = row.Badge;
-            badgeBrush?.Dispose(); toneBrush?.Dispose();
-            badgeBrush = badge.Bind(Border.BackgroundProperty, badge.GetResourceObservable("Badge" + row.Tone));
-            toneBrush = badgeText.Bind(TextBlock.ForegroundProperty, badgeText.GetResourceObservable(row.Tone));
+            tag.Set(row.Badge, row.Tone);
+            tag.Tip(row.Tone == "Accent" ? row.Badge : row.Album.Coverage);
         }
     }
 }

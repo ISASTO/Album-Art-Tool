@@ -2,164 +2,208 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="AlbumArtTool.App"
              RequestedThemeVariant="Dark">
+  <!--
+    Muzikette's two finishes: brushed Silver (light) and Black (dark). Four signal colors keep one meaning each:
+    orange = the action to take and the current place, amber = information inside a display window,
+    red = needs attention, green = done. Fonts, textures and the uppercase key labels are added in code (Ui/Theme.cs).
+  -->
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.ThemeDictionaries>
-        <ResourceDictionary x:Key="Dark">
-          <SolidColorBrush x:Key="Canvas" Color="#13171F"/>
-          <SolidColorBrush x:Key="Sidebar" Color="#161B25"/>
-          <SolidColorBrush x:Key="Surface" Color="#202633"/>
-          <SolidColorBrush x:Key="Input" Color="#191F29"/>
-          <SolidColorBrush x:Key="Inset" Color="#1B212C"/>
-          <SolidColorBrush x:Key="InsetBorder" Color="#293343"/>
-          <SolidColorBrush x:Key="InsetHeader" Color="#202631"/>
-          <SolidColorBrush x:Key="InsetAlternate" Color="#1F2530"/>
-          <SolidColorBrush x:Key="Ink" Color="#EDF2FA"/>
-          <SolidColorBrush x:Key="Muted" Color="#ACB8CD"/>
-          <SolidColorBrush x:Key="Accent" Color="#96B9FF"/>
-          <SolidColorBrush x:Key="Selection" Color="#293C5D"/>
-          <SolidColorBrush x:Key="Border" Color="#3B485E"/>
-          <SolidColorBrush x:Key="Positive" Color="#8AD9B8"/>
-          <SolidColorBrush x:Key="Warning" Color="#EFC88F"/>
-          <SolidColorBrush x:Key="Primary" Color="#3266D6"/>
-          <SolidColorBrush x:Key="PrimaryHover" Color="#3F6FD8"/>
-          <SolidColorBrush x:Key="PrimaryPressed" Color="#1F4AB0"/>
-          <SolidColorBrush x:Key="Alternate" Color="#232A38"/>
-          <SolidColorBrush x:Key="SelectedBorder" Color="#436094"/>
-          <SolidColorBrush x:Key="BadgeAccent" Color="#2F394D"/>
-          <SolidColorBrush x:Key="BadgeWarning" Color="#3B3B3F"/>
-          <SolidColorBrush x:Key="BadgePositive" Color="#2E3D44"/>
-          <SolidColorBrush x:Key="ProgressTrack" Color="#3B485E"/>
-          <SolidColorBrush x:Key="Shadow" Color="#0D25375D"/>
-          <LinearGradientBrush x:Key="CanvasBrush" StartPoint="0%,0%" EndPoint="100%,70%">
-            <GradientStop Color="#171F2D" Offset="0"/>
-            <GradientStop Color="#171822" Offset="1"/>
-          </LinearGradientBrush>
-          <RadialGradientBrush x:Key="GlowA" Center="25%,17%" GradientOrigin="25%,17%" Radius="0.55">
-            <GradientStop Color="#0C97BBFA" Offset="0"/>
-            <GradientStop Color="#0097BBFA" Offset="1"/>
-          </RadialGradientBrush>
-          <RadialGradientBrush x:Key="GlowB" Center="100%,50%" GradientOrigin="100%,50%" Radius="0.55">
-            <GradientStop Color="#09B5A6EE" Offset="0"/>
-            <GradientStop Color="#00B5A6EE" Offset="1"/>
-          </RadialGradientBrush>
-          <LinearGradientBrush x:Key="FrostBrush" StartPoint="0%,0%" EndPoint="0%,100%">
-            <GradientStop Color="#262E3D" Offset="0"/>
-            <GradientStop Color="#202633" Offset="1"/>
-          </LinearGradientBrush>
-          <LinearGradientBrush x:Key="CoverPlaceholder" StartPoint="0%,0%" EndPoint="100%,100%">
-            <GradientStop Color="#2F4263" Offset="0"/>
-            <GradientStop Color="#352E4F" Offset="1"/>
-          </LinearGradientBrush>
-          <LinearGradientBrush x:Key="ProgressFill" StartPoint="0%,0%" EndPoint="100%,0%">
-            <GradientStop Color="#96B9FF" Offset="0"/>
-            <GradientStop Color="#769AFF" Offset="1"/>
-          </LinearGradientBrush>
-
-          <SolidColorBrush x:Key="TextControlBackground" Color="#191F29"/>
-          <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#1C2330"/>
-          <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#191F29"/>
-          <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#191F29"/>
-          <SolidColorBrush x:Key="TextControlForeground" Color="#EDF2FA"/>
-          <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#EDF2FA"/>
-          <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#EDF2FA"/>
-          <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#ACB8CD"/>
-          <SolidColorBrush x:Key="TextControlBorderBrush" Color="#3B485E"/>
-          <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#4A5A75"/>
-          <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#96B9FF"/>
-          <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#3B485E"/>
-          <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#ACB8CD"/>
-          <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#3266D6"/>
-          <SolidColorBrush x:Key="ComboBoxBackground" Color="#191F29"/>
-          <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#212B3F"/>
-          <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#293C5D"/>
-          <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#191F29"/>
-          <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#3B485E"/>
-          <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#4A5A75"/>
-          <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#96B9FF"/>
-          <SolidColorBrush x:Key="ComboBoxForeground" Color="#EDF2FA"/>
-          <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#ACB8CD"/>
-          <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#202633"/>
-          <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#3B485E"/>
-          <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#ACB8CD"/>
-        </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
-          <SolidColorBrush x:Key="Canvas" Color="#F1F4FA"/>
-          <SolidColorBrush x:Key="Sidebar" Color="#F5F7FC"/>
-          <SolidColorBrush x:Key="Surface" Color="#FDFEFF"/>
-          <SolidColorBrush x:Key="Input" Color="#F6F8FC"/>
-          <SolidColorBrush x:Key="Inset" Color="#F1F4F9"/>
-          <SolidColorBrush x:Key="InsetBorder" Color="#E8ECF4"/>
-          <SolidColorBrush x:Key="InsetHeader" Color="#ECEFF5"/>
-          <SolidColorBrush x:Key="InsetAlternate" Color="#EDF0F6"/>
-          <SolidColorBrush x:Key="Ink" Color="#1E2433"/>
-          <SolidColorBrush x:Key="Muted" Color="#5E697E"/>
-          <SolidColorBrush x:Key="Accent" Color="#2B5CD6"/>
-          <SolidColorBrush x:Key="Selection" Color="#E7EEFF"/>
-          <SolidColorBrush x:Key="Border" Color="#DCE2ED"/>
-          <SolidColorBrush x:Key="Positive" Color="#287E68"/>
-          <SolidColorBrush x:Key="Warning" Color="#9B6624"/>
-          <SolidColorBrush x:Key="Primary" Color="#2B5CD6"/>
-          <SolidColorBrush x:Key="PrimaryHover" Color="#2550C4"/>
-          <SolidColorBrush x:Key="PrimaryPressed" Color="#1B45B8"/>
-          <SolidColorBrush x:Key="Alternate" Color="#F9FBFE"/>
-          <SolidColorBrush x:Key="SelectedBorder" Color="#D3DFFB"/>
-          <SolidColorBrush x:Key="BadgeAccent" Color="#EDF2FD"/>
-          <SolidColorBrush x:Key="BadgeWarning" Color="#F5F2EE"/>
-          <SolidColorBrush x:Key="BadgePositive" Color="#ECF4F3"/>
-          <SolidColorBrush x:Key="ProgressTrack" Color="#DDE4F3"/>
+          <!-- Faceplate and panels -->
+          <SolidColorBrush x:Key="Canvas" Color="#D2D1CB"/>
+          <LinearGradientBrush x:Key="CanvasBrush" StartPoint="0%,0%" EndPoint="0%,100%">
+            <GradientStop Color="#DBDAD5" Offset="0"/>
+            <GradientStop Color="#C9C8C2" Offset="1"/>
+          </LinearGradientBrush>
+          <SolidColorBrush x:Key="Sidebar" Color="Transparent"/>
+          <SolidColorBrush x:Key="Surface" Color="#EDECE8"/>
+          <SolidColorBrush x:Key="FrostBrush" Color="#EDECE8"/>
+          <SolidColorBrush x:Key="Alternate" Color="#F2F1EE"/>
+          <SolidColorBrush x:Key="Border" Color="#B6B5AF"/>
+          <SolidColorBrush x:Key="Seam" Color="#D3D2CC"/>
+          <SolidColorBrush x:Key="Highlight" Color="#FAFAF7"/>
+          <SolidColorBrush x:Key="Input" Color="#E2E1DB"/>
+          <SolidColorBrush x:Key="Inset" Color="#EDECE8"/>
+          <SolidColorBrush x:Key="InsetBorder" Color="#D3D2CC"/>
+          <SolidColorBrush x:Key="InsetHeader" Color="#E5E4DF"/>
+          <SolidColorBrush x:Key="InsetAlternate" Color="Transparent"/>
+          <SolidColorBrush x:Key="Selection" Color="#DAD8D1"/>
+          <SolidColorBrush x:Key="SelectedBorder" Color="#B6B5AF"/>
+          <SolidColorBrush x:Key="Key" Color="#E8E7E2"/>
+          <SolidColorBrush x:Key="KeyHover" Color="#F1F0EC"/>
+          <SolidColorBrush x:Key="KeyEdge" Color="#A3A29C"/>
+          <SolidColorBrush x:Key="CoverPlaceholder" Color="#DAD8D1"/>
+          <SolidColorBrush x:Key="Tooltip" Color="#161616"/>
+          <SolidColorBrush x:Key="TooltipInk" Color="#ECEAE5"/>
+          <!-- Text -->
+          <SolidColorBrush x:Key="Ink" Color="#1A1A19"/>
+          <SolidColorBrush x:Key="Muted" Color="#5D5C58"/>
+          <SolidColorBrush x:Key="Accent" Color="#B23A05"/>
+          <SolidColorBrush x:Key="Positive" Color="#1F7A4A"/>
+          <SolidColorBrush x:Key="Warning" Color="#B42318"/>
+          <!-- Signals -->
+          <SolidColorBrush x:Key="Primary" Color="#FF5B14"/>
+          <SolidColorBrush x:Key="PrimaryHover" Color="#FF6A2B"/>
+          <SolidColorBrush x:Key="PrimaryPressed" Color="#EC4F0B"/>
+          <SolidColorBrush x:Key="OnPrimary" Color="#141414"/>
+          <SolidColorBrush x:Key="Glass" Color="#0B0A08"/>
+          <SolidColorBrush x:Key="Amber" Color="#FFB347"/>
+          <SolidColorBrush x:Key="LedOff" Color="#B4B3AD"/>
+          <SolidColorBrush x:Key="LedOrange" Color="#FF5B14"/>
+          <SolidColorBrush x:Key="LedRed" Color="#FF3B30"/>
+          <SolidColorBrush x:Key="LedGreen" Color="#34D17A"/>
+          <SolidColorBrush x:Key="BadgeAccent" Color="#E2E1DB"/>
+          <SolidColorBrush x:Key="BadgeWarning" Color="#F0DDD8"/>
+          <SolidColorBrush x:Key="BadgePositive" Color="#D9E7DD"/>
           <SolidColorBrush x:Key="Shadow" Color="#0D25375D"/>
-          <LinearGradientBrush x:Key="CanvasBrush" StartPoint="0%,0%" EndPoint="100%,70%">
-            <GradientStop Color="#EBF1FC" Offset="0"/>
-            <GradientStop Color="#F6F4FA" Offset="1"/>
-          </LinearGradientBrush>
-          <RadialGradientBrush x:Key="GlowA" Center="25%,17%" GradientOrigin="25%,17%" Radius="0.55">
-            <GradientStop Color="#1E97BBFA" Offset="0"/>
-            <GradientStop Color="#0097BBFA" Offset="1"/>
-          </RadialGradientBrush>
-          <RadialGradientBrush x:Key="GlowB" Center="100%,50%" GradientOrigin="100%,50%" Radius="0.55">
-            <GradientStop Color="#16B5A6EE" Offset="0"/>
-            <GradientStop Color="#00B5A6EE" Offset="1"/>
-          </RadialGradientBrush>
-          <LinearGradientBrush x:Key="FrostBrush" StartPoint="0%,0%" EndPoint="0%,100%">
-            <GradientStop Color="#FEFFFF" Offset="0"/>
-            <GradientStop Color="#F7F9FD" Offset="1"/>
-          </LinearGradientBrush>
-          <LinearGradientBrush x:Key="CoverPlaceholder" StartPoint="0%,0%" EndPoint="100%,100%">
-            <GradientStop Color="#E0EBFD" Offset="0"/>
-            <GradientStop Color="#E7E1F7" Offset="1"/>
-          </LinearGradientBrush>
-          <LinearGradientBrush x:Key="ProgressFill" StartPoint="0%,0%" EndPoint="100%,0%">
-            <GradientStop Color="#2B5CD6" Offset="0"/>
-            <GradientStop Color="#769AFF" Offset="1"/>
-          </LinearGradientBrush>
+          <SolidColorBrush x:Key="GlowA" Color="Transparent"/>
+          <SolidColorBrush x:Key="GlowB" Color="Transparent"/>
+          <SolidColorBrush x:Key="ProgressTrack" Color="#D3D2CC"/>
+          <SolidColorBrush x:Key="ProgressFill" Color="#FF5B14"/>
 
-          <SolidColorBrush x:Key="TextControlBackground" Color="#F6F8FC"/>
-          <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#F1F4FB"/>
-          <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFFFFF"/>
-          <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#F6F8FC"/>
-          <SolidColorBrush x:Key="TextControlForeground" Color="#1E2433"/>
-          <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#1E2433"/>
-          <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#1E2433"/>
-          <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#5E697E"/>
-          <SolidColorBrush x:Key="TextControlBorderBrush" Color="#DCE2ED"/>
-          <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#C3CDDF"/>
-          <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#2B5CD6"/>
-          <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#DCE2ED"/>
-          <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#5E697E"/>
-          <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#2B5CD6"/>
-          <SolidColorBrush x:Key="ComboBoxBackground" Color="#F6F8FC"/>
-          <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#EEF2FD"/>
-          <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#E7EEFF"/>
-          <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#F6F8FC"/>
-          <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#DCE2ED"/>
-          <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#C3CDDF"/>
-          <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#2B5CD6"/>
-          <SolidColorBrush x:Key="ComboBoxForeground" Color="#1E2433"/>
-          <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#5E697E"/>
-          <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#FDFEFF"/>
-          <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#DCE2ED"/>
-          <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#5E697E"/>
+          <SolidColorBrush x:Key="TextControlBackground" Color="#E2E1DB"/>
+          <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#E6E5DF"/>
+          <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#F4F3F0"/>
+          <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#E2E1DB"/>
+          <SolidColorBrush x:Key="TextControlForeground" Color="#1A1A19"/>
+          <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#1A1A19"/>
+          <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#1A1A19"/>
+          <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#5D5C58"/>
+          <SolidColorBrush x:Key="TextControlBorderBrush" Color="#B6B5AF"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#A3A29C"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#FF5B14"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#C9C8C2"/>
+          <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#6F6E69"/>
+          <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#FFB98F"/>
+          <SolidColorBrush x:Key="ComboBoxBackground" Color="#E8E7E2"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#F1F0EC"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#DAD8D1"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#E2E1DB"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#A3A29C"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#8F8E88"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#8F8E88"/>
+          <SolidColorBrush x:Key="ComboBoxForeground" Color="#1A1A19"/>
+          <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#5D5C58"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#EDECE8"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#A3A29C"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#5D5C58"/>
+          <!-- Checkboxes are drawn as square LEDs: off grey, on orange. -->
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUnchecked" Color="#C4C3BD"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPointerOver" Color="#B9B8B2"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPressed" Color="#AFAEA8"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedDisabled" Color="#D3D2CC"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#FF5B14"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#FF6A2B"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#EC4F0B"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedDisabled" Color="#E9A27F"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#A3A29C"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#8F8E88"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPressed" Color="#8F8E88"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedDisabled" Color="#C9C8C2"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#C94306"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#C94306"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#C94306"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedDisabled" Color="#E9A27F"/>
+          <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#141414"/>
+          <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#141414"/>
+          <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#141414"/>
+          <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedDisabled" Color="#5D5C58"/>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="Canvas" Color="#161616"/>
+          <SolidColorBrush x:Key="CanvasBrush" Color="#161616"/>
+          <SolidColorBrush x:Key="Sidebar" Color="Transparent"/>
+          <SolidColorBrush x:Key="Surface" Color="#1D1D1C"/>
+          <SolidColorBrush x:Key="FrostBrush" Color="#1D1D1C"/>
+          <SolidColorBrush x:Key="Alternate" Color="#222221"/>
+          <SolidColorBrush x:Key="Border" Color="#363634"/>
+          <SolidColorBrush x:Key="Seam" Color="#2A2A28"/>
+          <SolidColorBrush x:Key="Highlight" Color="#00000000"/>
+          <SolidColorBrush x:Key="Input" Color="#141414"/>
+          <SolidColorBrush x:Key="Inset" Color="#1D1D1C"/>
+          <SolidColorBrush x:Key="InsetBorder" Color="#2A2A28"/>
+          <SolidColorBrush x:Key="InsetHeader" Color="#222221"/>
+          <SolidColorBrush x:Key="InsetAlternate" Color="Transparent"/>
+          <SolidColorBrush x:Key="Selection" Color="#141414"/>
+          <SolidColorBrush x:Key="SelectedBorder" Color="#363634"/>
+          <SolidColorBrush x:Key="Key" Color="#262625"/>
+          <SolidColorBrush x:Key="KeyHover" Color="#2E2E2C"/>
+          <SolidColorBrush x:Key="KeyEdge" Color="#3D3D3B"/>
+          <SolidColorBrush x:Key="CoverPlaceholder" Color="#141414"/>
+          <SolidColorBrush x:Key="Tooltip" Color="#0B0B0B"/>
+          <SolidColorBrush x:Key="TooltipInk" Color="#ECEAE5"/>
+          <SolidColorBrush x:Key="Ink" Color="#ECEAE5"/>
+          <SolidColorBrush x:Key="Muted" Color="#8F8D88"/>
+          <SolidColorBrush x:Key="Accent" Color="#FF7A3D"/>
+          <SolidColorBrush x:Key="Positive" Color="#5BD68F"/>
+          <SolidColorBrush x:Key="Warning" Color="#FF6B5E"/>
+          <SolidColorBrush x:Key="Primary" Color="#FF5B14"/>
+          <SolidColorBrush x:Key="PrimaryHover" Color="#FF6A2B"/>
+          <SolidColorBrush x:Key="PrimaryPressed" Color="#EC4F0B"/>
+          <SolidColorBrush x:Key="OnPrimary" Color="#141414"/>
+          <SolidColorBrush x:Key="Glass" Color="#050505"/>
+          <SolidColorBrush x:Key="Amber" Color="#FFB347"/>
+          <SolidColorBrush x:Key="LedOff" Color="#3A3A38"/>
+          <SolidColorBrush x:Key="LedOrange" Color="#FF5B14"/>
+          <SolidColorBrush x:Key="LedRed" Color="#FF3B30"/>
+          <SolidColorBrush x:Key="LedGreen" Color="#34D17A"/>
+          <SolidColorBrush x:Key="BadgeAccent" Color="#262625"/>
+          <SolidColorBrush x:Key="BadgeWarning" Color="#3A1F1C"/>
+          <SolidColorBrush x:Key="BadgePositive" Color="#17301F"/>
+          <SolidColorBrush x:Key="Shadow" Color="#66000000"/>
+          <SolidColorBrush x:Key="GlowA" Color="Transparent"/>
+          <SolidColorBrush x:Key="GlowB" Color="Transparent"/>
+          <SolidColorBrush x:Key="ProgressTrack" Color="#2A2A28"/>
+          <SolidColorBrush x:Key="ProgressFill" Color="#FF5B14"/>
+
+          <SolidColorBrush x:Key="TextControlBackground" Color="#141414"/>
+          <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#171717"/>
+          <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#101010"/>
+          <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#141414"/>
+          <SolidColorBrush x:Key="TextControlForeground" Color="#ECEAE5"/>
+          <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#ECEAE5"/>
+          <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#ECEAE5"/>
+          <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#8F8D88"/>
+          <SolidColorBrush x:Key="TextControlBorderBrush" Color="#363634"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#4A4A47"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#FF5B14"/>
+          <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#2A2A28"/>
+          <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#8F8D88"/>
+          <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#8A3A12"/>
+          <SolidColorBrush x:Key="ComboBoxBackground" Color="#262625"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#2E2E2C"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="#141414"/>
+          <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="#1D1D1C"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="#3D3D3B"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="#4A4A47"/>
+          <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="#4A4A47"/>
+          <SolidColorBrush x:Key="ComboBoxForeground" Color="#ECEAE5"/>
+          <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="#8F8D88"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="#1D1D1C"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="#3D3D3B"/>
+          <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="#8F8D88"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUnchecked" Color="#333331"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPointerOver" Color="#3D3D3B"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedPressed" Color="#454542"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUncheckedDisabled" Color="#262625"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#FF5B14"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#FF6A2B"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#EC4F0B"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedDisabled" Color="#7A3A1C"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked" Color="#4A4A47"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPointerOver" Color="#5A5A57"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedPressed" Color="#5A5A57"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUncheckedDisabled" Color="#333331"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#FF7A3D"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#FF7A3D"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#FF7A3D"/>
+          <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedDisabled" Color="#7A3A1C"/>
+          <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#141414"/>
+          <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#141414"/>
+          <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#141414"/>
+          <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedDisabled" Color="#8F8D88"/>
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
     </ResourceDictionary>
@@ -168,25 +212,25 @@
   <Application.Styles>
     <FluentTheme>
       <FluentTheme.Palettes>
-        <ColorPaletteResources x:Key="Dark" Accent="#3266D6" RegionColor="#13171F"
-                               AltHigh="#13171F" AltLow="#13171F" AltMedium="#13171F" AltMediumHigh="#13171F" AltMediumLow="#13171F"
-                               BaseHigh="#EDF2FA" BaseLow="#3B485E" BaseMedium="#ACB8CD" BaseMediumHigh="#D5DDEB" BaseMediumLow="#7D8BA3"
-                               ChromeAltLow="#D5DDEB" ChromeBlackHigh="#000000" ChromeBlackLow="#D5DDEB" ChromeBlackMedium="#000000" ChromeBlackMediumLow="#000000"
-                               ChromeDisabledHigh="#3B485E" ChromeDisabledLow="#7D8BA3" ChromeGray="#ACB8CD" ChromeHigh="#3B485E"
-                               ChromeLow="#191F29" ChromeMedium="#202633" ChromeMediumLow="#232A38" ChromeWhite="#FFFFFF"
-                               ListLow="#232E44" ListMedium="#293C5D" ErrorText="#FF9B9B"/>
-        <ColorPaletteResources x:Key="Light" Accent="#2B5CD6" RegionColor="#F1F4FA"
-                               AltHigh="#FDFEFF" AltLow="#FDFEFF" AltMedium="#FDFEFF" AltMediumHigh="#FDFEFF" AltMediumLow="#FDFEFF"
-                               BaseHigh="#1E2433" BaseLow="#DCE2ED" BaseMedium="#5E697E" BaseMediumHigh="#3B4458" BaseMediumLow="#8590A5"
-                               ChromeAltLow="#3B4458" ChromeBlackHigh="#000000" ChromeBlackLow="#DCE2ED" ChromeBlackMedium="#3B4458" ChromeBlackMediumLow="#8590A5"
-                               ChromeDisabledHigh="#DCE2ED" ChromeDisabledLow="#8590A5" ChromeGray="#5E697E" ChromeHigh="#DCE2ED"
-                               ChromeLow="#F6F8FC" ChromeMedium="#F1F4FA" ChromeMediumLow="#F6F8FC" ChromeWhite="#FFFFFF"
-                               ListLow="#EEF2FD" ListMedium="#E7EEFF" ErrorText="#B42318"/>
+        <ColorPaletteResources x:Key="Dark" Accent="#FF5B14" RegionColor="#161616"
+                               AltHigh="#161616" AltLow="#161616" AltMedium="#161616" AltMediumHigh="#161616" AltMediumLow="#161616"
+                               BaseHigh="#ECEAE5" BaseLow="#363634" BaseMedium="#8F8D88" BaseMediumHigh="#C9C7C2" BaseMediumLow="#6A6864"
+                               ChromeAltLow="#C9C7C2" ChromeBlackHigh="#000000" ChromeBlackLow="#C9C7C2" ChromeBlackMedium="#000000" ChromeBlackMediumLow="#000000"
+                               ChromeDisabledHigh="#363634" ChromeDisabledLow="#6A6864" ChromeGray="#8F8D88" ChromeHigh="#363634"
+                               ChromeLow="#141414" ChromeMedium="#1D1D1C" ChromeMediumLow="#222221" ChromeWhite="#FFFFFF"
+                               ListLow="#222221" ListMedium="#141414" ErrorText="#FF6B5E"/>
+        <ColorPaletteResources x:Key="Light" Accent="#FF5B14" RegionColor="#D2D1CB"
+                               AltHigh="#EDECE8" AltLow="#EDECE8" AltMedium="#EDECE8" AltMediumHigh="#EDECE8" AltMediumLow="#EDECE8"
+                               BaseHigh="#1A1A19" BaseLow="#B6B5AF" BaseMedium="#5D5C58" BaseMediumHigh="#3A3936" BaseMediumLow="#7E7D78"
+                               ChromeAltLow="#3A3936" ChromeBlackHigh="#000000" ChromeBlackLow="#B6B5AF" ChromeBlackMedium="#3A3936" ChromeBlackMediumLow="#7E7D78"
+                               ChromeDisabledHigh="#B6B5AF" ChromeDisabledLow="#7E7D78" ChromeGray="#5D5C58" ChromeHigh="#B6B5AF"
+                               ChromeLow="#E8E7E2" ChromeMedium="#E2E1DB" ChromeMediumLow="#E8E7E2" ChromeWhite="#FFFFFF"
+                               ListLow="#E5E4DF" ListMedium="#DAD8D1" ErrorText="#B42318"/>
       </FluentTheme.Palettes>
     </FluentTheme>
 
     <Style Selector="Window">
-      <Setter Property="FontFamily" Value="Segoe UI, Segoe UI Variable Text, Inter, Arial, sans-serif"/>
+      <Setter Property="FontFamily" Value="{DynamicResource TextFont}"/>
       <Setter Property="FontSize" Value="13.33"/>
       <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
       <Setter Property="Background" Value="{DynamicResource CanvasBrush}"/>
@@ -194,251 +238,387 @@
 
     <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource Muted}"/></Style>
     <Style Selector="TextBlock.accent"><Setter Property="Foreground" Value="{DynamicResource Accent}"/></Style>
-    <Style Selector="TextBlock.caption"><Setter Property="FontSize" Value="10.4"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="{DynamicResource Muted}"/></Style>
-
-    <!-- Panels -->
-    <Style Selector="Border.frost">
-      <Setter Property="Background" Value="{DynamicResource FrostBrush}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
-      <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="CornerRadius" Value="18"/>
-      <Setter Property="BoxShadow" Value="0 2 0 0 #0D25375D"/>
-    </Style>
-    <Style Selector="Border.inset">
-      <Setter Property="Background" Value="{DynamicResource Inset}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource InsetBorder}"/>
-      <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="CornerRadius" Value="12"/>
-      <Setter Property="Padding" Value="6"/>
-      <Setter Property="ClipToBounds" Value="True"/>
-    </Style>
-
-    <!-- Buttons -->
-    <Style Selector="Button">
-      <Setter Property="Background" Value="{DynamicResource Surface}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
-      <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="CornerRadius" Value="9"/>
-      <Setter Property="FontSize" Value="12"/>
-      <Setter Property="Padding" Value="8,2"/>
-      <Setter Property="Margin" Value="3"/>
-      <Setter Property="HorizontalAlignment" Value="Stretch"/>
-      <Setter Property="VerticalAlignment" Value="Stretch"/>
-      <Setter Property="HorizontalContentAlignment" Value="Center"/>
-      <Setter Property="VerticalContentAlignment" Value="Center"/>
-      <Setter Property="Cursor" Value="Hand"/>
-      <Setter Property="Transitions">
-        <Transitions><BrushTransition Property="Background" Duration="0:0:0.12"/></Transitions>
-      </Setter>
-    </Style>
-    <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource Selection}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
-    </Style>
-    <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource Selection}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource SelectedBorder}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
-    </Style>
-    <Style Selector="Button:disabled /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource Input}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+    <!-- Printed legends: small wide capitals, like the lettering on a front panel. -->
+    <Style Selector="TextBlock.caption">
+      <Setter Property="FontFamily" Value="{DynamicResource LegendFont}"/>
+      <Setter Property="FontSize" Value="9.5"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+      <Setter Property="LetterSpacing" Value="1.7"/>
       <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
     </Style>
-    <Style Selector="Button.chrome">
-      <Setter Property="Background" Value="{DynamicResource Input}"/>
-      <Setter Property="BorderThickness" Value="0"/>
-    </Style>
-    <Style Selector="Button.primary">
-      <Setter Property="Background" Value="{DynamicResource Primary}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource Primary}"/>
-      <Setter Property="Foreground" Value="#FFFFFF"/>
-    </Style>
-    <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource PrimaryHover}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource PrimaryHover}"/>
-      <Setter Property="Foreground" Value="#FFFFFF"/>
-    </Style>
-    <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource PrimaryPressed}"/>
-      <Setter Property="Foreground" Value="#FFFFFF"/>
-    </Style>
-    <Style Selector="Button.tab">
-      <Setter Property="Background" Value="{DynamicResource Input}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
-      <Setter Property="BorderThickness" Value="0"/>
-    </Style>
-    <Style Selector="Button.tab.selected">
-      <Setter Property="Background" Value="{DynamicResource Surface}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource SelectedBorder}"/>
-      <Setter Property="BorderThickness" Value="1"/>
-    </Style>
-    <Style Selector="Button.tab.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-    </Style>
-    <Style Selector="Button.card">
-      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-      <Setter Property="Background" Value="{DynamicResource Input}"/>
-      <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="FontSize" Value="11.3"/>
-      <Setter Property="Margin" Value="0"/>
-    </Style>
-
-    <!-- Quiet toolbar buttons: no fill until hovered. -->
-    <Style Selector="Button.ghost">
-      <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
-    </Style>
-    <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource Input}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
-    </Style>
-    <Style Selector="Button.ghost:disabled /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent"/>
-    </Style>
-    <Style Selector="Button.square">
-      <Setter Property="Padding" Value="0"/>
-      <Setter Property="Width" Value="34"/>
-      <Setter Property="HorizontalAlignment" Value="Center"/>
-    </Style>
-    <!-- Filter chips and segmented choices. -->
-    <Style Selector="Button.chip">
-      <Setter Property="CornerRadius" Value="15"/>
-      <Setter Property="Background" Value="{DynamicResource Input}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
-      <Setter Property="BorderBrush" Value="Transparent"/>
-      <Setter Property="Padding" Value="13,3"/>
-      <Setter Property="MinHeight" Value="28"/>
-      <Setter Property="HorizontalAlignment" Value="Left"/>
-      <Setter Property="VerticalAlignment" Value="Center"/>
-    </Style>
-    <Style Selector="Button.chip.selected">
-      <Setter Property="Background" Value="{DynamicResource Selection}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource SelectedBorder}"/>
-    </Style>
-    <Style Selector="Button.chip.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-    </Style>
-    <!-- Text-only actions inside cards. -->
-    <Style Selector="Button.link">
-      <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-      <Setter Property="Padding" Value="6,2"/>
-      <Setter Property="HorizontalAlignment" Value="Left"/>
-    </Style>
-    <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource Input}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-    </Style>
-    <Style Selector="Button.link:disabled /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent"/>
-    </Style>
-    <!-- Sidebar pages. -->
-    <Style Selector="Button.nav">
-      <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
-      <Setter Property="FontSize" Value="13.33"/>
-      <Setter Property="Height" Value="38"/>
-      <Setter Property="Padding" Value="12,0,8,0"/>
-      <Setter Property="Margin" Value="0"/>
-      <Setter Property="CornerRadius" Value="9"/>
-      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-    </Style>
-    <Style Selector="Button.nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource Input}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
-    </Style>
-    <Style Selector="Button.nav.selected">
-      <Setter Property="Background" Value="{DynamicResource Selection}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-      <Setter Property="FontWeight" Value="SemiBold"/>
-    </Style>
-    <Style Selector="Button.nav.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource Selection}"/>
-      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
-    </Style>
-    <Style Selector="Button.nav:disabled /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent"/>
-    </Style>
-    <!-- Add music: release and artist tiles, track rows, the round add button. -->
-    <Style Selector="Border.release">
-      <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="Transitions">
-        <Transitions><BrushTransition Property="Background" Duration="0:0:0.12"/></Transitions>
-      </Setter>
-    </Style>
-    <Style Selector="Border.release:pointerover"><Setter Property="Background" Value="{DynamicResource Input}"/></Style>
-    <Style Selector="Border.track"><Setter Property="Background" Value="Transparent"/></Style>
-    <Style Selector="Border.track:pointerover"><Setter Property="Background" Value="{DynamicResource Input}"/></Style>
-    <Style Selector="Button.fab">
-      <Setter Property="Width" Value="34"/>
-      <Setter Property="Height" Value="34"/>
-      <Setter Property="CornerRadius" Value="17"/>
-      <Setter Property="Padding" Value="0"/>
-      <Setter Property="Background" Value="{DynamicResource Primary}"/>
-      <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="Foreground" Value="#FFFFFF"/>
-      <Setter Property="HorizontalAlignment" Value="Right"/>
-    </Style>
-    <Style Selector="Button.fab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource PrimaryHover}"/>
-      <Setter Property="Foreground" Value="#FFFFFF"/>
-    </Style>
-    <Style Selector="Button.fab:disabled /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource Positive}"/>
-      <Setter Property="Foreground" Value="#FFFFFF"/>
+    <Style Selector="TextBlock.display">
+      <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}"/>
+      <Setter Property="FontWeight" Value="ExtraBold"/>
     </Style>
     <Style Selector="TextBlock.title"><Setter Property="FontSize" Value="20"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
     <Style Selector="TextBlock.metric"><Setter Property="FontSize" Value="22"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
     <Style Selector="TextBlock.positive"><Setter Property="Foreground" Value="{DynamicResource Positive}"/></Style>
     <Style Selector="TextBlock.warning"><Setter Property="Foreground" Value="{DynamicResource Warning}"/></Style>
 
-    <!-- Inputs -->
-    <Style Selector="TextBox">
-      <Setter Property="CornerRadius" Value="8"/>
+    <!-- Panels: flat, outlined, one depth above the faceplate. -->
+    <Style Selector="Border.frost">
+      <Setter Property="Background" Value="{DynamicResource Surface}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
       <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="Padding" Value="9,4"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="BoxShadow" Value="{DynamicResource PanelEdge}"/>
+    </Style>
+    <Style Selector="Border.inset">
+      <Setter Property="Background" Value="{DynamicResource Inset}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource InsetBorder}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="ClipToBounds" Value="True"/>
+    </Style>
+    <Style Selector="Border.actionbar">
+      <Setter Property="BorderThickness" Value="0,1,0,0"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Seam}"/>
+      <Setter Property="Padding" Value="0,12,0,0"/>
+    </Style>
+    <!-- Indicator lights. -->
+    <Style Selector="Border.led">
+      <Setter Property="Width" Value="7"/>
+      <Setter Property="Height" Value="7"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="Background" Value="{DynamicResource LedOff}"/>
+    </Style>
+    <Style Selector="Border.led.on"><Setter Property="Background" Value="{DynamicResource LedOrange}"/><Setter Property="BoxShadow" Value="0 0 7 0 #CCFF5B14"/></Style>
+    <Style Selector="Border.led.red"><Setter Property="Background" Value="{DynamicResource LedRed}"/><Setter Property="BoxShadow" Value="0 0 6 0 #B3FF3B30"/></Style>
+    <Style Selector="Border.led.green"><Setter Property="Background" Value="{DynamicResource LedGreen}"/><Setter Property="BoxShadow" Value="0 0 6 0 #9934D17A"/></Style>
+    <Style Selector="Border.led.amber"><Setter Property="Background" Value="{DynamicResource Amber}"/><Setter Property="BoxShadow" Value="0 0 6 0 #B3FFB347"/></Style>
+
+    <!-- Keys -->
+    <Style Selector="Button">
+      <Setter Property="Background" Value="{DynamicResource Key}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource KeyEdge}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="FontFamily" Value="{DynamicResource KeyFont}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Padding" Value="10,2"/>
+      <Setter Property="Margin" Value="3"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="VerticalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="{DynamicResource KeyLip}"/>
+    </Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KeyHover}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource KeyEdge}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button:pressed">
+      <Setter Property="RenderTransform" Value="translateY(1px)"/>
+    </Style>
+    <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource KeyEdge}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="BoxShadow" Value="{DynamicResource PressedIn}"/>
+    </Style>
+    <Style Selector="Button:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Seam}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+      <Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/>
+    </Style>
+    <!-- The one action to take: an orange key with a darker lip. -->
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource Primary}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource PrimaryPressed}"/>
+      <Setter Property="Foreground" Value="{DynamicResource OnPrimary}"/>
+    </Style>
+    <Style Selector="Button.primary /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="0 2 0 0 #B23A05"/>
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource PrimaryHover}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource PrimaryPressed}"/>
+      <Setter Property="Foreground" Value="{DynamicResource OnPrimary}"/>
+    </Style>
+    <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource PrimaryPressed}"/>
+      <Setter Property="Foreground" Value="{DynamicResource OnPrimary}"/>
+      <Setter Property="BoxShadow" Value="0 1 0 0 #B23A05"/>
+    </Style>
+    <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Seam}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+      <Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/>
+    </Style>
+    <Style Selector="Button.chrome">
+      <Setter Property="Background" Value="{DynamicResource Key}"/>
+    </Style>
+    <Style Selector="Button.card">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="FontSize" Value="10"/>
+      <Setter Property="Margin" Value="0"/>
+    </Style>
+    <!-- Ghost keys: printed label only; a face appears under the pointer. -->
+    <Style Selector="Button.ghost">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+    </Style>
+    <Style Selector="Button.ghost /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/></Style>
+    <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button.ghost:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.square">
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Width" Value="34"/>
+      <Setter Property="HorizontalAlignment" Value="Center"/>
+    </Style>
+    <!-- Switches: a key with an LED; the chosen one is pressed in and its LED lit. -->
+    <Style Selector="Button.chip">
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Background" Value="{DynamicResource Key}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+      <Setter Property="Padding" Value="11,3,12,3"/>
+      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.chip.selected">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button.chip.selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BoxShadow" Value="{DynamicResource PressedIn}"/>
+    </Style>
+    <Style Selector="Button.chip.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button.chip Border.led"><Setter Property="Margin" Value="0,0,8,0"/></Style>
+    <Style Selector="Button.chip.selected Border.led"><Setter Property="Background" Value="{DynamicResource LedOrange}"/><Setter Property="BoxShadow" Value="0 0 7 0 #CCFF5B14"/></Style>
+    <!-- Text actions inside panels. -->
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+      <Setter Property="Padding" Value="6,2"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+    </Style>
+    <Style Selector="Button.link /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/></Style>
+    <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="Button.link:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <!-- Sidebar pages: an LED and a legend; the current page is pressed in with a glowing orange edge. -->
+    <Style Selector="Button.nav">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+      <Setter Property="FontSize" Value="11.5"/>
+      <Setter Property="Height" Value="36"/>
+      <Setter Property="Padding" Value="12,0,8,0"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="Button.nav /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/></Style>
+    <Style Selector="Button.nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Highlight}"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button.nav.selected">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button.nav.selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="BoxShadow" Value="{DynamicResource PressedEdge}"/>
+    </Style>
+    <Style Selector="Button.nav.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button.nav.selected Border.led"><Setter Property="Background" Value="{DynamicResource LedOrange}"/><Setter Property="BoxShadow" Value="0 0 8 0 #DDFF5B14"/></Style>
+    <Style Selector="Button.nav:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <!-- Selectable items (Health checks) and numbered steps (Organize). -->
+    <Style Selector="Button.item">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Padding" Value="12,8"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="MinHeight" Value="54"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="FontFamily" Value="{DynamicResource TextFont}"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+      <Setter Property="FontSize" Value="13.33"/>
+    </Style>
+    <Style Selector="Button.item /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/></Style>
+    <Style Selector="Button.item:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Alternate}"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.item.selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="BoxShadow" Value="{DynamicResource PressedEdge}"/>
+    </Style>
+    <Style Selector="Button.item.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+    </Style>
+    <Style Selector="Button.step">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0,0,0,2"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+      <Setter Property="FontSize" Value="11.5"/>
+      <Setter Property="Padding" Value="4,0,12,0"/>
+      <Setter Property="Margin" Value="0,0,18,0"/>
+      <Setter Property="Height" Value="40"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+    </Style>
+    <Style Selector="Button.step /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/></Style>
+    <Style Selector="Button.step:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button.step.selected">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Primary}"/>
+    </Style>
+    <Style Selector="Button.step.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Primary}"/>
+    </Style>
+    <Style Selector="Button.step:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Border.stepNumber">
+      <Setter Property="Width" Value="22"/>
+      <Setter Property="Height" Value="22"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Background" Value="{DynamicResource Glass}"/>
+    </Style>
+    <Style Selector="Border.stepNumber TextBlock">
+      <Setter Property="Foreground" Value="#7A5A2C"/>
+      <Setter Property="FontFamily" Value="{DynamicResource ReadoutFont}"/>
+    </Style>
+    <Style Selector="Button.step.selected Border.stepNumber TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Amber}"/>
+    </Style>
+    <!-- Add music: release and artist tiles, track rows, the round add key. -->
+    <Style Selector="Border.release">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Border.release:pointerover"><Setter Property="Background" Value="{DynamicResource Highlight}"/></Style>
+    <Style Selector="Border.track"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Border.track:pointerover"><Setter Property="Background" Value="{DynamicResource Alternate}"/></Style>
+    <Style Selector="Button.fab">
+      <Setter Property="Width" Value="34"/>
+      <Setter Property="Height" Value="34"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="{DynamicResource Primary}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource PrimaryPressed}"/>
+      <Setter Property="Foreground" Value="{DynamicResource OnPrimary}"/>
+      <Setter Property="HorizontalAlignment" Value="Right"/>
+    </Style>
+    <Style Selector="Button.fab /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BoxShadow" Value="0 2 0 0 #B23A05"/></Style>
+    <Style Selector="Button.fab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource PrimaryHover}"/>
+      <Setter Property="Foreground" Value="{DynamicResource OnPrimary}"/>
+    </Style>
+    <Style Selector="Button.fab:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource KeyEdge}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Positive}"/>
+      <Setter Property="BoxShadow" Value="{DynamicResource PressedIn}"/>
+    </Style>
+
+    <!-- Fields are pressed-in wells. -->
+    <Style Selector="TextBox">
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="10,5"/>
       <Setter Property="Margin" Value="3,6,6,3"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
-      <Setter Property="MinHeight" Value="28"/>
+      <Setter Property="MinHeight" Value="30"/>
     </Style>
+    <Style Selector="TextBox /template/ Border#PART_BorderElement"><Setter Property="BoxShadow" Value="{DynamicResource Well}"/></Style>
     <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
       <Setter Property="BorderThickness" Value="1.4"/>
     </Style>
     <Style Selector="ComboBox">
-      <Setter Property="CornerRadius" Value="7"/>
+      <Setter Property="CornerRadius" Value="6"/>
       <Setter Property="FontSize" Value="12"/>
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
       <Setter Property="Margin" Value="3,0,4,6"/>
-      <Setter Property="MinHeight" Value="26"/>
+      <Setter Property="MinHeight" Value="28"/>
     </Style>
     <Style Selector="CheckBox">
-      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontSize" Value="12.5"/>
       <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
-      <Setter Property="MinHeight" Value="24"/>
+      <Setter Property="MinHeight" Value="26"/>
+    </Style>
+    <Style Selector="CheckBox /template/ Border#NormalRectangle">
+      <Setter Property="Width" Value="13"/>
+      <Setter Property="Height" Value="13"/>
+      <Setter Property="CornerRadius" Value="3"/>
+    </Style>
+    <Style Selector="CheckBox:checked /template/ Border#NormalRectangle">
+      <Setter Property="BoxShadow" Value="0 0 7 0 #B3FF5B14"/>
+    </Style>
+    <Style Selector="CheckBox /template/ Path#CheckGlyph">
+      <Setter Property="IsVisible" Value="False"/>
     </Style>
     <Style Selector="CheckBox:disabled /template/ ContentPresenter#ContentPresenter">
       <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
     </Style>
-
-    <!-- Progress -->
-    <Style Selector="ProgressBar">
-      <Setter Property="MinHeight" Value="7"/>
-      <Setter Property="Height" Value="7"/>
-      <Setter Property="CornerRadius" Value="4"/>
-      <Setter Property="Background" Value="{DynamicResource ProgressTrack}"/>
-      <Setter Property="Foreground" Value="{DynamicResource ProgressFill}"/>
-      <Setter Property="VerticalAlignment" Value="Center"/>
+    <Style Selector="ToolTip">
+      <Setter Property="Background" Value="{DynamicResource Tooltip}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TooltipInk}"/>
+      <Setter Property="BorderBrush" Value="#3A3A38"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="5"/>
+      <Setter Property="FontFamily" Value="{DynamicResource TextFont}"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Padding" Value="10,7"/>
     </Style>
 
-    <!-- Lists: rows draw their own rounded selection; plain lists use alternating rows. -->
+    <!-- Meters: segmented bars. Orange on panels; amber in display windows. -->
+    <Style Selector="ProgressBar">
+      <Setter Property="MinHeight" Value="8"/>
+      <Setter Property="Height" Value="8"/>
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="Background" Value="{DynamicResource MeterTrack}"/>
+      <Setter Property="Foreground" Value="{DynamicResource MeterFill}"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="ProgressBar.display">
+      <Setter Property="Background" Value="{DynamicResource DisplayMeterTrack}"/>
+      <Setter Property="Foreground" Value="{DynamicResource DisplayMeterFill}"/>
+    </Style>
+
+    <!-- Lists: rows separated by seams; the selected row is pressed in with a glowing orange edge. -->
     <Style Selector="ListBox">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
@@ -459,36 +639,42 @@
       <Setter Property="Background" Value="Transparent"/>
     </Style>
     <Style Selector="ListBox.albums ListBoxItem Border.tile">
-      <Setter Property="Background" Value="{DynamicResource Surface}"/>
-      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Seam}"/>
     </Style>
     <Style Selector="ListBox.albums ListBoxItem:pointerover Border.tile">
-      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="Background" Value="{DynamicResource Alternate}"/>
     </Style>
     <Style Selector="ListBox.albums ListBoxItem:selected Border.tile">
       <Setter Property="Background" Value="{DynamicResource Selection}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource SelectedBorder}"/>
+      <Setter Property="BoxShadow" Value="{DynamicResource PressedIn}"/>
+    </Style>
+    <Style Selector="ListBox.albums ListBoxItem Border.edge">
+      <Setter Property="Opacity" Value="0"/>
+    </Style>
+    <Style Selector="ListBox.albums ListBoxItem:selected Border.edge">
+      <Setter Property="Opacity" Value="1"/>
     </Style>
     <Style Selector="ListBox.albums ListBoxItem:focus-visible Border.tile">
-      <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Primary}"/>
     </Style>
 
     <Style Selector="ListBox.grid ListBoxItem">
       <Setter Property="Padding" Value="0"/>
       <Setter Property="MinHeight" Value="0"/>
       <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
-    </Style>
-    <Style Selector="ListBox.grid ListBoxItem:nth-child(2n)">
-      <Setter Property="Background" Value="{DynamicResource InsetAlternate}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Seam}"/>
+      <Setter Property="BorderThickness" Value="0,0,0,1"/>
     </Style>
     <Style Selector="ListBox.grid ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="BoxShadow" Value="{DynamicResource PressedEdge}"/>
     </Style>
     <Style Selector="ListBox.grid ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource Selection}"/>
     </Style>
     <Style Selector="ListBox.grid ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource Input}"/>
+      <Setter Property="Background" Value="{DynamicResource Alternate}"/>
     </Style>
     <Style Selector="ListBox.grid TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource Ink}"/>

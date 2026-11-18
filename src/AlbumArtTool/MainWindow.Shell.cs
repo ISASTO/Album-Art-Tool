@@ -46,47 +46,58 @@ namespace AlbumArtTool
 
         private Control BuildSidebar()
         {
-            var mark = new Image { Source = Kit.Mark, Width = 26, Height = 26, Margin = new Thickness(0, 0, 9, 0) };
-            var name = Kit.Label("Music Library Manager", 13, true);
-            var brand = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(8, 2, 0, 18) };
-            brand.Children.Add(mark); brand.Children.Add(name);
-            brand.Named("Music Library Manager");
+            // The wordmark, printed like a model name on a front panel.
+            var name = new TextBlock { Text = "MUZIKETTE", FontFamily = Skin.Legend, FontSize = 17, LetterSpacing = 1.2, VerticalAlignment = VerticalAlignment.Center };
+            var brand = new Border { Child = name, Margin = new Thickness(12, 6, 0, 26) };
+            brand.Named("Muzikette");
+            // Pages grouped by what you are doing: your library, getting music, cleaning up.
             var pages = new StackPanel { Spacing = 2 };
+            pages.Children.Add(Group("Library", false));
             pages.Children.Add(AddNav(Page.Albums, Icons.Album, "Albums", "Add, change and standardize album covers (Ctrl+1)."));
-            pages.Children.Add(AddNav(Page.Artists, Icons.Artist, "Artists", "Collapse guest credits into each album's main artist (Ctrl+2)."));
+            pages.Children.Add(AddNav(Page.Artists, Icons.Artist, "Artists", "Collapse guest credits into each album's main artist, or rename artists everywhere (Ctrl+2)."));
+            pages.Children.Add(Group("Get music"));
             pages.Children.Add(AddNav(Page.AddMusic, Icons.AddMusic, "Add music", "Search YouTube Music for artists, albums and songs and add them to your library as MP3 320 (Ctrl+3)."));
-            pages.Children.Add(AddNav(Page.Health, Icons.Health, "Health", "Missing titles, extra pictures, low-bitrate albums and duplicates, each with a fix (Ctrl+4)."));
+            pages.Children.Add(Group("Clean up"));
+            pages.Children.Add(AddNav(Page.Health, Icons.Health, "Health", "Missing titles and album artists, extra or oversized pictures, low-bitrate albums and duplicates, each with a fix (Ctrl+4)."));
             pages.Children.Add(AddNav(Page.Organize, Icons.Organize, "Organize", "Convert, standardize, tidy and reorganize the whole library with presets. Every change is previewed and can be undone (Ctrl+5)."));
-            pages.Children.Add(AddNav(Page.YouTube, Icons.Download, "YouTube Music", "Replace low-bitrate songs with fresh downloads from YouTube Music. Opened from Health."));
-            pages.Children.Add(AddNav(Page.Activity, Icons.Activity, "Activity", "Work in progress, recent results, problems and Undo (Ctrl+6)."));
+            pages.Children.Add(AddNav(Page.YouTube, Icons.Download, "Replace songs", "Replace low-bitrate songs with fresh downloads from YouTube Music. Opened from Health › Low bitrate."));
             nav[Page.YouTube].Button.IsVisible = false;
+            var activity = AddNav(Page.Activity, Icons.Activity, "Activity", "Work in progress, recent results, problems and Undo (Ctrl+6).");
             var settings = AddNav(Page.Settings, Icons.Settings, "Settings", "Appearance, music and backup folders, helper programs and app updates (Ctrl+,).");
             // Where the music is, at the foot of the sidebar.
-            browse.HorizontalAlignment = HorizontalAlignment.Stretch; browse.HorizontalContentAlignment = HorizontalAlignment.Left; browse.Height = 34;
-            scan.Height = 34;
+            browse.HorizontalAlignment = HorizontalAlignment.Stretch; browse.HorizontalContentAlignment = HorizontalAlignment.Left; browse.Height = 34; browse.Margin = new Thickness(0, 0, 4, 0);
+            scan.Height = 34; scan.Margin = new Thickness(0);
             var place = Kit.Grid("*,Auto", "Auto").Add(browse.Cell(0, 0), scan.Cell(0, 1));
-            var divider = new Border { Height = 1, Margin = new Thickness(6, 8, 6, 8) };
+            var divider = new Border { Height = 1, Margin = new Thickness(6, 10, 6, 10) };
             divider.Brush(Border.BackgroundProperty, "Border");
             var foot = new StackPanel { Spacing = 2 };
-            foot.Children.Add(settings); foot.Children.Add(divider); foot.Children.Add(Kit.Caption("Music folder").Also(c => c.Margin = new Thickness(10, 0, 0, 2))); foot.Children.Add(place);
+            foot.Children.Add(activity); foot.Children.Add(settings); foot.Children.Add(divider); foot.Children.Add(Kit.Caption("Source").Also(c => c.Margin = new Thickness(12, 0, 0, 6))); foot.Children.Add(place);
             var dock = new DockPanel();
             DockPanel.SetDock(brand, Dock.Top); DockPanel.SetDock(foot, Dock.Bottom);
             dock.Children.Add(brand); dock.Children.Add(foot); dock.Children.Add(pages);
-            var panel = new Border { Child = dock, Padding = new Thickness(10, 16, 10, 12), BorderThickness = new Thickness(0, 0, 1, 0) };
+            var panel = new Border { Child = dock, Padding = new Thickness(12, 20, 12, 14), BorderThickness = new Thickness(0, 0, 1, 0) };
             panel.Brush(Border.BackgroundProperty, "Sidebar"); panel.Brush(Border.BorderBrushProperty, "Border");
+            panel.Brush(Border.BoxShadowProperty, "PanelEdge");
             return panel;
         }
 
+        private static Control Group(string title, bool spaced = true)
+        {
+            var caption = Kit.Caption(title); caption.Margin = new Thickness(12, spaced ? 20 : 0, 0, 6);
+            return caption;
+        }
+
+        // A page key: an indicator light, its legend and, when there is something to count, a tiny amber display.
         private Button AddNav(Page page, string icon, string label, string tip)
         {
-            var badgeText = new TextBlock { FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
-            var badge = new Border { Child = badgeText, CornerRadius = new CornerRadius(9), Padding = new Thickness(7, 1), VerticalAlignment = VerticalAlignment.Center, IsVisible = false };
-            badge.Brush(Border.BackgroundProperty, "BadgeAccent");
-            var text = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 6, 0) };
-            var content = Kit.Grid("Auto,*,Auto", "*").Add(Kit.Glyph(icon, 16).Cell(0, 0), text.Cell(0, 1), badge.Cell(0, 2));
+            var badgeText = new TextBlock { FontFamily = Skin.Readout, FontWeight = FontWeight.Bold, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(Skin.Amber), Effect = Skin.Glow(Skin.Amber, 6, 0.5) };
+            var badge = new Border { Child = badgeText, CornerRadius = new CornerRadius(3), Padding = new Thickness(6, 0, 6, 1), VerticalAlignment = VerticalAlignment.Center, IsVisible = false };
+            badge.Brush(Border.BackgroundProperty, "Glass");
+            var text = CapsText.Create(label); text.Margin = new Thickness(11, 0, 6, 0); text.LetterSpacing = 1;
+            var content = Kit.Grid("Auto,*,Auto", "*").Add(Kit.Led().Cell(0, 0), text.Cell(0, 1), badge.Cell(0, 2));
             var button = new Button { Content = content, Classes = { "nav" } }.Named(label).Tip(tip);
             Avalonia.Automation.AutomationProperties.SetControlTypeOverride(button, Avalonia.Automation.Peers.AutomationControlType.TabItem);
-            button.Click += (s, e) => Navigate(page);
+            button.Click += (s, e) => { var before = current; Navigate(page); if (current != before && button.Classes.Contains("selected")) Motion.Latch(button); };
             nav[page] = new NavItem { Page = page, Button = button, Badge = badge, BadgeText = badgeText };
             return button;
         }
@@ -114,34 +125,70 @@ namespace AlbumArtTool
             foreach (Control child in pageHost.Children) child.IsVisible = ReferenceEquals(child, shown);
             if (changed) FadeIn(shown);
             if (viewChips != null) viewChips.IsVisible = !showingArtists;
+            if (artistChips != null) artistChips.IsVisible = showingArtists;
             foreach (var item in nav.Values) item.Button.Classes.Set("selected", item.Page == page);
             closePage.IsVisible = page == Page.YouTube;
             renameArtist.IsVisible = page == Page.Artists;
+            // Undo here reverses the last cover or artist edit, so it only shows where those are made.
+            undo.IsVisible = page == Page.Albums || page == Page.Artists;
             if (page == Page.YouTube) youtubePage.Start();
             if (page == Page.Organize) organizePage.Refresh();
             UpdateHeader();
         }
 
+        // The right half of the display: what is running (a legend, the meter and the status line). The status line belongs
+        // to the album pages and Activity; elsewhere it only lights up while library work runs.
+        private void UpdateStatusBar()
+        {
+            if (statusBar == null) return;
+            bool running = busy || queueRunning;
+            bool show = running || current == Page.Albums || current == Page.Artists || current == Page.Activity;
+            string legend = busy ? (writing ? "Writing" : "Scanning") : queueRunning ? "Saving covers" : "Status";
+            display.SetActivity(show ? legend : "", show ? status.Text : "");
+        }
+
+        // The left half of the display: the page (MODE) and up to three counts that matter on it. The page's name and
+        // description stay as text too (read by screen readers, and shown as the display's tooltip).
         private void UpdateHeader()
         {
-            int albumsCount = library.Albums.Count, tracks = library.Albums.Sum(a => a.Tracks.Count);
+            int albumsCount = library.Albums.Count, tracks = 0, missing = 0, credits = 0;
+            foreach (var album in library.Albums) { tracks += album.Tracks.Count; if (album.MissingCount > 0) missing++; if (album.ArtistChangeCount > 0) credits++; }
+            string Number(int n) => hasScanned ? n.ToString() : "--";
             switch (current)
             {
-                case Page.Albums: pageTitle.Text = "Albums"; pageSubtitle.Text = !hasScanned ? "Scanning your music folder…" : albumsCount + (albumsCount == 1 ? " album · " : " albums · ") + tracks + (tracks == 1 ? " track" : " tracks"); break;
-                case Page.Artists: pageTitle.Text = "Artists"; pageSubtitle.Text = "Collapse guest credits into each album's main artist. Already-correct tracks are left alone."; break;
-                case Page.Health: pageTitle.Text = "Library health"; pageSubtitle.Text = "Based on the last scan. Nothing changes until you choose a fix and apply it."; break;
+                case Page.Albums:
+                    pageTitle.Text = "Albums"; pageSubtitle.Text = !hasScanned ? "Scanning your music folder…" : albumsCount + (albumsCount == 1 ? " album · " : " albums · ") + tracks + (tracks == 1 ? " track" : " tracks");
+                    display.SetReadouts(("Mode", "Albums"), ("Albums", Number(albumsCount)), ("Tracks", Number(tracks)), ("No cover", Number(missing))); break;
+                case Page.Artists:
+                    pageTitle.Text = "Artists"; pageSubtitle.Text = "Credit every song of an album to its main artist, or rename an artist everywhere.";
+                    display.SetReadouts(("Mode", "Artists"), ("Albums", Number(albumsCount)), ("To credit", Number(credits))); break;
+                case Page.Health:
+                    pageTitle.Text = "Library health"; pageSubtitle.Text = "What needs attention, from the last scan. Nothing changes until you preview and apply a fix.";
+                    display.SetReadouts(("Mode", "Health"), ("Albums", Number(albumsCount)), ("To fix", healthPage == null ? "--" : healthPage.Attention.ToString())); break;
                 case Page.Organize:
                     pageTitle.Text = "Organize";
                     pageSubtitle.Text = organizePage != null && organizePage.WorksOnNewMusic
-                        ? "Tidy up New music before it joins your library: pick your preset, preview, apply, then go back to Add music."
-                        : "Choose what to change in " + Kit.MiddleEllipsis(organizePage?.Root ?? Root, 60) + ". Every change is previewed first and every original is backed up.";
-                    break;
-                case Page.AddMusic: pageTitle.Text = "Add music"; pageSubtitle.Text = "Search YouTube Music and add albums or songs. They download as MP3 320 to New music, ready to tidy and add to your library."; break;
-                case Page.YouTube: pageTitle.Text = "Replace from YouTube Music"; pageSubtitle.Text = "Checked songs are downloaded at YouTube Music's best free quality and saved as MP3 320 with your tags and cover. Originals are backed up first."; break;
-                case Page.Activity: pageTitle.Text = "Activity"; pageSubtitle.Text = "Work in progress, recent results, problems and Undo."; break;
-                case Page.Welcome: pageTitle.Text = ""; pageSubtitle.Text = ""; break;
-                default: pageTitle.Text = "Settings"; pageSubtitle.Text = "Appearance, folders, helper programs and updates."; break;
+                        ? "Tidy up New music before it joins your library, then go back to Add music and add it."
+                        : "Choose what to change, review every change, then apply. Originals are backed up and can be restored.";
+                    display.SetReadouts(("Mode", "Organize"), ("Folder", organizePage != null && organizePage.WorksOnNewMusic ? "New" : "Library"), ("Step", (organizePage?.CurrentStep ?? 1) + "/2")); break;
+                case Page.AddMusic:
+                    pageTitle.Text = "Add music"; pageSubtitle.Text = "Search YouTube Music and add albums or songs. They download as MP3 320 to New music, ready to tidy and add to your library.";
+                    display.SetReadouts(("Mode", "Add music"), ("Waiting", (addMusicPage?.Queue.Waiting ?? 0).ToString())); break;
+                case Page.YouTube:
+                    pageTitle.Text = "Replace from YouTube Music"; pageSubtitle.Text = "Checked songs are downloaded at YouTube Music's best free quality and saved as MP3 320 with your tags and cover. Originals are backed up first.";
+                    display.SetReadouts(("Mode", "Replace"), ("Albums", (youtubePage?.Albums.Count ?? 0).ToString()), ("Low songs", (youtubePage?.Albums.Sum(a => a.LowCount) ?? 0).ToString())); break;
+                case Page.Activity:
+                    pageTitle.Text = "Activity"; pageSubtitle.Text = "What is running, what finished, what went wrong, and Undo.";
+                    display.SetReadouts(("Mode", "Activity"), ("Queued", QueuedCount.ToString()), ("Done", jobsFinished.ToString()), ("Issues", issues.Count.ToString())); break;
+                case Page.Welcome:
+                    pageTitle.Text = ""; pageSubtitle.Text = "";
+                    display.SetReadouts(("Mode", "Hello")); break;
+                default:
+                    pageTitle.Text = "Settings"; pageSubtitle.Text = "Appearance, folders, helper programs and updates.";
+                    display.SetReadouts(("Mode", "Setup"), ("Version", AlbumArtTool.Updates.UpdateService.DisplayVersion)); break;
             }
+            display.Tip(pageSubtitle.Text.Length > 0 ? pageTitle.Text + "\n\n" + pageSubtitle.Text : null);
+            UpdateStatusBar();
         }
 
         private void AddPage(Control page)
@@ -158,6 +205,7 @@ namespace AlbumArtTool
                 healthPage = new HealthPage(() => library.Albums.ToArray(), info => StartExplorer(info), () => ShowOrganize().PreviewTitleFill(), () => ShowOrganize().PreviewArtworkFix(),
                     result => { ShowUpgrade(result); return Task.CompletedTask; }, () => !busy && !maintenanceRunning && library.Albums.Count > 0, () => ShowOrganize().PreviewAlbumArtistFill(), () => ShowOrganize().PreviewShrinkCovers());
                 AddPage(healthPage);
+                healthPage.Checked += () => { if (current == Page.Health) UpdateHeader(); };
                 healthVersion = libraryVersion;
             }
             else if (healthVersion != libraryVersion && !healthPage.IsScanning) { healthPage.Check(); healthVersion = libraryVersion; }
@@ -294,6 +342,7 @@ namespace AlbumArtTool
             nav[Page.Health].Button.IsEnabled = !busy && hasScanned && library.Albums.Count > 0;
             nav[Page.Artists].Button.IsEnabled = !busy;
             nav[Page.Albums].Button.IsEnabled = !busy || !showingArtists;
+            if (current != Page.Albums) UpdateHeader();
         }
 
         private void SetBadge(Page page, string text, string tip, bool warning = false)
@@ -301,7 +350,8 @@ namespace AlbumArtTool
             var item = nav[page];
             item.Badge.IsVisible = text != null;
             item.BadgeText.Text = text ?? "";
-            item.Badge.Brush(Border.BackgroundProperty, warning ? "BadgeWarning" : "BadgeAccent");
+            item.BadgeText.Foreground = new SolidColorBrush(warning ? Skin.Red : Skin.Amber);
+            item.BadgeText.Effect = Skin.Glow(warning ? Skin.Red : Skin.Amber, 6, 0.5);
             ToolTip.SetTip(item.Badge, text == null ? null : tip);
             Avalonia.Automation.AutomationProperties.SetHelpText(item.Button, text == null ? null : tip);
         }

@@ -30,6 +30,9 @@ namespace AlbumArtTool
         internal DuplicateResult Result { get; private set; }
         internal bool IsScanning { get; private set; }
         internal IReadOnlyList<Node> Nodes { get; private set; } = Array.Empty<Node>();
+        /// <summary>Raised when a scan starts or ends, so a host can update its own labels.</summary>
+        internal event Action StateChanged;
+        private readonly TextBlock help;
 
         internal sealed class Node
         {
@@ -43,7 +46,7 @@ namespace AlbumArtTool
         {
             albums = snapshot; currentAlbums = latest;
             this.openFolder = openFolder ?? (info => { using (Process.Start(info)) { } });
-            var help = Kit.Label("Confirmed copies have identical audio; possible copies share tags and length. Nothing is deleted here: remove confirmed copies with Organize › Remove confirmed duplicates.", Kit.Small, cls: "muted");
+            help = Kit.Label("Confirmed copies have identical audio; possible copies share tags and length. Nothing is deleted here: remove confirmed copies with Organize › Remove confirmed duplicates.", Kit.Small, cls: "muted");
             help.TextWrapping = TextWrapping.Wrap; help.TextTrimming = TextTrimming.None;
             message.Named("Duplicate scan status");
             progress.Named("Duplicate scan progress");
@@ -70,13 +73,16 @@ namespace AlbumArtTool
         }
 
         internal void Stop() => source?.Cancel();
+
+        /// <summary>Inside Library health the page header explains the check and starts or stops scans; the panel shows only the results.</summary>
+        internal void Embed() { help.IsVisible = false; scan.IsVisible = false; }
         private Window Owner => TopLevel.GetTopLevel(this) as Window;
 
         internal async Task ScanAsync()
         {
             if (IsScanning) return;
             source?.Dispose(); source = new CancellationTokenSource(); var token = source.Token;
-            IsScanning = true; Result = null; save.IsEnabled = open.IsEnabled = false; scan.SetText("Stop scan");
+            IsScanning = true; Result = null; save.IsEnabled = open.IsEnabled = false; scan.SetText("Stop scan"); StateChanged?.Invoke();
             Nodes = Array.Empty<Node>(); matches.ItemsSource = null;
             progress.IsVisible = true; progress.Value = 0; message.Text = "Finding duplicate candidates…";
             var reporter = new Throttled<ProgressInfo>(p =>
@@ -96,7 +102,7 @@ namespace AlbumArtTool
             }
             catch (OperationCanceledException) { message.Text = "Duplicate scan stopped. Run it again to compare the whole snapshot."; }
             catch (Exception e) { message.Text = "Duplicate scan could not finish. " + e.Message; }
-            finally { IsScanning = false; scan.SetText("Scan again"); progress.IsVisible = false; }
+            finally { IsScanning = false; scan.SetText("Scan again"); progress.IsVisible = false; StateChanged?.Invoke(); }
         }
 
         private void ShowMatches()

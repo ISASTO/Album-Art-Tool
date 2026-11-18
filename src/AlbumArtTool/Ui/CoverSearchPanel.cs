@@ -18,7 +18,7 @@ namespace AlbumArtTool.Ui
     {
         private readonly ICoverSearch service;
         private readonly TextBox query = new TextBox();
-        private readonly CheckBox automatic = Kit.Check("Online suggestions", true);
+        private readonly CheckBox automatic = Kit.Check("Search automatically", true);
         private readonly Button find = Kit.Button("Search");
         private readonly Button bandcamp = Kit.Button("Bandcamp ↗");
         private readonly TextBlock summary = Kit.Label("", 11.33, cls: "muted");
@@ -39,16 +39,26 @@ namespace AlbumArtTool.Ui
         internal CoverSearchPanel(ICoverSearch service)
         {
             this.service = service;
-            query.Margin = new Thickness(0, 3, 5, 3); query.FontSize = Kit.Small;
+            query.Margin = new Thickness(0, 0, 6, 0); query.FontSize = Kit.Small; query.MinHeight = 32;
             query.Named("Online artwork search query");
-            var searchRow = Kit.Grid("*,72,103", "*").Add(query.Cell(0, 0), find.Cell(0, 1), bandcamp.Cell(0, 2));
-            automatic.Classes.Add("muted"); automatic.HorizontalAlignment = HorizontalAlignment.Right;
-            var instructions = Kit.Grid("*,Auto", "*").Add(Kit.Label("Click a cover to queue it.", Kit.Small, cls: "muted").Cell(0, 0), automatic.Cell(0, 1));
+            query.Tip("What to look for: the album title and artist. Press Enter to search again.");
+            foreach (var b in new[] { find, bandcamp }) { b.Height = 32; b.Margin = new Thickness(0, 0, 6, 0); b.Padding = new Thickness(12, 0); }
+            bandcamp.Margin = new Thickness(0);
+            var searchRow = Kit.Grid("*,Auto,Auto", "Auto").Add(query.Cell(0, 0), find.Cell(0, 1), bandcamp.Cell(0, 2));
+            searchRow.Margin = new Thickness(0, 0, 0, 8);
+            automatic.Classes.Add("muted"); automatic.HorizontalAlignment = HorizontalAlignment.Right; automatic.MinHeight = 0;
+            var caption = Kit.Caption("Covers found online");
+            var hint = Kit.Label("· click one to apply it", Kit.Small, cls: "muted"); hint.Margin = new Thickness(6, 0, 0, 0);
+            var titleRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            titleRow.Children.Add(caption); titleRow.Children.Add(hint);
+            var instructions = Kit.Grid("*,Auto", "28").Add(titleRow.Cell(0, 0), automatic.Cell(0, 1));
+            instructions.Margin = new Thickness(0, 0, 0, 4);
             viewport = new ScrollViewer { Content = choices, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
             viewport.SizeChanged += (s, e) => { foreach (var card in Cards) card.FitHeight(viewport.Bounds.Height); };
             var results = Kit.Inset(viewport).Named("Artwork search results");
             results.Padding = new Thickness(4);
-            var layout = Kit.Grid("*", "30,25,*,22").Add(searchRow.Cell(0, 0), instructions.Cell(1, 0), results.Cell(2, 0), summary.Cell(3, 0));
+            summary.Margin = new Thickness(2, 6, 0, 0);
+            var layout = Kit.Grid("*", "Auto,Auto,*,Auto").Add(instructions.Cell(0, 0), searchRow.Cell(1, 0), results.Cell(2, 0), summary.Cell(3, 0));
             Content = layout;
             find.Click += (s, e) => CurrentSearch = SearchAsync(true);
             query.KeyDown += (s, e) => { if (e.Key == Key.Enter) { e.Handled = true; CurrentSearch = SearchAsync(true); } };
@@ -184,7 +194,7 @@ namespace AlbumArtTool.Ui
         internal CoverCard(CoverCandidate candidate)
         {
             this.candidate = candidate;
-            Classes.Add("frost"); CornerRadius = new CornerRadius(12);
+            Classes.Add("frost"); CornerRadius = new CornerRadius(6);
             Width = 166; Margin = new Thickness(5); Padding = new Thickness(6, 5, 6, 5);
             string name = candidate.Title + " by " + candidate.Artist + " from " + candidate.Source;
             this.Named(name);

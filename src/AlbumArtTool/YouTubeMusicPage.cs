@@ -66,7 +66,7 @@ namespace AlbumArtTool
         private readonly ItemsControl candidateList = new ItemsControl();
         private readonly ListBox trackList = new ListBox { Classes = { "grid" } };
         private readonly TextBox query = new TextBox { Watermark = "Search YouTube Music" };
-        private readonly TextBlock heading = Kit.Label("", 17.33, true), subheading = Kit.Label("", Kit.Body, cls: "muted"), status = Kit.Label("", Kit.Body),
+        private readonly TextBlock heading = Kit.Heading("", 18), subheading = Kit.Label("", Kit.Body, cls: "muted"), status = Kit.Label("", Kit.Body),
             toolText = Kit.Label("", Kit.Body), tableNote = Kit.Label("", Kit.Small, cls: "muted");
         private readonly Image localCover = new Image { Stretch = Stretch.UniformToFill };
         private readonly Border toolsCard;
@@ -105,7 +105,7 @@ namespace AlbumArtTool
             // Tools banner (only when something is missing)
             toolText.TextWrapping = TextWrapping.Wrap; toolText.TextTrimming = TextTrimming.None;
             setup.MinWidth = 120; setup.Click += async (s, e) => await SetupAsync(false);
-            toolsCard = Kit.Frost(Kit.Grid("*,Auto", "Auto").Add(toolText.Cell(0, 0), setup.Cell(0, 1)), new Thickness(14, 10, 10, 10), 14);
+            toolsCard = Kit.Frost(Kit.Grid("*,Auto", "Auto").Add(toolText.Cell(0, 0), setup.Cell(0, 1)), new Thickness(14, 10, 10, 10));
             toolsCard.Margin = new Thickness(0, 10, 0, 0);
 
             // Left: albums
@@ -117,7 +117,7 @@ namespace AlbumArtTool
             var left = Kit.Grid("*", "Auto,*").Add(albumsLabel.Cell(0, 0), albumList.Cell(1, 0));
 
             // Right: selected album, YouTube Music matches, track pairing
-            var coverFrame = new Border { Width = 76, Height = 76, CornerRadius = new CornerRadius(12), ClipToBounds = true, Child = localCover, Margin = new Thickness(0, 0, 14, 0) };
+            var coverFrame = new Border { Width = 76, Height = 76, CornerRadius = new CornerRadius(3), ClipToBounds = true, Child = localCover, Margin = new Thickness(0, 0, 14, 0) };
             coverFrame.Brush(Border.BackgroundProperty, "CoverPlaceholder");
             heading.Named("Selected album"); subheading.Named("Selected album details");
             var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 3 }; titles.Children.Add(heading); titles.Children.Add(subheading);
@@ -174,12 +174,15 @@ namespace AlbumArtTool
             stop.Tip("Stops after the song in progress. Finished replacements stay and can be undone.");
             undo.Tip("Puts back the original files replaced in this window, byte for byte. Later, Organize → Preview Undo can also undo the last run.");
             UpdateCookiesTip();
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
-            foreach (var b in new Control[] { cookies, undo, stop, replaceAll, replaceAlbum }) buttons.Children.Add(b);
+            cookies.Classes.Remove("chrome"); cookies.Classes.Add("ghost"); undo.Classes.Add("ghost");
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            foreach (var b in new Button[] { cookies, undo, stop, replaceAll, replaceAlbum }) { b.Height = 38; b.Margin = new Thickness(0); b.Padding = new Thickness(14, 2); buttons.Children.Add(b); }
+            replaceAlbum.FontSize = Kit.Body;
             var footer = Kit.Grid("*,Auto", "Auto,Auto").Add(progress.Cell(0, 0, 2), status.Cell(1, 0), buttons.Cell(1, 1));
-            footer.Margin = new Thickness(0, 12, 0, 0); status.Margin = new Thickness(2, 0, 16, 0);
+            status.Margin = new Thickness(2, 0, 16, 0); status.VerticalAlignment = VerticalAlignment.Center;
+            var footerBar = new Border { Child = footer, Classes = { "actionbar" }, Margin = new Thickness(0, 12, 0, 0) };
 
-            var layout = Kit.Grid("*", "Auto,Auto,*,Auto").Add(header.Cell(0, 0), toolsCard.Cell(1, 0), body.Cell(2, 0), footer.Cell(3, 0));
+            var layout = Kit.Grid("*", "Auto,Auto,*,Auto").Add(header.Cell(0, 0), toolsCard.Cell(1, 0), body.Cell(2, 0), footerBar.Cell(3, 0));
             Content = layout;
             UpdateTools();
             if (states.Count == 0) status.Text = "No albums have low-bitrate songs at this threshold.";
@@ -611,20 +614,19 @@ namespace AlbumArtTool
         private sealed class AlbumTile : Border
         {
             private readonly Image cover = new Image { Stretch = Stretch.UniformToFill };
-            private readonly TextBlock title = Kit.Label("", 13.33, true), detail = Kit.Label("", Kit.Small, cls: "muted"), badgeText = new TextBlock { FontSize = Kit.Small, TextTrimming = TextTrimming.CharacterEllipsis };
-            private readonly Border badge;
+            private readonly TextBlock title = Kit.Label("", 13.33, true), detail = Kit.Label("", Kit.Small, cls: "muted");
+            private readonly Pill badge = new Pill();
             private AlbumState state;
-            private IDisposable badgeBrush, toneBrush;
 
             internal AlbumTile()
             {
                 Height = 74; Padding = new Thickness(2); Background = Brushes.Transparent;
-                var frame = new Border { Width = 52, Height = 52, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = cover, Margin = new Thickness(8, 0, 11, 0), VerticalAlignment = VerticalAlignment.Center };
+                var frame = new Border { Width = 52, Height = 52, CornerRadius = new CornerRadius(3), ClipToBounds = true, Child = cover, Margin = new Thickness(8, 0, 11, 0), VerticalAlignment = VerticalAlignment.Center };
                 frame.Brush(Border.BackgroundProperty, "CoverPlaceholder");
-                badge = new Border { CornerRadius = new CornerRadius(6), Padding = new Thickness(6, 1, 7, 2), Margin = new Thickness(-1, 4, 8, 0), HorizontalAlignment = HorizontalAlignment.Left, Child = badgeText };
+                badge.Margin = new Thickness(0, 4, 8, 0); badge.Label.FontSize = 9.5;
                 var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 1 };
                 text.Children.Add(title); text.Children.Add(detail); text.Children.Add(badge);
-                Child = new Border { CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), Classes = { "tile" }, Child = Kit.Grid("Auto,*", null).Add(frame.Cell(0, 0), text.Cell(0, 1)) };
+                Child = new Border { CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), Classes = { "tile" }, Child = Kit.Grid("Auto,*", null).Add(frame.Cell(0, 0), text.Cell(0, 1)) };
                 DataContextChanged += (s, e) =>
                 {
                     if (state != null) state.Changed -= Update;
@@ -642,10 +644,7 @@ namespace AlbumArtTool
             {
                 if (state == null) return;
                 detail.Text = (state.Low.Artist.Length > 0 ? state.Low.Artist + " · " : "") + state.LowCount + " of " + state.Tracks.Count + " songs at " + state.Low.Range;
-                badgeText.Text = state.Status;
-                badgeBrush?.Dispose(); toneBrush?.Dispose();
-                badgeBrush = badge.Bind(Border.BackgroundProperty, badge.GetResourceObservable("Badge" + state.Tone));
-                toneBrush = badgeText.Bind(TextBlock.ForegroundProperty, badgeText.GetResourceObservable(state.Tone));
+                badge.Set(state.Status, state.Tone);
             }
         }
 
@@ -658,10 +657,10 @@ namespace AlbumArtTool
             internal MatchCard(YouTubeMusicPage owner)
             {
                 this.owner = owner;
-                Width = 236; Height = 92; Padding = new Thickness(6); CornerRadius = new CornerRadius(12); BorderThickness = new Thickness(1); Cursor = new Cursor(StandardCursorType.Hand);
+                Width = 236; Height = 92; Padding = new Thickness(6); CornerRadius = new CornerRadius(6); BorderThickness = new Thickness(1); Cursor = new Cursor(StandardCursorType.Hand);
                 PointerPressed += async (s, e) => { if (DataContext is YtmAlbum album) await owner.ChooseAsync(album); };
                 Classes.Add("frost");
-                var frame = new Border { Width = 78, Height = 78, CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = cover, Margin = new Thickness(0, 0, 9, 0) };
+                var frame = new Border { Width = 78, Height = 78, CornerRadius = new CornerRadius(3), ClipToBounds = true, Child = cover, Margin = new Thickness(0, 0, 9, 0) };
                 frame.Brush(Border.BackgroundProperty, "CoverPlaceholder");
                 title.TextWrapping = TextWrapping.Wrap; title.MaxLines = 2; detail.TextWrapping = TextWrapping.Wrap; detail.MaxLines = 2;
                 var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 2 };

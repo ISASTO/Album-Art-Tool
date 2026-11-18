@@ -10,7 +10,7 @@
   <ItemGroup>
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
     <PackageReference Include="SkiaSharp" Version="2.88.9" />
-    <InternalsVisibleTo Include="AlbumArtTool" />
+    <InternalsVisibleTo Include="Muzikette" />
     <InternalsVisibleTo Include="AlbumArtTool.Tests" />
   </ItemGroup>
 </Project>

@@ -34,7 +34,7 @@ internal static partial class Tests
             session.Dispatch(async () =>
             {
                 // Screenshots should show finished pages; the fade itself is checked in the first-run test.
-                MainWindow.PageFade = false;
+                MainWindow.PageFade = false; Motion.Enabled = false;
                 await Gui("first run, shortcuts and empty states", FirstRunGui);
                 await Gui("main window and online covers", MainWindowGui);
                 await Gui("queue", QueueGui);
@@ -104,6 +104,12 @@ internal static partial class Tests
             await window.ScanAsync();
             var list = window.Albums;
             Assert(Icons.All.All(icon => Kit.Glyph(icon).Data != null), "every icon's vector path parses");
+            foreach (var (family, weight, name) in new[] { (Skin.Text, Avalonia.Media.FontWeight.Normal, "Archivo"), (Skin.Key, Avalonia.Media.FontWeight.SemiBold, "ArchivoSemiExpanded"),
+                (Skin.Display, Avalonia.Media.FontWeight.ExtraBold, "ArchivoExpanded"), (Skin.Legend, Avalonia.Media.FontWeight.Normal, "Michroma"), (Skin.Readout, Avalonia.Media.FontWeight.Bold, "Doto") })
+                Assert(Avalonia.Media.FontManager.Current.TryGetGlyphTypeface(new Avalonia.Media.Typeface(family, Avalonia.Media.FontStyle.Normal, weight), out var face) && face.FamilyName == name && face.Weight == weight,
+                    "the bundled " + name + " font loads at its own weight (got " + (face == null ? "nothing" : face.FamilyName + " " + face.Weight) + ")");
+            Assert(Named<Button>(window, "Albums").Presenter?.Child is Grid && Named<Button>(window, "Music folder").Presenter?.Child is StackPanel && ButtonStarting(window, "Apply cover").Presenter?.Child is CapsText,
+                "keys with an icon or indicator show it; text keys print their label in capitals");
             Assert(list.AlbumCount == 2, "missing tab lists only incomplete albums");
             Assert(ButtonStarting(window, "Missing art (").Text() == "Missing art (2)" && ButtonStarting(window, "Has art (").Text() == "Has art (1)" && ButtonStarting(window, "All (").Text() == "All (3)", "view chips count their albums");
             Click(ButtonStarting(window, "Has art"));
@@ -137,7 +143,7 @@ internal static partial class Tests
     {
         string root = NewFolder("first-run"), album = Path.Combine(root, "Alpha");
         CopyTrack(Directory.CreateDirectory(album).FullName, "one.mp3", "Alpha", "First Artist");
-        MainWindow.PageFade = true;
+        MainWindow.PageFade = true; Motion.Enabled = true;
         var window = new MainWindow(root, false, new FakeCoverSearch(Cover), firstRun: true);
         window.Show();
         try
@@ -168,7 +174,7 @@ internal static partial class Tests
             Click(Named<Button>(window, "Empty list action"));
             Assert(window.Albums.AlbumCount == 1 && ButtonStarting(window, "Missing art (").Classes.Contains("selected"), "the empty state's action switches the view");
         }
-        finally { MainWindow.PageFade = false; window.Close(); }
+        finally { MainWindow.PageFade = false; Motion.Enabled = false; window.Close(); }
     }
 
     private static async Task ThemeGui(MainWindow window)
@@ -282,6 +288,7 @@ internal static partial class Tests
             Assert(!window.CanInstallUpdate, "active artwork queue prevents an update restart");
             service.Release.TrySetResult(true);
             await Task.WhenAll(online, folderJob, localJob); await window.QueueCompletion;
+            Assert(MainWindow.UiError == null, "the window refreshes after queued work without errors: " + MainWindow.UiError);
             Assert(list.SelectedAlbum.Title == names[3] && window.HasStagedCover && apply.IsEnabled, "completed jobs preserve another album's selection and staged cover");
             foreach (string track in Directory.GetFiles(paths[0], "*.mp3"))
                 using (var audio = TagLib.File.Create(track)) Assert(Size(Artwork.GetCover(audio.Tag)).Width == 600, "folder-cover shortcut embeds the full image, not the scan thumbnail");
@@ -446,6 +453,9 @@ internal static partial class Tests
             await window.ScanAsync();
             Click(ButtonStarting(dialog, "Check again"));
             Assert(dialog.Result.MissingTitles.Count == 1, "checking again uses the latest scan");
+            var readouts = window.Display.Readouts;
+            Assert(readouts.Count == 3 && readouts[0] == "HEALTH" && readouts[1] == window.Library.Albums.Count.ToString() && readouts[2] == dialog.Attention.ToString(),
+                "the display shows the page and its counts (" + string.Join(", ", readouts) + ")");
             Shot(window, "tag-checks.png");
             Assert(ReferenceEquals(window.CheckTags(), dialog), "Health is one page, reused");
         }

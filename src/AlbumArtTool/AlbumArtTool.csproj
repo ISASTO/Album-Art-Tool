@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    <AssemblyName>AlbumArtTool</AssemblyName>
+    <AssemblyName>Muzikette</AssemblyName>
     <RootNamespace>AlbumArtTool</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/AppIcon.ico</ApplicationIcon>
@@ -24,6 +24,8 @@
     <!-- TagLibSharp creates its file readers through reflection; keep the whole library. -->
     <TrimmerRootAssembly Include="TagLibSharp" />
     <AvaloniaResource Include="Assets/AppIcon.ico" />
+    <!-- Archivo, Michroma and Doto (SIL Open Font License 1.1; licenses in /licenses). -->
+    <AvaloniaResource Include="Assets/Fonts/*.ttf" />
     <InternalsVisibleTo Include="AlbumArtTool.Tests" />
   </ItemGroup>
 </Project>

@@ -34,9 +34,9 @@ namespace AlbumArtTool.Bridge
             }
             catch (Exception e)
             {
-                MessageBox.Show("Music Library Manager could not be installed.\n\n" + e.Message +
-                    "\n\nDownload the installer from https://github.com/ISASTO/Album-Art-Tool/releases/latest",
-                    "Music Library Manager", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Muzikette could not be installed.\n\n" + e.Message +
+                    "\n\nDownload the installer from https://github.com/ISASTO/Muzikette/releases/latest",
+                    "Muzikette", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return 1;
             }
         }
@@ -52,9 +52,9 @@ namespace AlbumArtTool.Bridge
 
         private static int Install(string folder)
         {
-            string directory = Path.Combine(Path.GetTempPath(), "AlbumArtTool-setup-" + Guid.NewGuid().ToString("N"));
+            string directory = Path.Combine(Path.GetTempPath(), "Muzikette-setup-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directory);
-            string setup = Path.Combine(directory, "AlbumArtTool-Setup.exe");
+            string setup = Path.Combine(directory, "Muzikette-Setup.exe");
             try
             {
                 using (var input = Assembly.GetExecutingAssembly().GetManifestResourceStream("AlbumArtTool.Setup.exe"))
@@ -87,8 +87,12 @@ namespace AlbumArtTool.Bridge
                         {
                             string location = key?.GetValue("InstallLocation") as string;
                             if (string.IsNullOrEmpty(location)) continue;
-                            string exe = Path.Combine(location, "AlbumArtTool.exe");
-                            if (File.Exists(exe)) return exe;
+                            // Muzikette.exe from 4.0 on; AlbumArtTool.exe before.
+                            foreach (string name in new[] { "Muzikette.exe", "AlbumArtTool.exe" })
+                            {
+                                string exe = Path.Combine(location, name);
+                                if (File.Exists(exe)) return exe;
+                            }
                         }
                     }
                     catch (Exception e) when (e is IOException || e is UnauthorizedAccessException || e is System.Security.SecurityException) { }
