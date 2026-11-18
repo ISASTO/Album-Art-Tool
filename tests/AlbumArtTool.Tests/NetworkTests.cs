@@ -182,6 +182,11 @@ internal static partial class Tests
             Assert(!UpdateService.AllowedUrl(address), "unsafe update URL rejected: " + address);
         Assert(UpdateService.AllowedUrl("https://release-assets.githubusercontent.com/github-production-release-asset/1/2?token=abc"), "GitHub's release asset CDN is allowed");
 
+        // Helper downloads follow a moved repository only to the address GitHub's own release names.
+        Assert(AlbumArtTool.Management.EncoderSetup.RepositoryOf("https://github.com/BtbN/FFmpeg-Builds/releases/tag/latest") == "https://github.com/BtbN/FFmpeg-Builds" &&
+            AlbumArtTool.Management.EncoderSetup.RepositoryOf("https://example.com/a/b/releases/tag/x") == null && AlbumArtTool.Management.EncoderSetup.RepositoryOf("https://github.com/a/b/tree/main") == null &&
+            AlbumArtTool.Management.EncoderSetup.Allowed("https://api.github.com/repositories/123/releases/latest") && !AlbumArtTool.Management.EncoderSetup.Allowed("https://github.com/someone/else/releases/download/x/ffmpeg.zip") &&
+            AlbumArtTool.Management.EncoderSetup.Allowed("https://github.com/new/home/releases/download/x/ffmpeg.zip", "/new/home/releases/download/"), "FFmpeg downloads follow the builds' repository and nothing else");
         // The rename: releases from the old repository and installer name (3.x) and the new ones (4.0+) are both accepted.
         string legacyUrl = "https://github.com/ISASTO/Album-Art-Tool/releases/download/v" + version + "/" + UpdateService.LegacyInstallerName;
         var legacy = UpdateService.ParseRelease(ReleaseJson("v" + version, appBytes, url: legacyUrl, name: UpdateService.LegacyInstallerName), old);

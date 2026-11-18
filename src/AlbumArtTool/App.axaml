@@ -379,6 +379,37 @@
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
+    <!-- Window keys (minimize, maximize, close): quiet until pointed at; close lights red. -->
+    <Style Selector="Button.windowKey">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="Cursor" Value="Arrow"/>
+      <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+    </Style>
+    <Style Selector="Button.windowKey:pressed"><Setter Property="RenderTransform" Value="none"/></Style>
+    <Style Selector="Button.windowKey /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/></Style>
+    <Style Selector="Button.windowKey:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KeyHover}"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+    </Style>
+    <Style Selector="Button.windowKey:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Selection}"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BoxShadow" Value="0 0 0 0 #00000000"/>
+    </Style>
+    <Style Selector="Button.windowKey.close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#E5352B"/>
+      <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="Button.windowKey.close:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#B8241C"/>
+      <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
     <Style Selector="Button.square">
       <Setter Property="Padding" Value="0"/>
       <Setter Property="Width" Value="34"/>

@@ -192,13 +192,27 @@ namespace AlbumArtTool.Ui
         }
 
         /// <summary>Applies the shared window chrome: icon, the faceplate's brushed texture, native title bar colors.</summary>
-        internal static void Prepare(Window window, Control content)
+        /// <summary>Dresses a window: the finish's texture, the app's own title bar (a dialog gets a title strip; the main
+        /// window places its keys itself, see <paramref name="main"/>), and zoom.</summary>
+        internal static void Prepare(Window window, Control content, bool main = false)
         {
             window.Icon = Icon;
             Skin.Install(Application.Current);
+            Control body = content;
+            if (Chrome.Enabled)
+            {
+                Chrome.Extend(window);
+                if (!main)
+                {
+                    // The title strip replaces the system title bar, so the window keeps the same room for its content.
+                    if (!double.IsNaN(window.Height)) window.Height += Chrome.KeyHeight;
+                    if (window.MinHeight > 0) window.MinHeight += Chrome.KeyHeight;
+                    body = Grid("*", "Auto,*").Add(Chrome.TitleBar(window).Cell(0, 0), content.Cell(1, 0));
+                }
+            }
             var host = new Panel();
             host.Children.Add(new Border { IsHitTestVisible = false }.Brush(Border.BackgroundProperty, "FaceTexture"));
-            host.Children.Add(content);
+            host.Children.Add(Zoom.Attach(window, body, keepsSize: main));
             window.Content = host;
             window.Opened += (s, e) => Appearance.ApplyNativeFrame(window);
             Appearance.Track(window);

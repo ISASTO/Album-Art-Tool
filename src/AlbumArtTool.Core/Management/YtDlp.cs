@@ -230,6 +230,9 @@ namespace AlbumArtTool.Management
             if (!UpdateService.Hash(path).Equals(digest.Substring(7), StringComparison.OrdinalIgnoreCase)) throw new IOException(name + "'s SHA-256 checksum did not match.");
         }
 
+        // Where a refused redirect pointed, without its query (which can hold a download token).
+        private static string Address(string url) => Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.Scheme + "://" + u.Host + u.AbsolutePath : "an invalid address";
+
         internal static bool Allowed(string url)
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || u.Scheme != "https" || u.Port != 443 || u.UserInfo.Length != 0) return false;
@@ -245,7 +248,7 @@ namespace AlbumArtTool.Management
                 timeout.CancelAfter(TimeSpan.FromMinutes(15));
                 for (int redirects = 0; redirects < 6; redirects++)
                 {
-                    if (!Allowed(url)) throw new IOException("A download redirected outside GitHub's release servers.");
+                    if (!Allowed(url)) throw new IOException("A download redirected outside GitHub's release servers (" + Address(url) + ").");
                     using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false))
                     {
                         int status = (int)response.StatusCode;

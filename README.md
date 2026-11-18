@@ -93,7 +93,7 @@ The first time, Muzikette downloads yt-dlp, Deno and FFmpeg from their official 
   <img src="docs/settings-silver.png" alt="Settings: finish, folders, helper programs and updates">
 </picture>
 
-Finish (Match Windows, Silver or Black), the music and backup folders, downloads at once, helper programs and **Check for updates**.
+Finish (Match Windows, Silver or Black), zoom, the music and backup folders, downloads at once, helper programs and **Check for updates**.
 
 ## Safety
 
@@ -108,7 +108,7 @@ MP3, FLAC, M4A/M4B, Ogg, Opus, WMA, WAV, AIFF, APE and WavPack. Albums are group
 
 ## Keyboard
 
-**Ctrl+1 … Ctrl+6** Albums, Artists, Add music, Health, Organize, Activity · **Ctrl+,** Settings · **Ctrl+F** search · **Ctrl+O** choose a music folder · **F5** rescan · **Ctrl+Enter** apply · **Esc** discard a staged cover · **Ctrl+Z** undo · **F1** all shortcuts.
+**Ctrl+1 … Ctrl+6** Albums, Artists, Add music, Health, Organize, Activity · **Ctrl+,** Settings · **Ctrl+F** search · **Ctrl+O** choose a music folder · **F5** rescan · **Ctrl+Enter** apply · **Esc** discard a staged cover · **Ctrl+Z** undo · **Ctrl + plus / minus** or **Ctrl + mouse wheel** zoom (**Ctrl+0** resets) · **F1** all shortcuts.
 
 ## Install and update
 

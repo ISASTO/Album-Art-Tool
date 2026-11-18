@@ -37,6 +37,12 @@ namespace AlbumArtTool.Ui
         internal const string Resize = "M10,21V19H6.41L10.91,14.5L9.5,13.09L5,17.59V14H3V21H10M14.5,10.91L19,6.41V10H21V3H14V5H17.59L13.09,9.5L14.5,10.91Z";
         internal const string Speed = "M12,16A3,3 0 0,1 9,13C9,11.88 9.61,10.9 10.5,10.39L20.21,4.77L14.68,14.35C14.18,15.33 13.17,16 12,16M12,3C13.81,3 15.5,3.5 16.97,4.32L14.87,5.53C14,5.19 13,5 12,5A8,8 0 0,0 4,13C4,15.21 4.89,17.21 6.34,18.65H6.35C6.74,19.04 6.74,19.67 6.35,20.06C5.96,20.45 5.32,20.45 4.93,20.07V20.07C3.12,18.26 2,15.76 2,13A10,10 0 0,1 12,3M22,13C22,15.76 20.88,18.26 19.07,20.07V20.07C18.68,20.45 18.05,20.45 17.66,20.06C17.27,19.67 17.27,19.04 17.66,18.65V18.65C19.11,17.2 20,15.21 20,13C20,12 19.81,11 19.46,10.1L20.67,8C21.5,9.5 22,11.18 22,13Z";
 
-        internal static readonly string[] All = { Back, Play, Close, AddMusic, Undo, Refresh, Stop, Folder, Settings, Queue, Album, Artist, Health, Organize, Activity, Search, Duplicates, Check, Warning, Add, Delete, Download, Open, Keyboard, Image, Next, Title, Resize, Speed };
+        // Window keys: thin strokes like the Windows caption glyphs.
+        internal const string Minimize = "M4,11.4H20V12.6H4Z";
+        internal const string Maximize = "M4,4H20V20H4ZM5.2,5.2V18.8H18.8V5.2Z";
+        internal const string Restore = "M8,4H20V16H17.6V14.8H18.8V5.2H9.2V6.4H8ZM4,8H16V20H4ZM5.2,9.2V18.8H14.8V9.2Z";
+        internal const string WindowClose = "M4.85,4L12,11.15L19.15,4L20,4.85L12.85,12L20,19.15L19.15,20L12,12.85L4.85,20L4,19.15L11.15,12L4,4.85Z";
+
+        internal static readonly string[] All = { Back, Play, Close, AddMusic, Undo, Refresh, Stop, Folder, Settings, Queue, Album, Artist, Health, Organize, Activity, Search, Duplicates, Check, Warning, Add, Delete, Download, Open, Keyboard, Image, Next, Title, Resize, Speed, Minimize, Maximize, Restore, WindowClose };
     }
 }
