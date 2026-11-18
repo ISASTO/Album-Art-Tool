@@ -205,6 +205,7 @@ namespace AlbumArtTool
                 healthPage = new HealthPage(() => library.Albums.ToArray(), info => StartExplorer(info), () => ShowOrganize().PreviewTitleFill(), () => ShowOrganize().PreviewArtworkFix(),
                     result => { ShowUpgrade(result); return Task.CompletedTask; }, () => !busy && !maintenanceRunning && library.Albums.Count > 0, () => ShowOrganize().PreviewAlbumArtistFill(), () => ShowOrganize().PreviewShrinkCovers());
                 AddPage(healthPage);
+                healthPage.Checked += () => { if (current == Page.Health) UpdateHeader(); };
                 healthVersion = libraryVersion;
             }
             else if (healthVersion != libraryVersion && !healthPage.IsScanning) { healthPage.Check(); healthVersion = libraryVersion; }

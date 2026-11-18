@@ -292,7 +292,11 @@ namespace AlbumArtTool
             measureStatus = Result.LowBitrate.Count > 0 ? "measuring " + Result.LowBitrate.Count + " songs…" : "";
             ShowRows();
             Verification = Result.LowBitrate.Count > 0 ? VerifyAsync(Result) : Task.CompletedTask;
+            Checked?.Invoke();
         }
+
+        /// <summary>Raised after every check, so the display's counts follow.</summary>
+        internal event Action Checked;
 
         // Header bitrates are shown at once; the real bitrates replace them when measured (in the background, cancelled by a new check).
         private async Task VerifyAsync(LibraryCheckResult result)

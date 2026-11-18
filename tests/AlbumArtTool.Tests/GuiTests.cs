@@ -453,6 +453,9 @@ internal static partial class Tests
             await window.ScanAsync();
             Click(ButtonStarting(dialog, "Check again"));
             Assert(dialog.Result.MissingTitles.Count == 1, "checking again uses the latest scan");
+            var readouts = window.Display.Readouts;
+            Assert(readouts.Count == 3 && readouts[0] == "HEALTH" && readouts[1] == window.Library.Albums.Count.ToString() && readouts[2] == dialog.Attention.ToString(),
+                "the display shows the page and its counts (" + string.Join(", ", readouts) + ")");
             Shot(window, "tag-checks.png");
             Assert(ReferenceEquals(window.CheckTags(), dialog), "Health is one page, reused");
         }
