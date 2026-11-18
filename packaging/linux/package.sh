@@ -26,6 +26,8 @@ share "$app/usr"
 cp "$here/$id.desktop" "$app/"
 cp "$here/icons/hicolor/256x256/apps/$id.png" "$app/$id.png"
 ln -s "$id.png" "$app/.DirIcon"
+# NuGet unpacks the native libraries readable by their owner only; everyone who runs the app needs to read them.
+chmod -R a+rX "$app"
 tool="${APPIMAGETOOL:-}"
 if [ -z "$tool" ]; then
   tool="$work/appimagetool"
@@ -40,5 +42,6 @@ mkdir -p "$dir"
 cp -a "$build/." "$dir/"
 install -m755 "$here/muzikette.sh" "$dir/muzikette"
 share "$dir"
+chmod -R a+rX "$dir"
 tar -C "$work" --owner=0 --group=0 -czf "$out/Muzikette-linux-x64.tar.gz" Muzikette
 ls -l "$out"

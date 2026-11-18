@@ -335,15 +335,23 @@ jobs:
           name: Muzikette-Linux
           path: dist
       - name: Install Flatpak tools
+        timeout-minutes: 10
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
+          sudo apt-get update -qq
+          # Without recommends: those pull in desktop portals and services that do not belong on a build machine.
+          sudo -E apt-get install -y --no-install-recommends flatpak flatpak-builder xvfb xauth ffmpeg
+          # Ubuntu 24.04 limits unprivileged user namespaces, which bubblewrap (Flatpak's sandbox) needs.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
-          sudo apt-get update -qq && sudo apt-get install -y -qq flatpak flatpak-builder xvfb xauth ffmpeg
+          flatpak --version; flatpak-builder --version
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
       - name: Unpack the tested Linux build
         run: |
           mkdir -p dist/linux && tar -xzf dist/Muzikette-linux-x64.tar.gz -C dist/linux --strip-components=1
           rm -rf dist/linux/share dist/linux/muzikette
       - name: Build the bundle
+        timeout-minutes: 15
         run: |
           flatpak-builder --user --install-deps-from=flathub --disable-rofiles-fuse --force-clean --repo=repo build packaging/flatpak/io.github.isasto.Muzikette.yml
           flatpak build-bundle repo dist/Muzikette.flatpak io.github.isasto.Muzikette --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
@@ -353,6 +361,7 @@ jobs:
           flatpak run --user --filesystem="$PWD" --command=appstreamcli org.freedesktop.Sdk//25.08 \
             validate --no-net --explain "$PWD/packaging/linux/io.github.isasto.Muzikette.metainfo.xml"
       - name: Install the bundle and open a library in it (Xvfb)
+        timeout-minutes: 10
         run: |
           flatpak install --user -y --noninteractive dist/Muzikette.flatpak
           packaging/linux/smoke-library.sh "$RUNNER_TEMP/library"

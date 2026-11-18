@@ -83,7 +83,13 @@ namespace AlbumArtTool.Management
             string scratch = Path.Combine(Path.GetDirectoryName(archive), "unpacked"); Directory.CreateDirectory(scratch);
             var info = new System.Diagnostics.ProcessStartInfo("tar") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
             foreach (string argument in new[] { "-xJf", archive, "-C", scratch, "--no-same-owner" }) info.ArgumentList.Add(argument);
-            using (var tar = System.Diagnostics.Process.Start(info))
+            System.Diagnostics.Process started;
+            try { started = System.Diagnostics.Process.Start(info); }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                throw new IOException("Unpacking FFmpeg needs the tar program, which this system does not have. Install FFmpeg with your package manager instead; Muzikette uses the one on your PATH.");
+            }
+            using (var tar = started)
             {
                 string error = tar.StandardError.ReadToEnd();
                 if (!tar.WaitForExit(300000)) { try { tar.Kill(); } catch { } throw new IOException("Unpacking FFmpeg took too long."); }
