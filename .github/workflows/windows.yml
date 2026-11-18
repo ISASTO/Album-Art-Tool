@@ -290,7 +290,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install FFmpeg and tagging tools
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg && python -m pip install --quiet mutagen==1.47.0 pillow==11.0.0
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-noto-cjk && python -m pip install --quiet mutagen==1.47.0 pillow==11.0.0
       - name: Build a library of real albums
         run: python tools/showcase/library.py "$RUNNER_TEMP/library" "$RUNNER_TEMP/covers"
       - name: Build

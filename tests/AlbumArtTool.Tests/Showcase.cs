@@ -76,7 +76,7 @@ internal static partial class Tests
                         // Albums: every album, one with its cover and its colors washed behind the details.
                         window.Navigate(MainWindow.Page.Albums);
                         Click(ButtonStarting(window, "All ("));
-                        await Pick("consolation");
+                        await Pick("SECRETS");
                         Shot(window, "albums-" + finish + ".png");
                         // Missing art: a new cover found online, ready to apply.
                         Click(ButtonStarting(window, "Missing art ("));
@@ -93,9 +93,11 @@ internal static partial class Tests
                         window.Navigate(MainWindow.Page.Health); await window.Health.Verification; await Settle(200);
                         var low = Controls(window).OfType<Button>().FirstOrDefault(b => b.AccessibleName() == "Health check Low bitrate");
                         if (low != null) Click(low);
-                        await Settle(200);
+                        await Settle(200); await window.Health.Verification; await Settle(300);
                         Shot(window, "health-" + finish + ".png");
                         window.Navigate(MainWindow.Page.Organize); await Settle(300);
+                        var preset = Controls(window).OfType<Button>().FirstOrDefault(b => b.IsEffectivelyVisible && b.Text() == "Full clean-up");
+                        if (preset != null) { Click(preset); await Settle(200); }
                         Shot(window, "organize-" + finish + ".png");
                         window.Navigate(MainWindow.Page.Settings); await Settle(200);
                         Shot(window, "settings-" + finish + ".png");

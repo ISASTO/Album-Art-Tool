@@ -42,9 +42,9 @@ namespace AlbumArtTool.Ui
             query.Margin = new Thickness(0, 0, 6, 0); query.FontSize = Kit.Small; query.MinHeight = 32;
             query.Named("Online artwork search query");
             query.Tip("What to look for: the album title and artist. Press Enter to search again.");
-            foreach (var b in new[] { find, bandcamp }) { b.Height = 32; b.Margin = new Thickness(0, 0, 6, 0); }
+            foreach (var b in new[] { find, bandcamp }) { b.Height = 32; b.Margin = new Thickness(0, 0, 6, 0); b.Padding = new Thickness(12, 0); }
             bandcamp.Margin = new Thickness(0);
-            var searchRow = Kit.Grid("*,76,104", "Auto").Add(query.Cell(0, 0), find.Cell(0, 1), bandcamp.Cell(0, 2));
+            var searchRow = Kit.Grid("*,Auto,Auto", "Auto").Add(query.Cell(0, 0), find.Cell(0, 1), bandcamp.Cell(0, 2));
             searchRow.Margin = new Thickness(0, 0, 0, 8);
             automatic.Classes.Add("muted"); automatic.HorizontalAlignment = HorizontalAlignment.Right; automatic.MinHeight = 0;
             var caption = Kit.Caption("Covers found online");

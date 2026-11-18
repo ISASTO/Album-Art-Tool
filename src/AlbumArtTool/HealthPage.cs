@@ -98,7 +98,7 @@ namespace AlbumArtTool
             findDuplicates.Click += async (s, e) => { if (IsScanning) Duplicates.Stop(); else await FindDuplicatesAsync(); };
             foreach (var b in new[] { fill, fillArtists, onePicture, shrinkCovers, replace, findDuplicates })
             {
-                b.Classes.Add("primary"); b.Height = 36; b.Padding = new Thickness(16, 2); b.Margin = new Thickness(0, 0, 10, 0); b.HorizontalAlignment = HorizontalAlignment.Left; b.FontSize = Kit.Body;
+                b.Classes.Add("primary"); b.Height = 36; b.Padding = new Thickness(16, 2); b.Margin = new Thickness(0, 0, 10, 0); b.HorizontalAlignment = HorizontalAlignment.Left; b.FontSize = 11;
                 b.IsVisible = false; fixHost.Children.Add(b);
             }
 
@@ -152,8 +152,10 @@ namespace AlbumArtTool
             show.IsEnabled = false; show.Click += (s, e) => ShowSelected();
             show.Tip("Highlights the selected song in File Explorer, or opens the selected album's folder.");
             show.Height = 34; show.Margin = new Thickness(0);
-            var actions = Kit.Grid("Auto,Auto,*,Auto", "Auto").Add(fixHost.Cell(0, 0), optionHost.Cell(0, 1), show.Cell(0, 3));
-            actions.Margin = new Thickness(58, 14, 0, 14);
+            // The fix, its option, and Show selected; on a narrow window they wrap instead of running off the panel.
+            var actions = new WrapPanel { Margin = new Thickness(60, 14, 0, 14) };
+            optionHost.Margin = new Thickness(0, 0, 14, 0);
+            foreach (var c in new Control[] { fixHost, optionHost, show }) { c.VerticalAlignment = VerticalAlignment.Center; actions.Children.Add(c); }
             list.Named("Tag check results");
             list.ItemTemplate = new FuncDataTemplate<Row>((row, scope) => new RowView(), true);
             list.SelectionChanged += (s, e) => show.IsEnabled = (list.SelectedItem as Row)?.Path != null;

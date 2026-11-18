@@ -462,6 +462,7 @@ namespace AlbumArtTool
             coverCaption.Text = "New cover · " + size.Width + " × " + size.Height;
             coverage.Set("New cover ready to apply", "Accent"); discard.IsVisible = true;
             Motion.Drop(coverFrame.Child as Visual);
+            wash.Show("new " + previewVersion, image);
             UpdateApplyButton();
         }
 
