@@ -36,6 +36,12 @@ internal static partial class Tests
             if (options.Contains("--live-youtube-music")) return LiveYouTubeMusic().GetAwaiter().GetResult();
             if (options.Contains("--live-ytdlp")) return LiveYtDlpSetup().GetAwaiter().GetResult();
             if (options.Contains("--benchmark")) { Benchmark(); return 0; }
+            if (options.Contains("--showcase"))
+            {
+                var folders = args.Where(a => !a.StartsWith("--")).ToArray();
+                output = folders[2];
+                return Showcase(folders[0], folders[1], folders[2]);
+            }
             watchdog = new Timer(_ => { Console.Error.WriteLine("FAIL: watchdog at " + stage); Environment.Exit(1); }, null, TimeSpan.FromMinutes(12), Timeout.InfiniteTimeSpan);
             Run("artwork", ArtworkTests);
             Run("online", () => OnlineTests().GetAwaiter().GetResult());

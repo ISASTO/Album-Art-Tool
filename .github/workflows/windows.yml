@@ -6,6 +6,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      showcase:
+        description: 'Only take the README screenshots (real albums, fetched on the build machine)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -17,6 +22,7 @@ env:
 jobs:
   linux:
     name: Tests (Linux, headless GUI)
+    if: ${{ !inputs.showcase }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -44,6 +50,7 @@ jobs:
 
   windows:
     name: Tests, AOT build and installer (Windows)
+    if: ${{ !inputs.showcase }}
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
@@ -266,6 +273,39 @@ jobs:
           name: Muzikette-Windows
           path: release/*
           if-no-files-found: error
+
+  # README screenshots on a library of real albums. Covers and track lists are fetched here, on the build machine, and
+  # never committed; the audio is silence of each track's length. Run by hand: Actions › Run workflow › showcase.
+  showcase:
+    name: README screenshots (real albums)
+    if: github.event_name == 'workflow_dispatch' && inputs.showcase
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install FFmpeg and tagging tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg && python -m pip install --quiet mutagen==1.47.0 pillow==11.0.0
+      - name: Build a library of real albums
+        run: python tools/showcase/library.py "$RUNNER_TEMP/library" "$RUNNER_TEMP/covers"
+      - name: Build
+        run: dotnet build tests/AlbumArtTool.Tests/AlbumArtTool.Tests.csproj -c Release
+      - name: Take the screenshots
+        run: ALBUMART_FFMPEG="$(command -v ffmpeg)" dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll --showcase "$RUNNER_TEMP/library" "$RUNNER_TEMP/covers" "$PWD/showcase"
+      - name: Print the screenshots
+        if: always()
+        run: for f in showcase/*.png; do echo "==PNG $(basename "$f")"; base64 -w0 "$f"; echo; done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: README-screenshots
+          path: showcase/*.png
+          if-no-files-found: ignore
 
   release:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]'))
