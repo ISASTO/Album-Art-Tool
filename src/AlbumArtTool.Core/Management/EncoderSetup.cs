@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -14,8 +15,14 @@ namespace AlbumArtTool.Management
 {
     internal sealed class EncoderSetup : IDisposable
     {
-        internal const string Api = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest";
-        internal const string Repository = "https://github.com/BtbN/FFmpeg-Builds";
+        // Windows and Linux: BtbN's static LGPL builds. macOS: shaka-project's static builds (GPL), plain ffmpeg and ffprobe
+        // programs for each Mac processor. Both are built in the open on GitHub and published with SHA-256 digests.
+        internal const string BtbNApi = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest";
+        internal const string BtbNRepository = "https://github.com/BtbN/FFmpeg-Builds";
+        internal const string MacApi = "https://api.github.com/repos/shaka-project/static-ffmpeg-binaries/releases/latest";
+        internal const string MacRepository = "https://github.com/shaka-project/static-ffmpeg-binaries";
+        internal static string Api => OperatingSystem.IsMacOS() ? MacApi : BtbNApi;
+        internal static string Repository => OperatingSystem.IsMacOS() ? MacRepository : BtbNRepository;
         private readonly HttpClient client;
 
         internal EncoderSetup(HttpMessageHandler handler = null)
@@ -27,12 +34,13 @@ namespace AlbumArtTool.Management
         internal async Task<string> InstallAsync(IProgress<int> progress, CancellationToken token)
         {
             if (!Supported)
-                throw new IOException("Automatic FFmpeg setup needs 64-bit Windows or Linux on x86-64. Install FFmpeg yourself and choose its ffmpeg program instead.");
+                throw new IOException("Automatic FFmpeg setup needs 64-bit Windows, Linux on x86-64 or macOS. Install FFmpeg yourself and choose its ffmpeg program instead.");
             string stage = Path.Combine(Path.GetTempPath(), "Muzikette-encoder-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
             try
             {
                 string json;
                 using (var output = new MemoryStream()) { await Fetch(Api, output, 2 * 1024 * 1024, null, token).ConfigureAwait(false); json = Encoding.UTF8.GetString(output.ToArray()); }
+                if (OperatingSystem.IsMacOS()) return await InstallMacAsync(json, stage, progress, token).ConfigureAwait(false);
                 string url, digest; long size;
                 string source = Repository;
                 using (var document = Json.Parse(json))
@@ -72,8 +80,67 @@ namespace AlbumArtTool.Management
             finally { try { Directory.Delete(stage, true); } catch { } }
         }
 
-        /// <summary>64-bit Windows, or Linux on x86-64: the systems BtbN builds static LGPL FFmpeg for.</summary>
-        internal static bool Supported => OperatingSystem.IsWindows() && Environment.Is64BitOperatingSystem || OperatingSystem.IsLinux() && Platform.X64;
+        // macOS: ffmpeg-osx-arm64 / ffprobe-osx-arm64 (or -x64) are the programs themselves, checked against their digests,
+        // and saved with a notice of the build's license and source.
+        private async Task<string> InstallMacAsync(string json, string stage, IProgress<int> progress, CancellationToken token)
+        {
+            string arch = Platform.Arm64 ? "arm64" : "x64";
+            var files = new List<(string Name, string Url, string Digest, long Size)>();
+            string source;
+            using (var document = Json.Parse(json))
+            {
+                source = RepositoryOf(Json.String(document.RootElement, "html_url")) ?? Repository;
+                foreach (string program in new[] { "ffmpeg", "ffprobe" })
+                {
+                    string name = program + "-osx-" + arch;
+                    JsonElement? asset = Json.Array(document.RootElement, "assets").Where(a => Json.String(a, "name") == name).Select(a => (JsonElement?)a).FirstOrDefault();
+                    if (asset == null) throw new IOException("The latest FFmpeg release does not include " + name + " yet. Try again shortly or choose a local FFmpeg.");
+                    string url = Json.String(asset, "browser_download_url"), digest = Json.String(asset, "digest");
+                    long.TryParse(Json.String(asset, "size"), out long size);
+                    if (!url.StartsWith(source + "/releases/download/", StringComparison.OrdinalIgnoreCase) || size <= 0 || size > 256L * 1024 * 1024 ||
+                        !digest.StartsWith("sha256:", StringComparison.Ordinal) || !UpdateService.ValidHash(digest.Substring(7)))
+                        throw new IOException("The FFmpeg download does not have valid release metadata/checksum (" + Address(url) + ", " + (digest.Length == 0 ? "no checksum" : "checksum " + digest.Split(':')[0]) + ").");
+                    files.Add((program, url, digest, size));
+                }
+            }
+            downloads = new Uri(source).AbsolutePath + "/releases/download/";
+            string extracted = Path.Combine(stage, "tools"); Directory.CreateDirectory(extracted);
+            for (int i = 0; i < files.Count; i++)
+            {
+                var file = files[i]; int done = i;
+                string path = Path.Combine(extracted, file.Name);
+                using (var output = File.Create(path))
+                {
+                    await Fetch(file.Url, output, file.Size, new Progress<int>(p => progress?.Report((done * 100 + p) / files.Count)), token).ConfigureAwait(false);
+                    if (output.Length != file.Size) throw new IOException("The FFmpeg download was incomplete.");
+                }
+                if (!UpdateService.Hash(path).Equals(file.Digest.Substring(7), StringComparison.OrdinalIgnoreCase)) throw new IOException(file.Name + "'s SHA-256 checksum did not match.");
+                Platform.MakeExecutable(path);
+            }
+            token.ThrowIfCancellationRequested();
+            File.WriteAllText(Path.Combine(extracted, "LICENSE.txt"),
+                "FFmpeg (https://ffmpeg.org), static build from " + source + ".\n" +
+                "It includes x264, x265, LAME, Opus, libvpx and SVT-AV1, so the programs are licensed under the GNU General Public\n" +
+                "License, version 2 or later. The build scripts and the exact sources are published with each release at the\n" +
+                "address above. FFmpeg is a separate command-line program, downloaded at your request; Muzikette runs it.\n");
+            Encoder.Validate(Path.Combine(extracted, Encoder.ExecutableName), token);
+            Directory.CreateDirectory(Encoder.Cache);
+            foreach (string file in Directory.GetFiles(extracted))
+            {
+                string destination = Path.Combine(Encoder.Cache, Path.GetFileName(file));
+                string temp = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                File.Copy(file, temp);
+                if (File.Exists(destination)) File.Replace(temp, destination, null); else File.Move(temp, destination);
+                if (!destination.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)) Platform.MakeExecutable(destination);
+            }
+            File.WriteAllText(Path.Combine(Encoder.Cache, "SOURCE.txt"), source + "\n" + string.Join("\n", files.Select(f => f.Url + "\n" + f.Digest)) +
+                "\nFFmpeg is a separate command-line program. Its license notice is supplied here.\n");
+            return Path.Combine(Encoder.Cache, Encoder.ExecutableName);
+        }
+
+        /// <summary>64-bit Windows or Linux on x86-64 (BtbN's static LGPL builds), or a Mac (shaka-project's static builds).</summary>
+        internal static bool Supported => OperatingSystem.IsWindows() && Environment.Is64BitOperatingSystem || OperatingSystem.IsLinux() && Platform.X64 ||
+            OperatingSystem.IsMacOS() && (Platform.X64 || Platform.Arm64);
         private static string BuildSuffix => OperatingSystem.IsWindows() ? "-win64-lgpl.zip" : "-linux64-lgpl.tar.xz";
 
         // Linux builds come as .tar.xz, which .NET cannot read itself: the system's tar unpacks it into a scratch folder,
@@ -133,7 +200,7 @@ namespace AlbumArtTool.Management
         private static string Address(string url) => Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.Scheme + "://" + u.Host + u.AbsolutePath : "an invalid address";
 
         // Release downloads are accepted from the builds' repository (its current address, once the release names it).
-        private string downloads = "/BtbN/FFmpeg-Builds/releases/download/";
+        private string downloads = new Uri(Repository).AbsolutePath + "/releases/download/";
 
         internal static bool Allowed(string url, string downloads = "/BtbN/FFmpeg-Builds/releases/download/")
         {

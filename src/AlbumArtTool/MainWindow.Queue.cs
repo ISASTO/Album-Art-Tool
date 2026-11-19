@@ -205,7 +205,7 @@ namespace AlbumArtTool
             undoFromActivity.Click += async (s, e) => await UndoAsync();
             openOrganizeUndo.Tip("Organize keeps a journal of its last run, even after restarting the app. This opens it in Organize so you can choose what to restore.");
             openOrganizeUndo.Click += (s, e) => { var page = ShowOrganize(Root); if (!page.IsWorking) page.PreviewUndo(); };
-            openBackups.Tip("Open the PC backup folder in " + Platform.FileManager + ". Each run's originals, journal.json and report.csv are kept there.");
+            openBackups.Tip("Open the " + Platform.Computer + " backup folder in " + Platform.FileManager + ". Each run's originals, journal.json and report.csv are kept there.");
             openBackups.Click += (s, e) =>
             {
                 try { Directory.CreateDirectory(BackupSettings.Root); StartExplorer(new System.Diagnostics.ProcessStartInfo(BackupSettings.Root) { UseShellExecute = true }); }
@@ -214,7 +214,7 @@ namespace AlbumArtTool
             foreach (var b in new[] { undoFromActivity, openOrganizeUndo }) { b.HorizontalAlignment = HorizontalAlignment.Left; b.Padding = new Thickness(14, 2); b.Height = 34; b.Margin = new Thickness(0, 6, 0, 0); }
             openBackups.HorizontalAlignment = HorizontalAlignment.Left; openBackups.Margin = new Thickness(-8, 10, 0, 0);
             lastChange.TextWrapping = Avalonia.Media.TextWrapping.Wrap; lastChange.MaxLines = 2; lastChange.FontSize = Kit.Small; lastChange.Classes.Add("muted");
-            var organizeNote = Kit.Label("Organize keeps its last run on this PC, even after a restart.", Kit.Small, cls: "muted");
+            var organizeNote = Kit.Label("Organize keeps its last run on this " + Platform.Computer + ", even after a restart.", Kit.Small, cls: "muted");
             organizeNote.TextWrapping = Avalonia.Media.TextWrapping.Wrap; organizeNote.TextTrimming = Avalonia.Media.TextTrimming.None;
             var undoStack = new StackPanel { Spacing = 2 };
             undoStack.Children.Add(Kit.Caption("Undo").Also(c => c.Margin = new Thickness(0, 0, 0, 8)));

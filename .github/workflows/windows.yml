@@ -389,6 +389,115 @@ jobs:
           path: dist/Muzikette.flatpak
           if-no-files-found: error
 
+  # The Mac app: tests on macOS, one universal program for Apple Silicon and Intel, Muzikette.app in a DMG, checked by
+  # starting it on the Mac. It is signed ad hoc unless a Developer ID certificate is set up in the repository's secrets
+  # (MACOS_CERTIFICATE, MACOS_CERTIFICATE_PASSWORD), and then also notarized if APPLE_ID, APPLE_TEAM_ID and
+  # APPLE_APP_PASSWORD are set.
+  macos:
+    name: Tests, universal build and DMG (macOS)
+    if: ${{ !inputs.showcase }}
+    runs-on: macos-15
+    timeout-minutes: 50
+    env:
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test-only audio decoder
+        run: |
+          python -m pip install imageio-ffmpeg==0.6.0
+          mkdir -p "$RUNNER_TEMP/bin" && ln -sf "$(python -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')" "$RUNNER_TEMP/bin/ffmpeg"
+          "$RUNNER_TEMP/bin/ffmpeg" -hide_banner -version | head -1
+      - name: Build
+        run: dotnet build tests/AlbumArtTool.Tests/AlbumArtTool.Tests.csproj -c Release
+      - name: Run tests
+        run: ALBUMART_FFMPEG="$RUNNER_TEMP/bin/ffmpeg" dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll "$PWD/TestResults"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macOS-test-screenshots
+          path: TestResults/*.png
+          if-no-files-found: ignore
+      - name: Live FFmpeg download (Mac build), checksum, startup and MP3 conversion
+        continue-on-error: true
+        run: dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll --live-encoder
+      - name: Live yt-dlp and Deno download (Mac builds), checksums and launch
+        continue-on-error: true
+        run: dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll --live-ytdlp
+
+      - name: Publish native (AOT) app for Apple Silicon and Intel
+        run: |
+          dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r osx-arm64 -o dist/osx-arm64
+          dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r osx-x64 -o dist/osx-x64
+          ls -l dist/osx-arm64 dist/osx-x64
+      - name: Import the Developer ID certificate
+        if: env.MACOS_CERTIFICATE != ''
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"; password="$(openssl rand -hex 16)"
+          printf '%s' "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/certificate.p12"
+          echo "MACOS_SIGN_IDENTITY=Developer ID Application" >> "$GITHUB_ENV"
+      - name: Build Muzikette.app and Muzikette.dmg
+        run: packaging/macos/bundle.sh dist/osx-arm64 dist/osx-x64 dist "$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props)"
+      - name: Notarize the DMG
+        if: env.MACOS_CERTIFICATE != '' && env.APPLE_ID != ''
+        run: |
+          xcrun notarytool submit dist/Muzikette.dmg --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple dist/Muzikette.dmg
+      - name: Native self-test (tags in all nine formats), Apple Silicon and Intel
+        run: |
+          app=dist/Muzikette.app/Contents/MacOS/Muzikette
+          lipo -info "$app"
+          code=0
+          "$app" --self-test "$PWD/tests/AlbumArtTool.Tests/fixtures" "$RUNNER_TEMP/self-test.txt" || code=$?
+          echo "Apple Silicon self-test: $(cat "$RUNNER_TEMP/self-test.txt")"
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            arch -x86_64 "$app" --self-test "$PWD/tests/AlbumArtTool.Tests/fixtures" "$RUNNER_TEMP/self-test-x64.txt" || code=$?
+            echo "Intel (Rosetta) self-test: $(cat "$RUNNER_TEMP/self-test-x64.txt")"
+          else
+            echo "Rosetta is not installed on this runner; the Intel half was built but not run."
+          fi
+          exit $code
+      - name: Open a library in the app
+        timeout-minutes: 5
+        run: |
+          PATH="$RUNNER_TEMP/bin:$PATH" packaging/linux/smoke-library.sh "$RUNNER_TEMP/library"
+          code=0
+          ALBUMART_DATA="$RUNNER_TEMP/data" dist/Muzikette.app/Contents/MacOS/Muzikette --smoke "$RUNNER_TEMP/library" "$RUNNER_TEMP/macos.png" || code=$?
+          if [ -f "$RUNNER_TEMP/macos.png" ]; then echo "==PNG macos-app.png"; base64 -i "$RUNNER_TEMP/macos.png" | tr -d '\n'; echo; fi
+          exit $code
+      - name: Start it as a user would (Launch Services) and photograph the screen
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          open -n dist/Muzikette.app --args "$RUNNER_TEMP/library"
+          sleep 12
+          screencapture -x "$RUNNER_TEMP/screen.png" || true
+          pgrep -lf "Muzikette.app/Contents/MacOS/Muzikette" || echo "Muzikette is not running"
+          osascript -e 'tell application "Muzikette" to quit' || pkill -f "Muzikette.app/Contents/MacOS/Muzikette" || true
+          if [ -f "$RUNNER_TEMP/screen.png" ]; then sips -Z 1600 "$RUNNER_TEMP/screen.png" >/dev/null; echo "==PNG macos-screen.png"; base64 -i "$RUNNER_TEMP/screen.png" | tr -d '\n'; echo; fi
+          tail -5 ~/Library/Application\ Support/Muzikette/errors.log 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Muzikette-macOS
+          path: dist/Muzikette.dmg
+          if-no-files-found: error
+
   # README screenshots on a library of real albums. Covers and track lists are fetched here, on the build machine, and
   # never committed; the audio is silence of each track's length. Run by hand: Actions › Run workflow › showcase.
   showcase:
@@ -424,7 +533,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release]'))
-    needs: [linux, windows, linux-package, flatpak]
+    needs: [linux, windows, linux-package, flatpak, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -442,6 +551,10 @@ jobs:
         with:
           name: Muzikette-Flatpak
           path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: Muzikette-macOS
+          path: release
       - name: Publish tested build
         env:
           GH_TOKEN: ${{ github.token }}
@@ -455,12 +568,12 @@ jobs:
           fi
           # One checksum list for every package (the Windows job wrote its part).
           sed -i 's/\r$//' release/SHA256SUMS.txt
-          (cd release && sha256sum Muzikette-x86_64.AppImage Muzikette.flatpak Muzikette-linux-x64.tar.gz) >> release/SHA256SUMS.txt
+          (cd release && sha256sum Muzikette.dmg Muzikette-x86_64.AppImage Muzikette.flatpak Muzikette-linux-x64.tar.gz) >> release/SHA256SUMS.txt
           cat release/SHA256SUMS.txt
           # Notes come from the release commit message (without the [release] marker).
           NOTES="$(printf '%s' "$COMMIT_MESSAGE" | sed -e 's/\[release\] *//' -e '/^Co-Authored-By:/d' -e '/^Claude-Session:/d')"
           [ -n "$NOTES" ] || NOTES="Muzikette $RELEASE_TAG"
-          NOTES="$(printf '%s\n\n**Windows:** install Muzikette-Setup.exe, or update from inside the app (Settings › Check for updates; Get updates in Music Library Manager).\n\n**Linux (x86-64):** Muzikette-x86_64.AppImage runs on most distributions and updates itself (make it executable, then open it). Or install Muzikette.flatpak with `flatpak install --user Muzikette.flatpak`; it is not on Flathub.' "$NOTES")"
+          NOTES="$(printf '%s\n\n**Windows:** install Muzikette-Setup.exe, or update from inside the app (Settings › Check for updates; Get updates in Music Library Manager).\n\n**macOS 14 or later (Apple Silicon and Intel):** open Muzikette.dmg and drag Muzikette into Applications. If macOS says it cannot verify the app, open System Settings › Privacy & Security and click Open Anyway (once).\n\n**Linux (x86-64):** Muzikette-x86_64.AppImage runs on most distributions and updates itself (make it executable, then open it). Or install Muzikette.flatpak with `flatpak install --user Muzikette.flatpak`; it is not on Flathub.' "$NOTES")"
           gh release create "$RELEASE_TAG" release/Muzikette-Setup.exe release/AlbumArtTool-Setup.exe release/AlbumArtTool.exe release/Muzikette-Portable.zip \
-            release/Muzikette-x86_64.AppImage release/Muzikette.flatpak release/Muzikette-linux-x64.tar.gz release/SHA256SUMS.txt \
+            release/Muzikette.dmg release/Muzikette-x86_64.AppImage release/Muzikette.flatpak release/Muzikette-linux-x64.tar.gz release/SHA256SUMS.txt \
             --target "$RELEASE_COMMIT" --title "Muzikette $RELEASE_TAG" --notes "$NOTES"

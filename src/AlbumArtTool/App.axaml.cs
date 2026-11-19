@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using AlbumArtTool.Core;
@@ -20,6 +21,8 @@ namespace AlbumArtTool
 
         public override void Initialize()
         {
+            // The Mac menu bar's Hide and Quit items are named after the app.
+            Name = "Muzikette";
             AvaloniaXamlLoader.Load(this);
             Appearance.Initialize(this);
             Skin.Install(this);
@@ -75,9 +78,28 @@ namespace AlbumArtTool
                 string root = ResolveRoot(Arguments, out bool firstRun);
                 var main = new MainWindow(root, firstRun: firstRun);
                 desktop.MainWindow = main;
+                if (OperatingSystem.IsMacOS()) InstallMacMenu(main);
                 if (SmokeShot != null) main.Opened += async (s, e) => desktop.Shutdown(await SmokeAsync(main));
             }
             base.OnFrameworkInitializationCompleted();
+        }
+
+        // The app menu in a Mac's menu bar: About, Settings, updates and the shortcuts, above the system's own Services,
+        // Hide and Quit items (it replaces the framework's default "About Avalonia").
+        private void InstallMacMenu(MainWindow main)
+        {
+            var about = new NativeMenuItem("About Muzikette");
+            about.Click += (s, e) => _ = Dialogs.ShowMessage(main, "About Muzikette", "Muzikette " + UpdateService.DisplayVersion +
+                "\n\nKeeps a music library in order: covers, artists, tags, formats and duplicates.\n\nFree and open source (MIT license).\n" + UpdateService.RepositoryUrl);
+            var settings = new NativeMenuItem("Settings…") { Gesture = new KeyGesture(Key.OemComma, KeyModifiers.Meta) };
+            settings.Click += (s, e) => main.Navigate(MainWindow.Page.Settings);
+            var updates = new NativeMenuItem("Check for Updates…");
+            updates.Click += (s, e) => _ = main.GetUpdatesAsync();
+            var shortcuts = new NativeMenuItem("Keyboard Shortcuts");
+            shortcuts.Click += (s, e) => main.ShowShortcuts();
+            var menu = new NativeMenu();
+            menu.Add(about); menu.Add(new NativeMenuItemSeparator()); menu.Add(settings); menu.Add(updates); menu.Add(shortcuts);
+            NativeMenu.SetMenu(this, menu);
         }
 
         private static async Task<int> SmokeAsync(MainWindow main)

@@ -16,14 +16,31 @@ namespace AlbumArtTool
         private readonly TextBlock welcomeFolder = Kit.Label("", Kit.Body);
         private bool firstRunPending;
 
-        /// <summary>Shortcuts shown by F1, in the order they are listed.</summary>
-        internal static readonly (string Keys, string Action)[] Shortcuts =
+        /// <summary>Shortcuts shown by F1 (⌘? on a Mac), in the order they are listed.</summary>
+        internal static (string Keys, string Action)[] Shortcuts => Shortcut.Mac ? MacShortcuts : PcShortcuts;
+
+        private static readonly (string Keys, string Action)[] MacShortcuts =
+        {
+            ("⌘1 … ⌘6", "Albums, Artists, Add music, Health, Organize, Activity"),
+            ("⌘,", "Settings"),
+            ("⌘F", "Search albums"),
+            ("⌘O", "Choose a different music folder"),
+            ("⌘R", "Rescan the music folder (⇧⌘R reads every file again)"),
+            ("⌘↩", "Apply the cover, or set the track artists"),
+            ("Esc", "Discard the cover being previewed"),
+            ("⌘Z", "Undo the last cover or artist change"),
+            ("⌘+ / ⌘−", "Zoom in or out (or pinch on the trackpad); ⌘0 resets"),
+            ("⌘W / ⌘M", "Close or minimize the window"),
+            ("⌘?", "Show these shortcuts"),
+        };
+
+        private static readonly (string Keys, string Action)[] PcShortcuts =
         {
             ("Ctrl+1 … Ctrl+6", "Albums, Artists, Add music, Health, Organize, Activity"),
             ("Ctrl+,", "Settings"),
             ("Ctrl+F", "Search albums"),
             ("Ctrl+O", "Choose a different music folder"),
-            ("F5", "Rescan the music folder (Shift+F5 reads every file again)"),
+            ("F5", "Rescan the music folder (Shift+F5 reads every file again; Ctrl+R works too)"),
             ("Ctrl+Enter", "Apply the cover, or set the track artists"),
             ("Esc", "Discard the cover being previewed"),
             ("Ctrl+Z", "Undo the last cover or artist change"),

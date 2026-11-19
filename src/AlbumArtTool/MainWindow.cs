@@ -182,11 +182,11 @@ namespace AlbumArtTool
         private void OnKey(object sender, KeyEventArgs e)
         {
             lastModifiers = e.KeyModifiers;
-            bool control = (e.KeyModifiers & KeyModifiers.Control) != 0;
+            bool control = Shortcut.Pressed(e.KeyModifiers);
             if (control && e.Key == Key.F) { if (current != Page.Albums && current != Page.Artists) Navigate(Page.Albums); search.Focus(); e.Handled = true; }
             else if (control && e.Key >= Key.D1 && e.Key <= Key.D6) { Navigate(new[] { Page.Albums, Page.Artists, Page.AddMusic, Page.Health, Page.Organize, Page.Activity }[e.Key - Key.D1]); e.Handled = true; }
             else if (control && e.Key == Key.OemComma) { Navigate(Page.Settings); e.Handled = true; }
-            else if (e.Key == Key.F1) { ShowShortcuts(); e.Handled = true; }
+            else if (e.Key == Key.F1 || control && e.Key == Key.OemQuestion) { ShowShortcuts(); e.Handled = true; }
             else if (control && e.Key == Key.O && !busy) { _ = ChangeFolderAsync(); e.Handled = true; }
             else if (control && e.Key == Key.Enter && !(e.Source is TextBox) && (current == Page.Albums || current == Page.Artists))
             {
@@ -194,7 +194,7 @@ namespace AlbumArtTool
                 else if (apply.IsEnabled) _ = ApplyAsync();
                 e.Handled = true;
             }
-            else if (e.Key == Key.F5 && !busy) { _ = ScanAsync((e.KeyModifiers & KeyModifiers.Shift) != 0); e.Handled = true; }
+            else if ((e.Key == Key.F5 || control && e.Key == Key.R) && !busy) { _ = ScanAsync((e.KeyModifiers & KeyModifiers.Shift) != 0); e.Handled = true; }
             else if (control && e.Key == Key.Z && undo.IsEnabled && !(e.Source is TextBox)) { _ = UndoAsync(); e.Handled = true; }
             else if (e.Key == Key.Escape && pending != null && !busy) { DiscardStaged(); e.Handled = true; }
         }

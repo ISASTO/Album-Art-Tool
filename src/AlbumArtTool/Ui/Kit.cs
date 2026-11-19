@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -77,6 +78,9 @@ namespace AlbumArtTool.Ui
         {
             if (OperatingSystem.IsWindows() && selectFile)
                 return new System.Diagnostics.ProcessStartInfo("explorer.exe", "/select," + Updates.UpdateInstaller.QuoteArgument(path)) { UseShellExecute = true };
+            // The Finder highlights a file with open -R.
+            if (OperatingSystem.IsMacOS() && selectFile)
+                return new System.Diagnostics.ProcessStartInfo("/usr/bin/open") { ArgumentList = { "-R", path }, UseShellExecute = false };
             string folder = selectFile ? System.IO.Path.GetDirectoryName(path) : path;
             return new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true };
         }
@@ -135,7 +139,7 @@ namespace AlbumArtTool.Ui
 
         internal static T Named<T>(this T control, string name) where T : Control { AutomationProperties.SetName(control, name); return control; }
         internal static string AccessibleName(this Control control) => AutomationProperties.GetName(control);
-        internal static T Tip<T>(this T control, string text) where T : Control { ToolTip.SetTip(control, string.IsNullOrEmpty(text) ? null : text); return control; }
+        internal static T Tip<T>(this T control, string text) where T : Control { ToolTip.SetTip(control, string.IsNullOrEmpty(text) ? null : Shortcut.Text(text)); return control; }
 
         internal static T Brush<T>(this T control, AvaloniaProperty property, string key) where T : Control
         { control.Bind(property, control.GetResourceObservable(key)); return control; }
@@ -206,8 +210,17 @@ namespace AlbumArtTool.Ui
         /// window places its keys itself, see <paramref name="main"/>), and zoom.</summary>
         internal static void Prepare(Window window, Control content, bool main = false)
         {
-            window.Icon = Icon;
+            // A Mac app's icon comes from its bundle; a window icon would replace it in the Dock.
+            if (!OperatingSystem.IsMacOS()) window.Icon = Icon;
             Skin.Install(Application.Current);
+            // ⌘W closes and ⌘M minimizes a window, as in every Mac app.
+            if (Shortcut.Mac)
+                window.AddHandler(InputElement.KeyDownEvent, (s, e) =>
+                {
+                    if (e.KeyModifiers != KeyModifiers.Meta) return;
+                    if (e.Key == Key.W) { window.Close(); e.Handled = true; }
+                    else if (e.Key == Key.M && window.CanResize) { window.WindowState = WindowState.Minimized; e.Handled = true; }
+                }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
             Control body = content;
             if (Chrome.Enabled)
             {

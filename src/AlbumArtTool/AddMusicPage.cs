@@ -495,7 +495,7 @@ namespace AlbumArtTool
             if (path == null) return;
             if (BackupSettings.Within(path, libraryRoot()) || BackupSettings.Within(libraryRoot(), path)) { mergeText.Text = "Choose a folder outside your music folder."; return; }
             if (Queue.IsRunning) { mergeText.Text = "Wait for the downloads to finish before changing the folder."; return; }
-            if (!AppSettings.Write(AddMusic.SettingFile, Path.GetFullPath(path))) mergeText.Text = "The folder could not be saved on this PC.";
+            if (!AppSettings.Write(AddMusic.SettingFile, Path.GetFullPath(path))) mergeText.Text = "The folder could not be saved on this " + Platform.Computer + ".";
             SyncQueue();
         }
 
