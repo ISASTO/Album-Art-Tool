@@ -112,13 +112,17 @@ namespace AlbumArtTool.Management
             }
             return value;
         }
+        // macOS links /var, /tmp and /etc to /private/...: they belong to the system, so a folder below them (the temporary
+        // folder, for one) is not treated as reached through a link someone made.
+        private static bool SystemLink(string folder) => OperatingSystem.IsMacOS() && (folder == "/var" || folder == "/tmp" || folder == "/etc");
+
         internal static void Safe(string path, string root)
         {
             if (!BackupSettings.Within(path, root)) throw new IOException("A planned path escapes the selected folder.");
             string folder = Directory.Exists(path) ? path : Path.GetDirectoryName(path);
             while (folder != null && BackupSettings.Within(folder, root))
             {
-                if (Directory.Exists(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0) throw new IOException("Linked folders are not changed.");
+                if (Directory.Exists(folder) && !SystemLink(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0) throw new IOException("Linked folders are not changed.");
                 folder = Path.GetDirectoryName(folder);
             }
             if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new IOException("Linked files are not changed.");
