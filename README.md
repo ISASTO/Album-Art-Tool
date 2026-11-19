@@ -1,6 +1,6 @@
 <p align="center"><img src="docs/icon.png" width="112" alt=""></p>
 
-<h1 align="center">Muzikette</h1>
+<h1 align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.svg"><img src="docs/wordmark-light.svg" width="300" alt="Muzikette"></picture></h1>
 
 <p align="center">An app for Windows, macOS and Linux that keeps a music library in order: album covers, artist credits, tags, formats, duplicates and folders.<br>Every change is previewed first, backed up, and can be undone.</p>
 

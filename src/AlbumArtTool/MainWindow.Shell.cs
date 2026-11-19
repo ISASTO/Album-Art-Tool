@@ -46,8 +46,8 @@ namespace AlbumArtTool
 
         private Control BuildSidebar()
         {
-            // The wordmark, printed like a model name on a front panel.
-            var name = new TextBlock { Text = "MUZIKETTE", FontFamily = Skin.Legend, FontSize = 17, LetterSpacing = 1.2, VerticalAlignment = VerticalAlignment.Center };
+            // The wordmark, with its orange power light as the dot of the i.
+            var name = Wordmark.Create(19); name.VerticalAlignment = VerticalAlignment.Center;
             var brand = new Border { Child = name, Margin = new Thickness(12, 6, 0, 26) };
             brand.Named("Muzikette");
             if (Chrome.Enabled) { Chrome.Drag(brand); brand.Margin = new Thickness(0, 0, 0, 20); brand.Padding = new Thickness(12, 6, 0, 6); }
