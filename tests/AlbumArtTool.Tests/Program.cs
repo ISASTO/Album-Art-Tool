@@ -25,6 +25,7 @@ internal static partial class Tests
         // Keep the real per-user app data out of the tests.
         Environment.SetEnvironmentVariable("ALBUMART_DATA", Path.Combine(workspace, "appdata"));
         var options = args.Where(a => a.StartsWith("--")).ToArray();
+        keepGoing = options.Contains("--keep-going");
         output = args.FirstOrDefault(a => !a.StartsWith("--")) ?? Path.Combine(workspace, "results");
         Directory.CreateDirectory(output);
         Timer watchdog = null;
@@ -63,6 +64,7 @@ internal static partial class Tests
             foreach (var path in Fixtures()) Run("artist round trip " + Path.GetExtension(path), () => ArtistRoundTrip(path));
             Run("scanning", () => { PartialAlbums(); MixedAlbums(); Guards(); FolderArt(); CancelScan(); CountedScanProgress(); InvalidArt(); UntaggedMp3(); });
             if (!options.Contains("--no-gui")) Run("GUI", GuiAll);
+            if (failures.Count > 0) { Console.Error.WriteLine("FAILED: " + string.Join(", ", failures)); return 1; }
             Console.WriteLine("PASS: " + assertions + " assertions, real codec round trips, audio integrity and headless GUI checks.");
             return 0;
         }
@@ -70,10 +72,17 @@ internal static partial class Tests
         finally { watchdog?.Dispose(); try { Directory.Delete(workspace, true); } catch { } }
     }
 
+    // --keep-going runs every group even after one fails, and lists the failures at the end (for a first run on a new system).
+    private static bool keepGoing;
+    private static readonly List<string> failures = new List<string>();
+
     private static void Run(string name, Action test)
     {
         stage = name; var clock = Stopwatch.StartNew();
-        test();
+        if (!keepGoing) test();
+        else
+            try { test(); }
+            catch (Exception e) { failures.Add(name); Console.Error.WriteLine("FAIL during " + name + ": " + e); return; }
         Console.WriteLine("PASS " + name + " (" + clock.ElapsedMilliseconds + " ms)");
     }
 
