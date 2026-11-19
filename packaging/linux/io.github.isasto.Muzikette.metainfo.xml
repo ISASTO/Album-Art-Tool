@@ -66,6 +66,11 @@
     <display_length compare="ge">768</display_length>
   </requires>
   <releases>
+    <release version="4.3.0" date="2026-11-19">
+      <description>
+        <p>Muzikette is available for macOS too, and Ctrl+R rescans the library.</p>
+      </description>
+    </release>
     <release version="4.2.0" date="2026-11-18">
       <description>
         <p>Muzikette runs on Linux, as an AppImage that updates itself or as a Flatpak. FFmpeg, yt-dlp and Deno can be set up from inside the app there too.</p>

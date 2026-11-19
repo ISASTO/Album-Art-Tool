@@ -2,9 +2,9 @@
 
 <h1 align="center">Muzikette</h1>
 
-<p align="center">An app for Windows and Linux that keeps a music library in order: album covers, artist credits, tags, formats, duplicates and folders.<br>Every change is previewed first, backed up, and can be undone.</p>
+<p align="center">An app for Windows, macOS and Linux that keeps a music library in order: album covers, artist credits, tags, formats, duplicates and folders.<br>Every change is previewed first, backed up, and can be undone.</p>
 
-<p align="center"><b><a href="https://github.com/ISASTO/Muzikette/releases/latest">Download</a></b> · Windows 10 and 11 (Muzikette-Setup.exe) · Linux (AppImage or Flatpak), x86-64 · free and open source</p>
+<p align="center"><b><a href="https://github.com/ISASTO/Muzikette/releases/latest">Download</a></b> · Windows 10 and 11 · macOS 14 and later · Linux (AppImage or Flatpak) · free and open source</p>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/albums-black.png">
@@ -97,7 +97,7 @@ Finish (match the system, Silver or Black), zoom, the music and backup folders, 
 
 ## Safety
 
-- Every change is made on a copy, checked, and swapped in only after a verified backup of the original is saved on your PC (outside the music folder, so players don't index it). The default backup folder is `%LOCALAPPDATA%\Muzikette\LibraryBackups` on Windows and `~/.local/share/Muzikette/LibraryBackups` on Linux.
+- Every change is made on a copy, checked, and swapped in only after a verified backup of the original is saved on your PC (outside the music folder, so players don't index it). The default backup folder is `%LOCALAPPDATA%\Muzikette\LibraryBackups` on Windows, `~/Library/Application Support/Muzikette/LibraryBackups` on a Mac and `~/.local/share/Muzikette/LibraryBackups` on Linux.
 - **Undo last change** restores the latest cover or artist edit; Organize's **Preview Undo** restores its last run, including moves, conversions and removals, after a restart too. Undo refuses to overwrite a file changed since.
 - Files that changed since the scan, read-only files and locked files are skipped with an explanation in Activity. One failed song never stops the rest.
 - No account, no background service. Searches send only the album title and artist; your music never leaves your PC.
@@ -116,6 +116,14 @@ MP3, FLAC, M4A/M4B, Ogg, Opus, WMA, WAV, AIFF, APE and WavPack. Albums are group
 
 Run **Muzikette-Setup.exe**. It installs for your Windows account only (no administrator prompt), with a Start menu entry and an uninstaller in **Settings › Apps**. Prefer no installer? **Muzikette-Portable.zip** contains the same app. **Settings › Check for updates** downloads a newer release, verifies its SHA-256 checksum and version, and reopens the app in the same music folder.
 
+### macOS
+
+Muzikette runs on macOS 14 Sonoma and later, on Apple Silicon and Intel Macs (one universal app).
+
+Open **Muzikette.dmg** and drag **Muzikette** into **Applications**. The app is not notarized by Apple, so the first time you open it macOS says it cannot verify it: click **Done**, open **System Settings › Privacy & Security**, scroll to *Muzikette was blocked*, click **Open Anyway** and confirm. That is needed once. (Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/Muzikette.app`.)
+
+Shortcuts use ⌘ (⌘1–⌘6 for the pages, ⌘, for Settings, ⌘R to rescan, ⌘Z to undo, ⌘+ and ⌘− or a trackpad pinch to zoom), and the app menu has About, Settings and Check for Updates. **Check for Updates** tells you when a new version is out and opens the release page; install it the same way, replacing the old app. FFmpeg (as ffmpeg and ffprobe, from [shaka-project/static-ffmpeg-binaries](https://github.com/shaka-project/static-ffmpeg-binaries)), yt-dlp and Deno are downloaded as Mac builds when you first need them, or Muzikette uses the ones Homebrew installed. Settings and backups live in `~/Library/Application Support/Muzikette`.
+
 ### Linux
 
 Muzikette runs on 64-bit x86 Linux with an X11 or Wayland desktop (through XWayland) and glibc 2.35 or newer: Ubuntu 22.04, Debian 12, Fedora 36 and later, and their relatives.
@@ -132,7 +140,7 @@ Use **Get updates** in Music Library Manager as usual (3.x and the old 2.x porta
 
 ## Build and test
 
-Install the .NET 10 SDK. The app, the core library and the test suite (including headless checks of every page) run on Windows and Linux; the tests run on macOS too.
+Install the .NET 10 SDK. The app, the core library and the test suite (including headless checks of every page) run on Windows, macOS and Linux.
 
 ```powershell
 dotnet run --project src/AlbumArtTool                                              # run from source
@@ -149,13 +157,21 @@ packaging/linux/package.sh dist/linux dist        # Muzikette-x86_64.AppImage an
 
 `packaging/flatpak/` packs that build into the release's Flatpak bundle; it is not a Flathub manifest.
 
+On a Mac (with Xcode's command line tools):
+
+```sh
+dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r osx-arm64 -o dist/osx-arm64
+dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r osx-x64 -o dist/osx-x64
+packaging/macos/bundle.sh dist/osx-arm64 dist/osx-x64 dist 4.3.0   # universal Muzikette.app and Muzikette.dmg
+```
+
 ```powershell
 dotnet build tests/AlbumArtTool.Tests/AlbumArtTool.Tests.csproj -c Release
 $env:ALBUMART_FFMPEG = 'C:\path\to\ffmpeg.exe'
 dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll TestResults   # screenshots land in TestResults
 ```
 
-The suite covers real round trips in nine audio formats (decoded-audio hashes, preserved tags, byte-exact Undo), scanning, artist cleanup, duplicates, every Organize option with crash recovery, update verification, the data-folder move from Music Library Manager, and the pages themselves. CI also installs the real installer, upgrades a real Music Library Manager 3.12.1 install and a 2.5.2 portable copy, and measures startup. On Linux it builds on an older glibc, runs the native self-test, and opens a library in the AppImage and in the installed Flatpak on a real X server. Test audio is synthesized tones; it contains no music.
+The suite covers real round trips in nine audio formats (decoded-audio hashes, preserved tags, byte-exact Undo), scanning, artist cleanup, duplicates, every Organize option with crash recovery, update verification, the data-folder move from Music Library Manager, and the pages themselves. CI also installs the real installer, upgrades a real Music Library Manager 3.12.1 install and a 2.5.2 portable copy, and measures startup. On Linux it builds on an older glibc, runs the native self-test, and opens a library in the AppImage and in the installed Flatpak on a real X server. On a Mac it runs the whole suite, builds the universal app, runs the native self-test on both processors (Intel through Rosetta) and opens a library in the app. Test audio is synthesized tones; it contains no music.
 
 The README screenshots come from a manual CI run (**Actions › Build, test and package › Run workflow › showcase**) that fetches the covers and track lists of real albums on the build machine and builds a library of silent stand-in files. Nothing it downloads is committed.
 

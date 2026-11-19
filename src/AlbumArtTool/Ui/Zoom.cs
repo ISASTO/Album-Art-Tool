@@ -12,9 +12,10 @@ using AlbumArtTool.Core;
 
 namespace AlbumArtTool.Ui
 {
-    // Zoom, as in a browser or Spotify: Ctrl + mouse wheel, Ctrl + plus / minus, and Ctrl + 0 to reset. Every window's
-    // content scales (drop-down lists and menus follow it). The main window keeps its size and its content reflows;
-    // dialogs grow or shrink with their content. The level is remembered on this PC.
+    // Zoom, as in a browser or Spotify: Ctrl + mouse wheel, Ctrl + plus / minus, and Ctrl + 0 to reset (on a Mac ⌘ + plus /
+    // minus / 0, and pinching on the trackpad). Every window's content scales (drop-down lists and menus follow it). The
+    // main window keeps its size and its content reflows; dialogs grow or shrink with their content. The level is
+    // remembered on this computer.
     internal static class Zoom
     {
         internal static readonly double[] Levels = { 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.4, 1.5 };
@@ -61,6 +62,7 @@ namespace AlbumArtTool.Ui
             Apply(entry);
             window.AddHandler(InputElement.KeyDownEvent, (s, e) => OnKey(e), RoutingStrategies.Tunnel);
             window.AddHandler(InputElement.PointerWheelChangedEvent, (s, e) => OnWheel(entry, e), RoutingStrategies.Tunnel);
+            window.AddHandler(Gestures.PointerTouchPadGestureMagnifyEvent, (s, e) => { Pinch(e.Delta.X); e.Handled = true; }, RoutingStrategies.Bubble, handledEventsToo: true);
             return entry.Host;
         }
 
@@ -128,16 +130,29 @@ namespace AlbumArtTool.Ui
 
         private static void OnKey(KeyEventArgs e)
         {
-            if ((e.KeyModifiers & KeyModifiers.Control) == 0 || (e.KeyModifiers & KeyModifiers.Alt) != 0) return;
+            if (!Shortcut.Pressed(e.KeyModifiers) || (e.KeyModifiers & KeyModifiers.Alt) != 0) return;
             if (e.Key == Key.OemPlus || e.Key == Key.Add) { Step(1); e.Handled = true; }
             else if (e.Key == Key.OemMinus || e.Key == Key.Subtract) { Step(-1); e.Handled = true; }
             else if (e.Key == Key.D0 || e.Key == Key.NumPad0) { Reset(); e.Handled = true; }
         }
 
+        private static double pinched;
+
+        /// <summary>A trackpad pinch (a Mac reports it as a change in magnification): about a quarter more or less is one step.</summary>
+        internal static void Pinch(double magnification)
+        {
+            if (double.IsNaN(magnification)) return;
+            if (Math.Sign(magnification) != Math.Sign(pinched)) pinched = 0;
+            pinched += magnification;
+            if (Math.Abs(pinched) < 0.2) return;
+            Step(Math.Sign(pinched));
+            pinched = 0;
+        }
+
         // Each notch of a mouse wheel is one step; a touchpad's small scrolls add up to one.
         private static void OnWheel(Scaled entry, PointerWheelEventArgs e)
         {
-            if ((e.KeyModifiers & KeyModifiers.Control) == 0) return;
+            if (!Shortcut.Pressed(e.KeyModifiers)) return;
             e.Handled = true;
             entry.Wheel += e.Delta.Y;
             if (Math.Abs(entry.Wheel) < 1) return;

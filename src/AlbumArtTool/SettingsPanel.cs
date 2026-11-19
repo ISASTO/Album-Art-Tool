@@ -22,7 +22,7 @@ namespace AlbumArtTool
     {
         private readonly Func<string> musicFolder;
         private readonly Func<Task> changeFolder, checkUpdates;
-        private readonly Button systemTheme = Kit.Button(Platform.Windows ? "Match Windows" : "Match system", "chip"), lightTheme = Kit.Button("Silver", "chip"), darkTheme = Kit.Button("Black", "chip");
+        private readonly Button systemTheme = Kit.Button(Platform.Windows ? "Match Windows" : Platform.Mac ? "Match macOS" : "Match system", "chip"), lightTheme = Kit.Button("Silver", "chip"), darkTheme = Kit.Button("Black", "chip");
         private readonly TextBlock folderValue = Value(), backupValue = Value(), encoderValue = Value(), downloaderValue = Value(), cookiesValue = Value(), versionValue = Value();
         private readonly Button changeMusic = Kit.Button("Change…"), changeBackup = Kit.Button("Change…"), openBackup = Kit.Button("Open"),
             downloadEncoder = Kit.Button("Download"), chooseEncoder = Kit.Button("Choose…"), downloadDownloader = Kit.Button("Download"),
@@ -50,16 +50,18 @@ namespace AlbumArtTool
 
             changeMusic.Named("Change music folder").Tip("Choose the top folder that contains your music. The app scans it again and remembers it for next time.");
             changeMusic.Click += async (s, e) => { await this.changeFolder(); Refresh(); };
-            changeBackup.Named("Change backup folder").Tip("Choose where originals, removed copies and Undo information are kept. It must be on this PC, outside the music folder, so your player never indexes the backups.");
+            changeBackup.Named("Change backup folder").Tip("Choose where originals, removed copies and Undo information are kept. It must be on this " + Platform.Computer + ", outside the music folder, so your player never indexes the backups.");
             changeBackup.Click += async (s, e) => await ChooseBackupAsync();
             openBackup.Named("Open backup folder").Tip("Open the backup folder in " + Platform.FileManager + ". Each run has its own folder with the originals, journal.json (used by Undo) and a readable report.csv.");
             openBackup.Click += (s, e) => Open(BackupSettings.Root);
             downloadEncoder.Named("Download FFmpeg").Tip(EncoderSetup.Supported
-                ? "Download a static build of FFmpeg for this system (about 100–170 MB, once) from BtbN/FFmpeg-Builds on GitHub. Its SHA-256 checksum is verified before anything is extracted or run."
+                ? (Platform.Mac
+                    ? "Download static builds of ffmpeg and ffprobe for this Mac (about 80 MB, once) from shaka-project/static-ffmpeg-binaries on GitHub. Their SHA-256 checksums are verified before they are run."
+                    : "Download a static build of FFmpeg for this system (about 100–170 MB, once) from BtbN/FFmpeg-Builds on GitHub. Its SHA-256 checksum is verified before anything is extracted or run.")
                 : "Automatic FFmpeg setup is not available on this system. Install FFmpeg yourself, then choose its ffmpeg program.");
             downloadEncoder.IsEnabled = EncoderSetup.Supported;
             downloadEncoder.Click += async (s, e) => await DownloadEncoderAsync();
-            chooseEncoder.Named("Choose FFmpeg").Tip("Use an " + Encoder.ExecutableName + " you already have instead of downloading one (one from your distribution's packages works too). The location is remembered.");
+            chooseEncoder.Named("Choose FFmpeg").Tip("Use an " + Encoder.ExecutableName + " you already have instead of downloading one (" + (Platform.Mac ? "Homebrew's is found by itself" : "one from your distribution's packages works too") + "). The location is remembered.");
             chooseEncoder.Click += async (s, e) => await ChooseEncoderAsync();
             downloadDownloader.Named("Download yt-dlp").Tip("Download yt-dlp and Deno from their official GitHub releases (verified with GitHub's SHA-256 digests). They are only used to replace low-bitrate songs from YouTube Music.");
             downloadDownloader.Click += async (s, e) => await DownloadDownloaderAsync();
@@ -89,7 +91,7 @@ namespace AlbumArtTool
             // Add music: how many songs download at once.
             parallel.Value = AddMusic.Parallel;
             parallel.Named("Downloads at once").Tip("How many songs Add music downloads at the same time, from 1 to " + AddMusic.MaxParallel + ". More is faster on a quick connection; " +
-                "fewer is gentler if YouTube starts asking you to confirm you're not a bot. A change applies to the next song that starts. Remembered on this PC, also after updates.");
+                "fewer is gentler if YouTube starts asking you to confirm you're not a bot. A change applies to the next song that starts. Remembered on this " + Platform.Computer + ", also after updates.");
             parallel.PropertyChanged += (s, e) =>
             {
                 if (e.Property != Slider.ValueProperty) return;
@@ -165,7 +167,7 @@ namespace AlbumArtTool
 
         private void SetTheme(ThemeMode mode)
         {
-            if (!Appearance.SetMode(mode, animate: true)) message.Text = "The appearance changed, but the choice could not be saved on this PC.";
+            if (!Appearance.SetMode(mode, animate: true)) message.Text = "The appearance changed, but the choice could not be saved on this " + Platform.Computer + ".";
             Refresh();
         }
 
@@ -174,7 +176,7 @@ namespace AlbumArtTool
         private async Task ChooseBackupAsync()
         {
             if (Storage == null) return;
-            var result = await Storage.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Choose a backup folder on your PC, outside the music folder", AllowMultiple = false });
+            var result = await Storage.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Choose a backup folder on your " + Platform.Computer + ", outside the music folder", AllowMultiple = false });
             string picked = result.Count > 0 ? result[0].TryGetLocalPath() : null;
             if (picked == null) return;
             SetBackupFolder(picked);

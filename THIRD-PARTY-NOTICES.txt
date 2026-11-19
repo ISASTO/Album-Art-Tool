@@ -21,6 +21,7 @@ libSkiaSharp and libHarfBuzzSharp libraries include Skia (BSD-3-Clause,
 Copyright Google LLC) and HarfBuzz (Old MIT license).
 
 ANGLE (BSD-3-Clause) - av_libglesv2.dll (Windows), Copyright The ANGLE Project Authors.
+Avalonia's macOS backend - libAvaloniaNative.dylib (Mac), MIT, as Avalonia above.
 
 Fonts, bundled in the application (SIL Open Font License 1.1):
   Archivo - Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo)
@@ -39,9 +40,11 @@ application; no separate .NET installation is required.
 Optional FFmpeg command-line program
 ------------------------------------
 FFmpeg is not embedded in the app or bundled in any of its packages (the
-installer, the ZIP, the AppImage, the Flatpak or the tar.gz). The app can use a
-user-supplied ffmpeg or download a static LGPL build for Windows or Linux
-directly from https://github.com/BtbN/FFmpeg-Builds/releases.
+installer, the ZIP, the DMG, the AppImage, the Flatpak or the tar.gz). The app
+can use a user-supplied ffmpeg or download a static LGPL build for Windows or
+Linux directly from https://github.com/BtbN/FFmpeg-Builds/releases, or on a Mac
+static ffmpeg and ffprobe builds (GPL v2 or later: they include x264, x265 and
+LAME) from https://github.com/shaka-project/static-ffmpeg-binaries/releases.
 That download retains upstream LICENSE/COPYING notices and a SOURCE.txt
 record of the release URL and verified GitHub SHA-256 digest in the cache.
 FFmpeg project and source: https://ffmpeg.org/ and https://git.ffmpeg.org/ffmpeg.git

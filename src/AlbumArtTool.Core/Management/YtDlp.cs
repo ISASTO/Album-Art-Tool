@@ -29,7 +29,7 @@ namespace AlbumArtTool.Management
         private static string Locate(string explicitPath, string name, string first = null)
         {
             if (!string.IsNullOrWhiteSpace(explicitPath) && File.Exists(explicitPath)) return Path.GetFullPath(explicitPath);
-            var folders = new[] { first, Cache, AppContext.BaseDirectory }.Concat((Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator));
+            var folders = new[] { first, Cache, AppContext.BaseDirectory }.Concat(Platform.ProgramFolders());
             foreach (string folder in folders)
                 try
                 {
@@ -153,8 +153,14 @@ namespace AlbumArtTool.Management
             client.Timeout = Timeout.InfiniteTimeSpan; client.DefaultRequestHeaders.UserAgent.ParseAdd("Muzikette/" + UpdateService.DisplayVersion);
         }
 
-        /// <summary>64-bit Windows, or Linux on x86-64: the systems yt-dlp and Deno publish standalone builds for.</summary>
-        internal static bool Supported => OperatingSystem.IsWindows() && Environment.Is64BitOperatingSystem || OperatingSystem.IsLinux() && Platform.X64;
+        /// <summary>64-bit Windows, Linux on x86-64, or a Mac: the systems yt-dlp and Deno publish standalone builds for.</summary>
+        internal static bool Supported => OperatingSystem.IsWindows() && Environment.Is64BitOperatingSystem || OperatingSystem.IsLinux() && Platform.X64 ||
+            OperatingSystem.IsMacOS() && (Platform.X64 || Platform.Arm64);
+
+        // The standalone builds' names: yt-dlp_macos is one program for both Mac processors.
+        internal static string YtDlpAsset => OperatingSystem.IsWindows() ? "yt-dlp.exe" : OperatingSystem.IsMacOS() ? "yt-dlp_macos" : "yt-dlp_linux";
+        internal static string DenoAsset => OperatingSystem.IsWindows() ? "deno-x86_64-pc-windows-msvc.zip" :
+            OperatingSystem.IsMacOS() ? (Platform.Arm64 ? "deno-aarch64-apple-darwin.zip" : "deno-x86_64-apple-darwin.zip") : "deno-x86_64-unknown-linux-gnu.zip";
 
         internal static bool Installed => File.Exists(Path.Combine(YtDlp.Cache, YtDlp.ExecutableName)) && File.Exists(Path.Combine(YtDlp.Cache, YtDlp.DenoName));
         internal static string InstalledTag { get { try { return File.ReadAllText(VersionFile).Trim(); } catch { return ""; } } }
@@ -169,17 +175,17 @@ namespace AlbumArtTool.Management
         internal async Task<string> InstallAsync(bool includeDeno, IProgress<int> progress, CancellationToken token)
         {
             if (!Supported)
-                throw new IOException("Automatic setup needs 64-bit Windows or Linux on x86-64. Put yt-dlp and deno on PATH instead.");
+                throw new IOException("Automatic setup needs 64-bit Windows, Linux on x86-64 or macOS. Put yt-dlp and deno on PATH instead.");
             string stage = Path.Combine(Path.GetTempPath(), "Muzikette-downloader-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
             try
             {
                 string tag;
-                // yt-dlp.exe on Windows; on Linux the standalone yt-dlp_linux build, saved as yt-dlp.
+                // yt-dlp.exe on Windows; on Linux and macOS the standalone yt-dlp_linux or yt-dlp_macos build, saved as yt-dlp.
                 string ytdlp = Path.Combine(stage, YtDlp.ExecutableName);
                 using (var release = await ReleaseAsync(YtDlpApi, token).ConfigureAwait(false))
                 {
                     tag = Json.String(release.RootElement, "tag_name");
-                    await FetchAsset(release.RootElement, OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp_linux", ytdlp, 64L * 1024 * 1024, new Progress<int>(p => progress?.Report(includeDeno ? p / 3 : p)), token).ConfigureAwait(false);
+                    await FetchAsset(release.RootElement, YtDlpAsset, ytdlp, 64L * 1024 * 1024, new Progress<int>(p => progress?.Report(includeDeno ? p / 3 : p)), token).ConfigureAwait(false);
                 }
                 Platform.MakeExecutable(ytdlp);
                 bool deno = includeDeno || !File.Exists(Path.Combine(YtDlp.Cache, YtDlp.DenoName));
@@ -187,7 +193,7 @@ namespace AlbumArtTool.Management
                     using (var release = await ReleaseAsync(DenoApi, token).ConfigureAwait(false))
                     {
                         string zip = Path.Combine(stage, "deno.zip");
-                        await FetchAsset(release.RootElement, OperatingSystem.IsWindows() ? "deno-x86_64-pc-windows-msvc.zip" : "deno-x86_64-unknown-linux-gnu.zip", zip, 256L * 1024 * 1024,
+                        await FetchAsset(release.RootElement, DenoAsset, zip, 256L * 1024 * 1024,
                             new Progress<int>(p => progress?.Report(33 + p * 2 / 3)), token).ConfigureAwait(false);
                         using (var archive = ZipFile.OpenRead(zip))
                         {

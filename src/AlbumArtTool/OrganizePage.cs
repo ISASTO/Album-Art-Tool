@@ -309,9 +309,9 @@ namespace AlbumArtTool
             if (OrganizePresets.IsReserved(clean)) { state.Text = "\"" + clean + "\" is a built-in preset. Choose another name."; return false; }
             if (!SelectedOptions.Any()) { state.Text = "Select at least one option to save as a preset."; return false; }
             var saved = OrganizePresets.Upsert(customPresets, clean, SelectedOptions);
-            if (saved == null) { state.Text = customPresets.Count >= OrganizePresets.MaxCustom ? "You have the maximum of " + OrganizePresets.MaxCustom + " presets. Delete one first." : "The preset could not be saved on this PC."; return false; }
+            if (saved == null) { state.Text = customPresets.Count >= OrganizePresets.MaxCustom ? "You have the maximum of " + OrganizePresets.MaxCustom + " presets. Delete one first." : "The preset could not be saved on this " + Platform.Computer + "."; return false; }
             ShowSaveRow(false); RebuildPresets();
-            state.Text = "Saved preset " + clean + ". It is kept on this PC for next time.";
+            state.Text = "Saved preset " + clean + ". It is kept on this " + Platform.Computer + " for next time.";
             return true;
         }
 
@@ -323,14 +323,14 @@ namespace AlbumArtTool
             customPresets.Remove(match);
             bool saved = OrganizePresets.SaveCustom(customPresets);
             RebuildPresets();
-            state.Text = saved ? "Deleted preset " + match.Name + ". Your selected options are unchanged." : "The preset was removed, but the change could not be saved on this PC.";
+            state.Text = saved ? "Deleted preset " + match.Name + ". Your selected options are unchanged." : "The preset was removed, but the change could not be saved on this " + Platform.Computer + ".";
             return saved;
         }
 
         // Mouse-over help for every control. Nothing runs until Preview changes, so each tip says what the preview will propose.
         private void AddTips()
         {
-            const string safe = "\n\nNothing changes until you click Preview changes, review the list, and Apply. Originals are backed up to the PC backup folder and Undo restores them exactly.";
+            string safe = "\n\nNothing changes until you click Preview changes, review the list, and Apply. Originals are backed up to the " + Platform.Computer + " backup folder and Undo restores them exactly.";
             convert.Tip("Re-encodes lossless files (FLAC, WAV, AIFF, ALAC, WavPack…) and any audio above 320 kbps as MP3 320 kbps CBR.\n\n" +
                 "Existing MP3s at or below 320 kbps and lower-bitrate lossy files are left alone, so nothing is encoded twice. Tags and embedded artwork are carried over; " +
                 "each new MP3's bitrate and duration are verified and the whole file is decoded before it replaces the original. Files with a video track are skipped. Needs FFmpeg." + safe);
@@ -341,11 +341,11 @@ namespace AlbumArtTool
                 "With \"Standardize embedded artwork\" also selected, the crop happens first and the result is then resized to 600 px." + safe);
             duplicates.Tip("Removes extra copies of the same song on the same album. Only confirmed matches count: identical file or audio contents with the same album and title.\n\n" +
                 "Copies on different albums, different recordings, and songs that only share a name are kept. The copy with artwork is preferred, and names like \"(1)\" or \"copy\" are removed first. " +
-                "The preview names the copy that stays. Removed copies go to the PC backup folder, not the recycle bin." + safe);
+                "The preview names the copy that stays. Removed copies go to the " + Platform.Computer + " backup folder, not the " + Platform.Trash + "." + safe);
             organize.Tip("Moves every song into Music folder \\ Artist \\ Album, using the Album Artist (or Artist) and Album tags, from any depth of subfolders.\n\n" +
                 "Year, Downloads and doubled artist folders disappear. Disc subfolders are kept for multi-disc releases and Various Artists albums stay together. " +
                 "Booklets, cover.jpg, cue sheets and lyrics move with their album. Songs without usable artist/album tags stay where they are. Empty old folders are removed." + safe);
-            archive.Tip("Moves leftover backups from older versions of this tool (.album-art-backups, .before-square-crop, .covercrop-tmp- files) out of the music folder and into the PC backup folder.\n\n" +
+            archive.Tip("Moves leftover backups from older versions of this tool (.album-art-backups, .before-square-crop, .covercrop-tmp- files) out of the music folder and into the " + Platform.Computer + " backup folder.\n\n" +
                 "Some music players index those hidden folders as extra songs, which shows up as duplicates." + safe);
             rename.Tip("Renames each song file to its Title tag: \"01 - World Eater.mp3\" becomes \"World Eater.mp3\". Works in every subfolder, on its own or with the other options.\n\n" +
                 "The extension is kept. Characters Windows can't use are replaced and very long titles are shortened. A name clash keeps both files with \" (2)\". " +
@@ -373,8 +373,8 @@ namespace AlbumArtTool
                 "an extra APE tag is merged in and removed (with its second copy of the cover). Duplicate frames left by older versions of this tool are repaired. ID3 tags in AIFF and WAV files are converted too. Files already in this form are left alone." + safe);
             encoderState.Tip("FFmpeg converts audio to MP3. It is only needed for the two Audio options; every other option works without it.");
             setupEncoder.Tip("Open Settings to download FFmpeg (about 170 MB, once, checksum-verified) or choose a copy you already have.");
-            openBackup.Tip("Opens the PC backup folder in " + Platform.FileManager + ", where each run's originals, journal.json and report.csv are kept. Change its location in Settings.");
-            savePreset.Tip("Save the options selected now as your own preset, so you can choose them again with one click. Presets are kept on this PC.");
+            openBackup.Tip("Opens the " + Platform.Computer + " backup folder in " + Platform.FileManager + ", where each run's originals, journal.json and report.csv are kept. Change its location in Settings.");
+            savePreset.Tip("Save the options selected now as your own preset, so you can choose them again with one click. Presets are kept on this " + Platform.Computer + ".");
             deletePreset.Tip("Delete your preset that matches the selected options. The options stay selected; built-in presets cannot be deleted.");
             presetName.Tip("A short name for your preset, up to " + OrganizePresets.MaxCustom + " presets of " + OrganizePresets.MaxName + " characters. Saving with an existing name replaces that preset.");
             confirmSave.Tip("Save the selected options under this name. Press Enter to save or Esc to cancel.");
@@ -560,8 +560,8 @@ namespace AlbumArtTool
                     foreach (var action in made.Actions)
                     {
                         var row = new FileRow { Tag = action, Action = action.HasWork ? action.Description : "Keep", Source = Relative(action.Source),
-                            Destination = action.Keeper != null ? "Keep: " + Relative(action.Keeper) : action.Target != null ? Relative(action.Target) : "PC backup folder",
-                            Details = action.Reason ?? "", Muted = !action.HasWork, Tooltip = action.Source + "\n" + (action.Target ?? action.Keeper ?? "PC backup folder") + "\n" + (action.Reason ?? "") };
+                            Destination = action.Keeper != null ? "Keep: " + Relative(action.Keeper) : action.Target != null ? Relative(action.Target) : Platform.Computer + " backup folder",
+                            Details = action.Reason ?? "", Muted = !action.HasWork, Tooltip = action.Source + "\n" + (action.Target ?? action.Keeper ?? Platform.Computer + " backup folder") + "\n" + (action.Reason ?? "") };
                         row.SetChecked(action.HasWork); list.Add(row);
                     }
                     foreach (string issue in made.Issues) list.Add(new FileRow { Action = "Skipped", Source = issue, Muted = true, Tooltip = issue });
@@ -649,7 +649,7 @@ namespace AlbumArtTool
             try
             {
                 undoJournal = LibraryJournal.Last(); plan = null; SetRows(new List<FileRow>());
-                if (undoJournal == null) { state.Text = "There is no saved library run to undo on this PC."; return; }
+                if (undoJournal == null) { state.Text = "There is no saved library run to undo on this " + Platform.Computer + "."; return; }
                 var next = new List<FileRow>();
                 foreach (var entry in undoJournal.Entries.Where(e => e.State == "Committed" || e.State == "Prepared" || e.State == "TargetCreated"))
                 {

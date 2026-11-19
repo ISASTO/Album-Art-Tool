@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>Muzikette</string>
+  <key>CFBundleIconFile</key>
+  <string>Muzikette</string>
+  <key>CFBundleIdentifier</key>
+  <string>io.github.isasto.Muzikette</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>Muzikette</string>
+  <key>CFBundleDisplayName</key>
+  <string>Muzikette</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>@VERSION@</string>
+  <key>CFBundleVersion</key>
+  <string>@VERSION@</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>14.0</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.music</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSPrincipalClass</key>
+  <string>NSApplication</string>
+  <key>NSSupportsAutomaticGraphicsSwitching</key>
+  <true/>
+  <key>NSHumanReadableCopyright</key>
+  <string>Copyright © 2026 Isaac Stoltz. MIT License.</string>
+  <key>NSDesktopFolderUsageDescription</key>
+  <string>Muzikette reads, tags and organizes the music you choose, including music kept on your Desktop.</string>
+  <key>NSDocumentsFolderUsageDescription</key>
+  <string>Muzikette reads, tags and organizes the music you choose, including music kept in Documents.</string>
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>Muzikette reads, tags and organizes the music you choose, including music kept in Downloads.</string>
+  <key>NSRemovableVolumesUsageDescription</key>
+  <string>Muzikette reads, tags and organizes the music you choose, including music on external drives.</string>
+  <key>NSNetworkVolumesUsageDescription</key>
+  <string>Muzikette reads, tags and organizes the music you choose, including music on network drives.</string>
+</dict>
+</plist>

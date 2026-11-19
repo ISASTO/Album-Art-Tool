@@ -163,8 +163,13 @@ internal static partial class Tests
             await Until(() => window.Health.Opacity > 0.999, "the new page fades in completely", 3000);
             Assert(window.Badge(MainWindow.Page.Albums) == "1", "the Albums page shows how many albums are missing art");
             var shortcuts = window.ShowShortcuts(); await Settle();
-            Assert(Named<Grid>(shortcuts, "Keyboard shortcuts").Children.Count == MainWindow.Shortcuts.Length * 2 && MainWindow.Shortcuts.Any(k => k.Keys == "F1"), "F1 lists every keyboard shortcut");
+            Assert(Named<Grid>(shortcuts, "Keyboard shortcuts").Children.Count == MainWindow.Shortcuts.Length * 2 && MainWindow.Shortcuts.Any(k => k.Keys == (Shortcut.Mac ? "⌘?" : "F1")), "F1 (⌘? on a Mac) lists every keyboard shortcut");
             Shot(shortcuts, "keyboard-shortcuts.png");
+            bool wasMac = Shortcut.Mac; Shortcut.Mac = true;
+            Assert(Shortcut.Text("Undo (Ctrl+Z).") == "Undo (⌘Z)." && Shortcut.Text("Smaller (Ctrl + minus, or Ctrl + mouse wheel).") == "Smaller (⌘ −, or pinching on the trackpad)." &&
+                Shortcut.Text("Scan again (F5).") == "Scan again (⌘R)." && Shortcut.Command == KeyModifiers.Meta && MainWindow.Shortcuts.Any(k => k.Keys == "⌘?") &&
+                MainWindow.Shortcuts.All(k => !k.Keys.Contains("Ctrl")), "on a Mac, shortcuts use ⌘ and are written the Mac way");
+            Shortcut.Mac = wasMac;
             Assert(ReferenceEquals(window.ShowShortcuts(), shortcuts), "the shortcuts window is reused");
             shortcuts.Close();
             window.Navigate(MainWindow.Page.Albums);
@@ -379,7 +384,8 @@ internal static partial class Tests
             Click(albumFolder); Assert(opened.FileName == list.SelectedAlbum.Folder && opened.UseShellExecute, "artist-tab album button opens the currently selected album folder");
             Named<ListBox>(window, "Current track artists").SelectedIndex = 1; Click(showTrack);
             Assert(OperatingSystem.IsWindows() ? opened.FileName == "explorer.exe" && opened.Arguments == "/select," + UpdateInstaller.QuoteArgument(window.ArtistRows[1].Track.Path)
-                : opened.FileName == Path.GetDirectoryName(window.ArtistRows[1].Track.Path) && opened.UseShellExecute, "selected-track action reveals that exact file in Explorer with a quoted path (its folder elsewhere)");
+                : OperatingSystem.IsMacOS() ? opened.FileName == "/usr/bin/open" && opened.ArgumentList.SequenceEqual(new[] { "-R", window.ArtistRows[1].Track.Path })
+                : opened.FileName == Path.GetDirectoryName(window.ArtistRows[1].Track.Path) && opened.UseShellExecute, "selected-track action reveals that exact file in Explorer or the Finder with a quoted path (its folder on Linux)");
             Shot(window, "track-artists.png");
             string firstKey = list.SelectedAlbum.Key;
             // A paused artwork job shares the same queue with artist edits.
@@ -436,7 +442,8 @@ internal static partial class Tests
             int index = dialog.Rows.ToList().FindIndex(r => r.Path != null && r.Path.EndsWith("05 - two covers.mp3"));
             dialog.Select(index); Click(show);
             Assert(OperatingSystem.IsWindows() ? opened.FileName == "explorer.exe" && opened.Arguments == "/select," + UpdateInstaller.QuoteArgument(dialog.Rows[index].Path)
-                : opened.FileName == Path.GetDirectoryName(dialog.Rows[index].Path), "the selected song is highlighted in File Explorer (its folder opens elsewhere)");
+                : OperatingSystem.IsMacOS() ? opened.FileName == "/usr/bin/open" && opened.ArgumentList.SequenceEqual(new[] { "-R", dialog.Rows[index].Path })
+                : opened.FileName == Path.GetDirectoryName(dialog.Rows[index].Path), "the selected song is highlighted in File Explorer or the Finder (its folder opens on Linux)");
             var fill = Named<Button>(dialog, "Fill titles from filenames");
             Assert(fill.IsEnabled, "songs missing titles can be filled from their filenames");
             Click(fill);
@@ -687,11 +694,11 @@ internal static partial class Tests
 
             LayoutTransformControl ZoomHost(Window w) => Controls(w).OfType<LayoutTransformControl>().First();
             double Scale(Window w) => (ZoomHost(w).LayoutTransform as ScaleTransform)?.ScaleX ?? 1;
-            void Press(Key key) => window.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = key, KeyModifiers = KeyModifiers.Control, Source = window });
+            void Press(Key key) => window.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = key, KeyModifiers = Shortcut.Command, Source = window });
             Press(Key.OemPlus); await Settle();
             Assert(Zoom.Level == 1.1 && Scale(window) == 1.1 && File.ReadAllText(Zoom.SettingsFile).Trim() == "1.1", "Ctrl + plus zooms in one step and remembers it");
             Assert(window.Display.Message == "110%", "the display shows the zoom level (" + window.Display.Message + ")");
-            window.RaiseEvent(new PointerWheelEventArgs(window, new Avalonia.Input.Pointer(1, PointerType.Mouse, true), window, new Point(400, 400), 0, PointerPointProperties.None, KeyModifiers.Control, new Vector(0, 1)) { RoutedEvent = InputElement.PointerWheelChangedEvent });
+            window.RaiseEvent(new PointerWheelEventArgs(window, new Avalonia.Input.Pointer(1, PointerType.Mouse, true), window, new Point(400, 400), 0, PointerPointProperties.None, Shortcut.Command, new Vector(0, 1)) { RoutedEvent = InputElement.PointerWheelChangedEvent });
             await Settle();
             Assert(Zoom.Level == 1.25 && Scale(window) == 1.25, "Ctrl + mouse wheel zooms in (" + Zoom.Level + ")");
             var again = window.ShowShortcuts(); await Settle();
@@ -701,6 +708,12 @@ internal static partial class Tests
             Shot(window, "zoom.png");
             Press(Key.D0); await Settle();
             Assert(Zoom.Level == 1 && ZoomHost(window).LayoutTransform == null && Math.Abs(again.Width - dialogWidth) < 0.5, "Ctrl + 0 resets the zoom");
+            Zoom.Pinch(0.08); Zoom.Pinch(0.08);
+            Assert(Zoom.Level == 1, "a small pinch does not zoom yet");
+            Zoom.Pinch(0.08); await Settle();
+            Assert(Zoom.Level == 1.1, "pinching out on a trackpad zooms in one step (" + Zoom.Level + ")");
+            Zoom.Pinch(-0.3); await Settle();
+            Assert(Zoom.Level == 1, "pinching in zooms out");
             for (int i = 0; i < 10; i++) Zoom.Step(-1);
             Assert(Zoom.Level == Zoom.Levels[0], "zoom stops at its smallest step");
             Zoom.Reset();

@@ -21,7 +21,7 @@ namespace AlbumArtTool.Management
             if (string.IsNullOrWhiteSpace(explicitPath))
                 try { explicitPath = File.ReadAllText(SettingFile).Trim(); } catch { }
             if (!string.IsNullOrWhiteSpace(explicitPath) && File.Exists(explicitPath)) return Path.GetFullPath(explicitPath);
-            var folders = new[] { AppContext.BaseDirectory, Cache }.Concat((Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator));
+            var folders = new[] { AppContext.BaseDirectory, Cache }.Concat(Platform.ProgramFolders());
             foreach (string folder in folders)
                 try
                 {

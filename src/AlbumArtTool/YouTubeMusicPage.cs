@@ -169,7 +169,7 @@ namespace AlbumArtTool
             stop.Click += (s, e) => running?.Cancel(); stop.IsEnabled = false;
             undo.Click += async (s, e) => await UndoAsync(); undo.IsEnabled = false;
             cookies.Classes.Add("chrome"); cookies.Click += async (s, e) => await ChooseCookiesAsync();
-            replaceAlbum.Tip("Downloads the checked songs of this album from YouTube Music and replaces your files with MP3 320 copies (your tags and cover are kept). Originals go to the PC backup folder.");
+            replaceAlbum.Tip("Downloads the checked songs of this album from YouTube Music and replaces your files with MP3 320 copies (your tags and cover are kept). Originals go to the " + Platform.Computer + " backup folder.");
             replaceAll.Tip("Does the same for every checked song in every album in the list.");
             stop.Tip("Stops after the song in progress. Finished replacements stay and can be undone.");
             undo.Tip("Puts back the original files replaced in this window, byte for byte. Later, Organize → Preview Undo can also undo the last run.");
@@ -223,7 +223,7 @@ namespace AlbumArtTool
             if (download == null && Downloader != null && YtDlp.FindDeno(Downloader) == null && YtDlpSetup.Supported) missing.Add("Deno (runs YouTube's player code for yt-dlp)");
             if (Ffmpeg == null) missing.Add("FFmpeg (makes the MP3 320 files)");
             toolsCard.IsVisible = missing.Count > 0;
-            toolText.Text = "To download, this needs " + string.Join(", ", missing) + ". Set up installs them once into this PC's app folder from their official GitHub releases (about " +
+            toolText.Text = "To download, this needs " + string.Join(", ", missing) + ". Set up installs them once into this " + Platform.Computer + "'s app folder from their official GitHub releases (about " +
                 (missing.Count >= 2 ? "230" : missing.Any(m => m.StartsWith("FFmpeg")) ? "170" : "60") + " MB), checking each download's SHA-256. Searching and matching work already.";
             UpdateButtons();
         }
@@ -291,7 +291,7 @@ namespace AlbumArtTool
             cookies.Content = set ? "Remove cookies" : "Cookies…";
             cookies.Tip(set ? "Downloads use " + YtDlp.Cookies + ". Click to stop using it." :
                 "Only needed if YouTube says \"confirm you're not a bot\": choose a cookies.txt exported from a browser where you are signed in to YouTube (for example with a \"Get cookies.txt\" extension). " +
-                "It is passed to yt-dlp and never leaves your PC.");
+                "It is passed to yt-dlp and never leaves your " + Platform.Computer + ".");
         }
 
         // ---- Searching and matching ----

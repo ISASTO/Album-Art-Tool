@@ -69,11 +69,12 @@ namespace AlbumArtTool
                         message.Text = "You are up to date. Version " + UpdateService.DisplayVersion + " is installed.";
                         return;
                     }
-                    // A Flatpak or a plain folder: the new version is downloaded from the release page.
+                    // A Mac, a Flatpak or a plain folder: the new version is downloaded from the release page.
                     if (release.Manual)
                     {
                         message.Text = "Version " + release.Version.ToString(3) + " is available. " + (Platform.Flatpak
                             ? "Download Muzikette.flatpak from the release page and open it to update."
+                            : Platform.Mac ? "Download Muzikette.dmg from the release page and drag the new Muzikette into Applications, replacing this one."
                             : "Download it from the release page.");
                         var open = Kit.Button("Open release page", "primary"); open.MinWidth = 170; open.HorizontalAlignment = HorizontalAlignment.Left; open.Named("Open release page");
                         open.Click += (s, e) => { try { OpenPage(release.PageUrl); } catch (Exception ex) { message.Text = "Could not open the page: " + ex.Message; } };
