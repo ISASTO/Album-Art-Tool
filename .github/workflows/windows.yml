@@ -435,12 +435,13 @@ jobs:
         run: dotnet tests/AlbumArtTool.Tests/bin/Release/net10.0/AlbumArtTool.Tests.dll --live-ytdlp
 
       - name: Publish native (AOT) app for Apple Silicon and Intel
+        if: ${{ !cancelled() }}
         run: |
           dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r osx-arm64 -o dist/osx-arm64
           dotnet publish src/AlbumArtTool/AlbumArtTool.csproj -c Release -r osx-x64 -o dist/osx-x64
           ls -l dist/osx-arm64 dist/osx-x64
       - name: Import the Developer ID certificate
-        if: env.MACOS_CERTIFICATE != ''
+        if: ${{ !cancelled() && env.MACOS_CERTIFICATE != '' }}
         run: |
           keychain="$RUNNER_TEMP/signing.keychain-db"; password="$(openssl rand -hex 16)"
           printf '%s' "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
@@ -453,13 +454,15 @@ jobs:
           rm "$RUNNER_TEMP/certificate.p12"
           echo "MACOS_SIGN_IDENTITY=Developer ID Application" >> "$GITHUB_ENV"
       - name: Build Muzikette.app and Muzikette.dmg
+        if: ${{ !cancelled() }}
         run: packaging/macos/bundle.sh dist/osx-arm64 dist/osx-x64 dist "$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props)"
       - name: Notarize the DMG
-        if: env.MACOS_CERTIFICATE != '' && env.APPLE_ID != ''
+        if: ${{ !cancelled() && env.MACOS_CERTIFICATE != '' && env.APPLE_ID != '' }}
         run: |
           xcrun notarytool submit dist/Muzikette.dmg --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
           xcrun stapler staple dist/Muzikette.dmg
       - name: Native self-test (tags in all nine formats), Apple Silicon and Intel
+        if: ${{ !cancelled() }}
         run: |
           app=dist/Muzikette.app/Contents/MacOS/Muzikette
           lipo -info "$app"
@@ -474,6 +477,7 @@ jobs:
           fi
           exit $code
       - name: Open a library in the app
+        if: ${{ !cancelled() }}
         timeout-minutes: 5
         run: |
           PATH="$RUNNER_TEMP/bin:$PATH" packaging/linux/smoke-library.sh "$RUNNER_TEMP/library"
@@ -482,6 +486,7 @@ jobs:
           if [ -f "$RUNNER_TEMP/macos.png" ]; then echo "==PNG macos-app.png"; base64 -i "$RUNNER_TEMP/macos.png" | tr -d '\n'; echo; fi
           exit $code
       - name: Start it as a user would (Launch Services) and photograph the screen
+        if: ${{ !cancelled() }}
         continue-on-error: true
         timeout-minutes: 3
         run: |
@@ -493,6 +498,7 @@ jobs:
           if [ -f "$RUNNER_TEMP/screen.png" ]; then sips -Z 1600 "$RUNNER_TEMP/screen.png" >/dev/null; echo "==PNG macos-screen.png"; base64 -i "$RUNNER_TEMP/screen.png" | tr -d '\n'; echo; fi
           tail -5 ~/Library/Application\ Support/Muzikette/errors.log 2>/dev/null || true
       - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
         with:
           name: Muzikette-macOS
           path: dist/Muzikette.dmg
