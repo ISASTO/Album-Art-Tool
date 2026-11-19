@@ -52,7 +52,7 @@ namespace AlbumArtTool
         private Control BuildWelcome()
         {
             // The front panel's model name, then one sentence on what the app does and one clear first step.
-            var name = new TextBlock { Text = "MUZIKETTE", FontFamily = Skin.Legend, FontSize = 30, LetterSpacing = 2, Margin = new Thickness(0, 0, 0, 22) };
+            var name = Wordmark.Create(34); name.Margin = new Thickness(0, 0, 0, 24);
             // A lit power light and its printed legend, as on the front of a deck.
             var leds = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(1, 0, 0, 14) };
             leds.Children.Add(Kit.Led("on").Also(l => l.VerticalAlignment = VerticalAlignment.Center)); leds.Children.Add(Kit.Legend("Power", 8.5).Also(l => l.VerticalAlignment = VerticalAlignment.Center));

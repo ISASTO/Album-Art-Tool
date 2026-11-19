@@ -1,10 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <defs><linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ECEBE7"/><stop offset="1" stop-color="#BDBCB6"/></linearGradient></defs>
-  <rect x="1.5" y="2.5" width="29" height="27" rx="5" fill="url(#face)" stroke="#7E7D78" stroke-width="1"/>
-  <circle cx="25.5" cy="6.5" r="1.6" fill="#FF5B14"/>
-  <rect x="4.5" y="9" width="23" height="12" rx="2" fill="#0B0A08"/>
-  <circle cx="11" cy="15" r="3.4" fill="none" stroke="#FFB347" stroke-width="1.6"/>
-  <circle cx="21" cy="15" r="3.4" fill="none" stroke="#FFB347" stroke-width="1.6"/>
-  <rect x="5" y="23" width="10" height="3.5" rx="1" fill="#DAD9D3" stroke="#A3A29C" stroke-width=".6"/>
-  <rect x="17" y="23" width="10" height="3.5" rx="1" fill="#FF5B14"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="100 100 824 824"><!-- Muzikette at 16-32 px. --><defs><linearGradient id="silver" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#F2F1ED"/><stop offset="1" stop-color="#C4C3BD"/></linearGradient><pattern id="brush" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="1.5" fill="#FFFFFF" fill-opacity=".28"/><rect y="3" width="6" height="1.5" fill="#000000" fill-opacity=".03"/></pattern><linearGradient id="slot" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#050505"/><stop offset="1" stop-color="#1E1D1B"/></linearGradient><radialGradient id="led" cx=".4" cy=".35" r=".7"><stop stop-color="#FFB08A"/><stop offset=".45" stop-color="#FF5B14"/><stop offset="1" stop-color="#E84E0C"/></radialGradient><filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="16" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><rect x="100" y="100" width="824" height="824" rx="150" fill="url(#silver)"/><rect x="104" y="104" width="816" height="816" rx="146" fill="none" stroke="#8F8E89" stroke-width="8"/><rect x="186" y="434" width="418" height="156" rx="78" fill="url(#slot)"/><circle cx="756" cy="512" r="92" fill="url(#led)"/></svg>

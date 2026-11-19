@@ -66,6 +66,11 @@
     <display_length compare="ge">768</display_length>
   </requires>
   <releases>
+    <release version="4.4.0" date="2026-11-19">
+      <description>
+        <p>A new, simpler logo: a silver panel with a tape window and its orange power light.</p>
+      </description>
+    </release>
     <release version="4.3.0" date="2026-11-19">
       <description>
         <p>Muzikette is available for macOS too, and Ctrl+R rescans the library.</p>
